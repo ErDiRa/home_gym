@@ -1,8 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import AccessoryCard from './components/AccessoryCard.vue'
+import type { Accessory } from './types'
 
-const accessories = ref([
+const accessories = ref<Accessory[]>([
   { id: 1, name: 'Leather Wallet', category: 'Wallets', price: 59 },
   { id: 2, name: 'Silver Watch', category: 'Watches', price: 249 },
   { id: 3, name: 'Wool Scarf', category: 'Scarves', price: 39 },
@@ -12,7 +13,7 @@ const accessories = ref([
 ])
 
 const query = ref('')
-const favorites = ref(new Set())
+const favorites = ref(new Set<number>())
 
 const filtered = computed(() =>
   accessories.value.filter((a) =>
@@ -20,7 +21,7 @@ const filtered = computed(() =>
   ),
 )
 
-function toggleFavorite(id) {
+function toggleFavorite(id: number) {
   const next = new Set(favorites.value)
   next.has(id) ? next.delete(id) : next.add(id)
   favorites.value = next

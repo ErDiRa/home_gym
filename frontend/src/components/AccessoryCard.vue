@@ -1,9 +1,11 @@
-<script setup>
-defineProps({
-  item: { type: Object, required: true },
-  favorite: { type: Boolean, default: false },
-})
-defineEmits(['toggle'])
+<script setup lang="ts">
+import type { Accessory } from '../types'
+
+defineProps<{
+  item: Accessory
+  favorite?: boolean
+}>()
+defineEmits<{ toggle: [] }>()
 </script>
 
 <template>
