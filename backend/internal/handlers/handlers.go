@@ -22,8 +22,8 @@ func New(queries *database.Queries, tokens *auth.TokenManager, secureCookies boo
 // Routes registers the API routes on r:
 //
 //	/api/auth/*    login, logout and session restore
-//	/api/client/*  endpoints for any authenticated user
-//	/api/admin/*   endpoints for admins only
+//	/api/client/*  endpoints for authenticated users
+//	/api/admin/*   endpoints for admins only (separate accounts, not linked to users)
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/login", h.Login)
@@ -32,7 +32,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.Middleware(h.tokens))
 			r.Get("/auth/me", h.Me)
-			r.Route("/client", h.clientRoutes)
+			r.With(auth.RequireUser).Route("/client", h.clientRoutes)
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(auth.RequireAdmin(h.queries.IsAdmin))
 				h.adminRoutes(r)

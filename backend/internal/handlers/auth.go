@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/stefankarlin/my-accessories/backend/internal/auth"
+	"github.com/stefankarlin/my-accessories/backend/internal/database"
 )
 
 type loginRequest struct {
@@ -35,36 +36,56 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
-	user, err := h.queries.GetUserByEmail(r.Context(), email)
-	if errors.Is(err, pgx.ErrNoRows) {
-		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
-		writeError(w, http.StatusUnauthorized, "invalid email or password")
+	account, role, ok := h.authenticate(w, r, email, req.Password)
+	if !ok {
 		return
 	}
-	if err != nil {
-		serverError(w, r, err)
-		return
-	}
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
-		writeError(w, http.StatusUnauthorized, "invalid email or password")
-		return
-	}
+	h.setSession(w, r, role, account, time.Now(), req.Remember)
+}
 
-	isAdmin, err := h.queries.IsAdmin(r.Context(), user.ID)
-	if err != nil {
+// authenticate checks the credentials against the users table, then the admins table,
+// and writes the error response itself on failure.
+func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request, email, password string) (userResponse, string, bool) {
+	var (
+		account userResponse
+		role    string
+		hash    string
+	)
+	user, err := h.queries.GetUserByEmail(r.Context(), email)
+	switch {
+	case err == nil:
+		account, role, hash = userResponse{ID: user.ID, Email: user.Email}, auth.RoleUser, user.PasswordHash
+	case errors.Is(err, pgx.ErrNoRows):
+		admin, err := h.queries.GetAdminByEmail(r.Context(), email)
+		switch {
+		case err == nil:
+			account, role, hash = userResponse{ID: admin.ID, Email: admin.Email, IsAdmin: true}, auth.RoleAdmin, admin.PasswordHash
+		case errors.Is(err, pgx.ErrNoRows):
+			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+			writeError(w, http.StatusUnauthorized, "invalid email or password")
+			return userResponse{}, "", false
+		default:
+			serverError(w, r, err)
+			return userResponse{}, "", false
+		}
+	default:
 		serverError(w, r, err)
-		return
+		return userResponse{}, "", false
 	}
-	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email, IsAdmin: isAdmin}, time.Now(), req.Remember)
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		writeError(w, http.StatusUnauthorized, "invalid email or password")
+		return userResponse{}, "", false
+	}
+	return account, role, true
 }
 
 // setSession issues a fresh token and cookie for user and writes the user as the response.
 // The token lasts auth.SessionTTL but never beyond auth.MaxSessionAge after authTime. With
 // "remember me" the cookie expires with the token; otherwise it is dropped when the browser closes.
-func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, user userResponse, authTime time.Time, remember bool) {
+func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, role string, user userResponse, authTime time.Time, remember bool) {
 	now := time.Now()
 	expiry := auth.SessionExpiry(now, authTime)
-	token, err := h.tokens.Issue(user.ID, authTime, remember, expiry)
+	token, err := h.tokens.Issue(role, user.ID, authTime, remember, expiry)
 	if err != nil {
 		serverError(w, r, err)
 		return
@@ -86,20 +107,35 @@ func (h *Handler) Logout(w http.ResponseWriter, _ *http.Request) {
 // after login). The frontend uses it to restore the session since it cannot read the
 // HttpOnly cookie.
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(w, r)
+	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
-	claims, _ := auth.ClaimsFromContext(r.Context())
-	user, err := h.queries.GetUserByID(r.Context(), userID)
+	id, err := claims.UserID()
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	var account userResponse
+	if claims.Role == auth.RoleAdmin {
+		var admin database.GetAdminByIDRow
+		admin, err = h.queries.GetAdminByID(r.Context(), id)
+		account = userResponse{ID: admin.ID, Email: admin.Email, IsAdmin: true}
+	} else {
+		var user database.GetUserByIDRow
+		user, err = h.queries.GetUserByID(r.Context(), id)
+		account = userResponse{ID: user.ID, Email: user.Email}
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		auth.ClearCookie(w, h.secureCookies)
-		writeError(w, http.StatusUnauthorized, "user no longer exists")
+		writeError(w, http.StatusUnauthorized, "account no longer exists")
 		return
 	}
 	if err != nil {
 		serverError(w, r, err)
 		return
 	}
-	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email, IsAdmin: user.IsAdmin}, time.Unix(claims.AuthTime, 0), claims.Remember)
+	h.setSession(w, r, claims.Role, account, time.Unix(claims.AuthTime, 0), claims.Remember)
 }

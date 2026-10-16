@@ -7,20 +7,29 @@ import (
 	"github.com/google/uuid"
 )
 
-// AdminLookup reports whether a user is an admin. It is checked against the database on
-// every request, so revoking admin rights takes effect immediately.
-type AdminLookup func(ctx context.Context, userID uuid.UUID) (bool, error)
+// AdminLookup reports whether an admin account exists. It is checked against the database
+// on every request, so removing an admin takes effect immediately.
+type AdminLookup func(ctx context.Context, adminID uuid.UUID) (bool, error)
 
-// RequireAdmin allows only admins through. It must run after Middleware.
+// RequireAdmin allows only admin sessions through. It must run after Middleware.
 func RequireAdmin(isAdmin AdminLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, ok := UserIDFromContext(r.Context())
+			claims, ok := ClaimsFromContext(r.Context())
 			if !ok {
 				unauthorized(w, "not authenticated")
 				return
 			}
-			admin, err := isAdmin(r.Context(), userID)
+			if claims.Role != RoleAdmin {
+				writeJSONError(w, http.StatusForbidden, "admin access required")
+				return
+			}
+			adminID, err := claims.UserID()
+			if err != nil {
+				unauthorized(w, "invalid token")
+				return
+			}
+			admin, err := isAdmin(r.Context(), adminID)
 			switch {
 			case err != nil:
 				writeJSONError(w, http.StatusInternalServerError, "internal server error")
@@ -31,4 +40,21 @@ func RequireAdmin(isAdmin AdminLookup) func(http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+// RequireUser allows only user sessions through (admins have no user data to act on).
+// It must run after Middleware.
+func RequireUser(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := ClaimsFromContext(r.Context())
+		if !ok {
+			unauthorized(w, "not authenticated")
+			return
+		}
+		if claims.Role != RoleUser {
+			writeJSONError(w, http.StatusForbidden, "user access required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

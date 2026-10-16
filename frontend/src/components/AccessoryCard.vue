@@ -1,13 +1,3 @@
-<script setup lang="ts">
-import type { Accessory } from '../types'
-
-defineProps<{
-  item: Accessory
-  favorite?: boolean
-}>()
-defineEmits<{ toggle: [] }>()
-</script>
-
 <template>
   <div class="rounded-xl bg-white p-5 shadow transition hover:shadow-md">
     <div class="mb-4 flex h-28 items-center justify-center rounded-lg bg-indigo-50 text-4xl">
@@ -27,3 +17,13 @@ defineEmits<{ toggle: [] }>()
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import type { Accessory } from '../types'
+
+defineProps<{
+  item: Accessory
+  favorite?: boolean
+}>()
+defineEmits<{ toggle: [] }>()
+</script>

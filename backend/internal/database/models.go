@@ -10,9 +10,12 @@ import (
 )
 
 type Admin struct {
-	UserID    uuid.UUID          `json:"user_id"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	ID           uuid.UUID          `json:"id"`
+	Email        string             `json:"email"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Exercise struct {
@@ -41,6 +44,7 @@ type User struct {
 	Email        string             `json:"email"`
 	PasswordHash string             `json:"password_hash"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 

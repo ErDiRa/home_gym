@@ -9,18 +9,23 @@ CREATE TABLE users (
     email         TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at    TIMESTAMPTZ
 );
 
 CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE deleted_at IS NULL;
 
--- A user is an admin if and only if a live row exists here.
--- Revoking sets deleted_at; granting again clears it.
+-- Admins are separate accounts with their own credentials; they are not linked to users.
 CREATE TABLE admins (
-    user_id    UUID PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at TIMESTAMPTZ
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at    TIMESTAMPTZ
 );
+
+CREATE UNIQUE INDEX idx_admins_email ON admins (email) WHERE deleted_at IS NULL;
 
 CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),

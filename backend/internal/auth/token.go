@@ -15,11 +15,19 @@ const (
 	MaxSessionAge = 7 * 24 * time.Hour
 )
 
-// Claims are the JWT claims: the subject is the user ID.
+// Roles carried in the token. Users and admins are separate accounts, so the subject
+// is a user ID for RoleUser and an admin ID for RoleAdmin.
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+)
+
+// Claims are the JWT claims: the subject is the account ID, Role says which table it is in.
 type Claims struct {
 	jwt.RegisteredClaims
-	AuthTime int64 `json:"auth_time"` // unix time of the original login
-	Remember bool  `json:"remember"`
+	Role     string `json:"role"`
+	AuthTime int64  `json:"auth_time"` // unix time of the original login
+	Remember bool   `json:"remember"`
 }
 
 func (c *Claims) UserID() (uuid.UUID, error) { return uuid.Parse(c.Subject) }
@@ -46,13 +54,14 @@ func NewTokenManager(secret string) (*TokenManager, error) {
 	return &TokenManager{secret: []byte(secret)}, nil
 }
 
-func (m *TokenManager) Issue(userID uuid.UUID, authTime time.Time, remember bool, expiry time.Time) (string, error) {
+func (m *TokenManager) Issue(role string, id uuid.UUID, authTime time.Time, remember bool, expiry time.Time) (string, error) {
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID.String(),
+			Subject:   id.String(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(expiry),
 		},
+		Role:     role,
 		AuthTime: authTime.Unix(),
 		Remember: remember,
 	}
@@ -67,7 +76,7 @@ func (m *TokenManager) Parse(token string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := claims.UserID(); err != nil || claims.AuthTime == 0 {
+	if _, err := claims.UserID(); err != nil || claims.AuthTime == 0 || (claims.Role != RoleUser && claims.Role != RoleAdmin) {
 		return nil, errors.New("invalid claims")
 	}
 	return claims, nil

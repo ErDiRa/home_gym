@@ -1,35 +1,3 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-import { logout } from '../api'
-import { state } from '../session'
-import AccessoryCard from '../components/AccessoryCard.vue'
-import type { Accessory } from '../types'
-
-const accessories = ref<Accessory[]>([
-  { id: 1, name: 'Leather Wallet', category: 'Wallets', price: 59 },
-  { id: 2, name: 'Silver Watch', category: 'Watches', price: 249 },
-  { id: 3, name: 'Wool Scarf', category: 'Scarves', price: 39 },
-  { id: 4, name: 'Aviator Sunglasses', category: 'Eyewear', price: 129 },
-  { id: 5, name: 'Canvas Belt', category: 'Belts', price: 29 },
-  { id: 6, name: 'Leather Gloves', category: 'Gloves', price: 49 },
-])
-
-const query = ref('')
-const favorites = ref(new Set<number>())
-
-const filtered = computed(() =>
-  accessories.value.filter((a) =>
-    `${a.name} ${a.category}`.toLowerCase().includes(query.value.toLowerCase()),
-  ),
-)
-
-function toggleFavorite(id: number) {
-  const next = new Set(favorites.value)
-  next.has(id) ? next.delete(id) : next.add(id)
-  favorites.value = next
-}
-</script>
-
 <template>
   <div class="min-h-screen bg-slate-50 text-slate-800">
     <header class="bg-white shadow-sm">
@@ -69,3 +37,35 @@ function toggleFavorite(id: number) {
     </main>
   </div>
 </template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { logout } from '../api'
+import { state } from '../session'
+import AccessoryCard from '../components/AccessoryCard.vue'
+import type { Accessory } from '../types'
+
+const accessories = ref<Accessory[]>([
+  { id: 1, name: 'Leather Wallet', category: 'Wallets', price: 59 },
+  { id: 2, name: 'Silver Watch', category: 'Watches', price: 249 },
+  { id: 3, name: 'Wool Scarf', category: 'Scarves', price: 39 },
+  { id: 4, name: 'Aviator Sunglasses', category: 'Eyewear', price: 129 },
+  { id: 5, name: 'Canvas Belt', category: 'Belts', price: 29 },
+  { id: 6, name: 'Leather Gloves', category: 'Gloves', price: 49 },
+])
+
+const query = ref('')
+const favorites = ref(new Set<number>())
+
+const filtered = computed(() =>
+  accessories.value.filter((a) =>
+    `${a.name} ${a.category}`.toLowerCase().includes(query.value.toLowerCase()),
+  ),
+)
+
+function toggleFavorite(id: number) {
+  const next = new Set(favorites.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  favorites.value = next
+}
+</script>

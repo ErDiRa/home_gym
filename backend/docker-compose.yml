@@ -2,16 +2,19 @@ services:
   db:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-workout}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-workout}
-      POSTGRES_DB: ${POSTGRES_DB:-workout}
+      POSTGRES_USER: ${POSTGRES_USER:-erdira}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nopassword}
+      POSTGRES_DB: ${POSTGRES_DB:-my_accessories}
     ports:
       - "5432:5432"
     volumes:
       # PostgreSQL 18+ images keep data under /var/lib/postgresql
       - pgdata:/var/lib/postgresql
       # Migrations run once, on first initialisation of an empty volume
-      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+      - ./db/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/000001_init_schema.up.sql:ro
+      # Dev seed (admin@example.com / test); runs after the schema (files are mounted
+      # individually because a file can't be mounted into a read-only directory mount)
+      - ./db/seed/seed-admin.sql:/docker-entrypoint-initdb.d/999_seed-admin.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -24,7 +27,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     environment:
-      DB_SOURCE: postgres://${POSTGRES_USER:-workout}:${POSTGRES_PASSWORD:-workout}@db:5432/${POSTGRES_DB:-workout}?sslmode=disable
+      DB_SOURCE: postgres://${POSTGRES_USER:-erdira}:${POSTGRES_PASSWORD:-nopassword}@db:5432/${POSTGRES_DB:-my_accessories}?sslmode=disable
       PORT: "8080"
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me}

@@ -11,7 +11,7 @@ tasks:
     desc: Run the backend dev environment (Postgres + API with hot reload)
     dir: backend
     cmds:
-      - docker compose up --build
+      - docker compose up --build -d
 
   backend:down:
     desc: Stop the backend containers
@@ -24,6 +24,15 @@ tasks:
     dir: backend
     cmds:
       - docker compose down -v
+
+  backend:fresh:
+    desc: Wipe the database, recreate it from the schema, apply the seeds and start the backend
+    dir: backend
+    cmds:
+      - docker compose down -v
+      # Schema and db/seed/*.sql run on first init of the empty volume; --wait blocks until healthy
+      - docker compose up --build -d --wait db
+      - docker compose up --build -d backend
 
   frontend:dev:
     desc: Run Vite in dev mode

@@ -20,9 +20,9 @@ func TestMiddleware(t *testing.T) {
 	other, _ := NewTokenManager("another-secret-another")
 
 	userID := uuid.New()
-	valid, _ := tm.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
-	expiredTok, _ := expired.Issue(userID, time.Now(), false, time.Now().Add(-time.Hour))
-	foreign, _ := other.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
+	valid, _ := tm.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(time.Hour))
+	expiredTok, _ := expired.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(-time.Hour))
+	foreign, _ := other.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(time.Hour))
 
 	tests := []struct {
 		name   string
@@ -73,26 +73,27 @@ func TestSessionExpiry(t *testing.T) {
 
 func TestRequireAdmin(t *testing.T) {
 	tm, _ := NewTokenManager("test-secret-test-secret")
-	userID := uuid.New()
-	token, _ := tm.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
+	adminToken, _ := tm.Issue(RoleAdmin, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
+	userToken, _ := tm.Issue(RoleUser, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
 
 	tests := []struct {
 		name   string
-		cookie bool
+		token  string
 		lookup AdminLookup
 		want   int
 	}{
-		{"admin", true, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
-		{"not an admin", true, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusForbidden},
-		{"lookup failure", true, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
-		{"no cookie", false, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
+		{"admin", adminToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
+		{"admin removed", adminToken, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusForbidden},
+		{"lookup failure", adminToken, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
+		{"user token", userToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusForbidden},
+		{"no cookie", "", func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := Middleware(tm)(RequireAdmin(tt.lookup)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			if tt.cookie {
-				req.AddCookie(&http.Cookie{Name: CookieName, Value: token})
+			if tt.token != "" {
+				req.AddCookie(&http.Cookie{Name: CookieName, Value: tt.token})
 			}
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
