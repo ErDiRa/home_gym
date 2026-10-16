@@ -23,6 +23,7 @@ type Exercise struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	VideoUrl    string             `json:"video_url"`
+	Type        string             `json:"type"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`

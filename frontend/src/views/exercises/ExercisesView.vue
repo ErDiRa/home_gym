@@ -38,10 +38,11 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { listExercises } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
 import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { state } from '../../session'
-import type { Exercise, Focus } from '../../types'
+import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -59,6 +60,16 @@ const listColumn: ColDef<Exercise> = {
 
 const columnDefs: ColDef<Exercise>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
+  {
+    field: 'type',
+    headerName: 'Type',
+    flex: 1,
+    minWidth: 110,
+    cellRenderer: ExerciseTypeCell,
+    // Filter and search by the label, not the stored key.
+    valueFormatter: (p) => exerciseTypeLabels[p.value as ExerciseType] ?? '',
+    getQuickFilterText: (p) => exerciseTypeLabels[p.value as ExerciseType] ?? '',
+  },
   { field: 'joints', headerName: 'Joints', flex: 1, minWidth: 130, ...listColumn },
   { field: 'muscle_groups', headerName: 'Muscle groups', flex: 1, minWidth: 160, ...listColumn },
   {

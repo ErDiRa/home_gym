@@ -1,6 +1,15 @@
+// Whether an exercise mainly improves mobility or strength.
+export type ExerciseType = 'mobility' | 'strength'
+
+export const exerciseTypeLabels: Record<ExerciseType, string> = {
+  mobility: 'Mobility',
+  strength: 'Strength',
+}
+
 export interface Exercise {
   id: string
   name: string
+  type: ExerciseType
   joints: string[]
   muscle_groups: string[]
   focuses: Focus[]
@@ -24,6 +33,7 @@ export interface Option {
 // What the exercise form sends when creating or updating an exercise.
 export interface ExerciseInput {
   name: string
+  type: ExerciseType
   description: string
   video_url: string
   joint_ids: string[]

@@ -66,6 +66,7 @@ CREATE TABLE exercises (
     name         TEXT NOT NULL,
     description  TEXT NOT NULL DEFAULT '',
     video_url    TEXT NOT NULL DEFAULT '', -- link to a video showing how to perform the exercise
+    type         TEXT NOT NULL CHECK (type IN ('mobility', 'strength')), -- mainly improves mobility or strength
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at   TIMESTAMPTZ

@@ -1,7 +1,7 @@
 -- name: CreateExercise :one
 WITH new_exercise AS (
-    INSERT INTO exercises (name, description, video_url)
-    VALUES ($1, $2, $3)
+    INSERT INTO exercises (name, description, video_url, type)
+    VALUES ($1, $2, $3, $4)
     RETURNING *
 ), linked_joints AS (
     INSERT INTO exercise_joints (exercise_id, joint_id)
@@ -13,7 +13,7 @@ WITH new_exercise AS (
     INSERT INTO exercise_focuses (exercise_id, focus_id)
     SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM new_exercise
 )
-SELECT id, name, description, video_url, created_at, updated_at FROM new_exercise;
+SELECT id, name, description, video_url, type, created_at, updated_at FROM new_exercise;
 
 -- name: ListExercises :many
 SELECT
@@ -21,6 +21,7 @@ SELECT
     e.name,
     e.description,
     e.video_url,
+    e.type,
     e.created_at,
     e.updated_at,
     ARRAY(
@@ -49,6 +50,7 @@ SELECT
     e.name,
     e.description,
     e.video_url,
+    e.type,
     ARRAY(SELECT joint_id FROM exercise_joints WHERE exercise_id = e.id)::uuid[] AS joint_ids,
     ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids,
     ARRAY(SELECT focus_id FROM exercise_focuses WHERE exercise_id = e.id)::uuid[] AS focus_ids
@@ -60,7 +62,7 @@ WHERE e.id = $1 AND e.deleted_at IS NULL;
 -- the two never touch the same row, so they are safe in one statement.
 WITH updated AS (
     UPDATE exercises
-    SET name = $2, description = $3, video_url = $4, updated_at = now()
+    SET name = $2, description = $3, video_url = $4, type = $5, updated_at = now()
     WHERE id = $1 AND deleted_at IS NULL
     RETURNING *
 ), removed_joints AS (
@@ -85,7 +87,7 @@ WITH updated AS (
     SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
 )
-SELECT id, name, description, video_url, created_at, updated_at FROM updated;
+SELECT id, name, description, video_url, type, created_at, updated_at FROM updated;
 
 -- name: ListJoints :many
 SELECT id, name FROM joints

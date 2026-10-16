@@ -36,6 +36,7 @@ type createExerciseRequest struct {
 	FocusIDs       []uuid.UUID `json:"focus_ids"`
 	Description    string      `json:"description"`
 	VideoURL       string      `json:"video_url"`
+	Type           string      `json:"type"`
 }
 
 // parseExerciseRequest decodes and validates an exercise body, writing the error response
@@ -48,6 +49,10 @@ func parseExerciseRequest(w http.ResponseWriter, r *http.Request) (createExercis
 	req.JointIDs, req.MuscleGroupIDs, req.FocusIDs = unique(req.JointIDs), unique(req.MuscleGroupIDs), unique(req.FocusIDs)
 	if req.Name == "" || len(req.JointIDs) == 0 || len(req.MuscleGroupIDs) == 0 {
 		writeError(w, http.StatusBadRequest, "name, joint_ids and muscle_group_ids are required")
+		return req, false
+	}
+	if req.Type != "mobility" && req.Type != "strength" {
+		writeError(w, http.StatusBadRequest, "type must be mobility or strength")
 		return req, false
 	}
 	if req.VideoURL != "" {
@@ -81,6 +86,7 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 		Name:           req.Name,
 		Description:    req.Description,
 		VideoUrl:       req.VideoURL,
+		Type:           req.Type,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
 		FocusIds:       req.FocusIDs,
@@ -107,6 +113,7 @@ func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
 		Name:           req.Name,
 		Description:    req.Description,
 		VideoUrl:       req.VideoURL,
+		Type:           req.Type,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
 		FocusIds:       req.FocusIDs,

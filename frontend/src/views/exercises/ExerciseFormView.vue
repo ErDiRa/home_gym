@@ -42,6 +42,34 @@
 				/>
 			</label>
 
+			<fieldset>
+				<legend class="text-sm font-medium text-slate-800">
+					Type<span v-if="!readonly" class="text-red-600" aria-hidden="true"> *</span>
+				</legend>
+				<div class="mt-1 inline-flex rounded-md border border-slate-300 bg-white p-0.5">
+					<label
+						v-for="(label, type) in exerciseTypeLabels"
+						:key="type"
+						:class="[
+							'rounded px-4 py-1.5 text-sm font-medium has-focus-visible:ring-2 has-focus-visible:ring-indigo-200',
+							form.type === type ? 'bg-indigo-600 text-white' : 'text-slate-700',
+							readonly ? 'cursor-default' : form.type === type ? 'cursor-pointer' : 'cursor-pointer hover:bg-slate-100'
+						]"
+					>
+						<input
+							v-model="form.type"
+							type="radio"
+							name="type"
+							:value="type"
+							:disabled="readonly"
+							required
+							class="sr-only"
+						/>
+						{{ label }}
+					</label>
+				</div>
+			</fieldset>
+
 			<VideoPreview :url="form.video_url" />
 
 			<div>
@@ -155,7 +183,12 @@
 	import MultiSelect from '../../components/form/MultiSelect.vue';
 	import VideoPreview from '../../components/video/VideoPreview.vue';
 	import { state } from '../../session';
-	import type { Focus, Option } from '../../types';
+	import {
+		exerciseTypeLabels,
+		type ExerciseType,
+		type Focus,
+		type Option
+	} from '../../types';
 
 	const router = useRouter();
 	// Set when editing an existing exercise (route /exercises/:id), absent when creating one.
@@ -189,6 +222,8 @@
 
 	const form = reactive({
 		name: '',
+		// Empty until picked, so a new exercise needs an explicit choice.
+		type: '' as ExerciseType | '',
 		description: '',
 		video_url: '',
 		joint_ids: [] as string[],
@@ -212,7 +247,10 @@
 	});
 	const addingFocus = ref(false);
 	const valid = computed(
-		() => form.joint_ids.length > 0 && form.muscle_group_ids.length > 0
+		() =>
+			form.type !== '' &&
+			form.joint_ids.length > 0 &&
+			form.muscle_group_ids.length > 0
 	);
 
 	onMounted(async () => {
@@ -275,11 +313,13 @@
 	}
 
 	async function submit() {
+		if (form.type === '') return;
+		const input = { ...form, type: form.type };
 		saving.value = true;
 		try {
 			await (exerciseId
-				? updateExercise(exerciseId, form)
-				: createExercise(form));
+				? updateExercise(exerciseId, input)
+				: createExercise(input));
 			toast.success(exerciseId ? 'Exercise saved.' : 'Exercise created.');
 			await router.push({ name: 'exercises' });
 		} catch (e) {

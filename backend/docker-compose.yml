@@ -17,6 +17,7 @@ services:
       - ./db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
       - ./db/seed/seed-admin.sql:/docker-entrypoint-initdb.d/999_seed-admin.sql:ro
       - ./db/seed/seed-exercises.sql:/docker-entrypoint-initdb.d/999_seed-exercises.sql:ro
+      - ./db/seed/seed-exercise-archive.sql:/docker-entrypoint-initdb.d/999_seed-exercises_archive.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

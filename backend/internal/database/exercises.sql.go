@@ -14,26 +14,27 @@ import (
 
 const createExercise = `-- name: CreateExercise :one
 WITH new_exercise AS (
-    INSERT INTO exercises (name, description, video_url)
-    VALUES ($1, $2, $3)
-    RETURNING id, name, description, video_url, created_at, updated_at, deleted_at
+    INSERT INTO exercises (name, description, video_url, type)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, name, description, video_url, type, created_at, updated_at, deleted_at
 ), linked_joints AS (
     INSERT INTO exercise_joints (exercise_id, joint_id)
-    SELECT id, unnest($4::uuid[]) FROM new_exercise
+    SELECT id, unnest($5::uuid[]) FROM new_exercise
 ), linked_muscle_groups AS (
     INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
-    SELECT id, unnest($5::uuid[]) FROM new_exercise
+    SELECT id, unnest($6::uuid[]) FROM new_exercise
 ), linked_focuses AS (
     INSERT INTO exercise_focuses (exercise_id, focus_id)
-    SELECT id, unnest($6::uuid[]) FROM new_exercise
+    SELECT id, unnest($7::uuid[]) FROM new_exercise
 )
-SELECT id, name, description, video_url, created_at, updated_at FROM new_exercise
+SELECT id, name, description, video_url, type, created_at, updated_at FROM new_exercise
 `
 
 type CreateExerciseParams struct {
 	Name           string      `json:"name"`
 	Description    string      `json:"description"`
 	VideoUrl       string      `json:"video_url"`
+	Type           string      `json:"type"`
 	JointIds       []uuid.UUID `json:"joint_ids"`
 	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
 	FocusIds       []uuid.UUID `json:"focus_ids"`
@@ -44,6 +45,7 @@ type CreateExerciseRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	VideoUrl    string             `json:"video_url"`
+	Type        string             `json:"type"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -53,6 +55,7 @@ func (q *Queries) CreateExercise(ctx context.Context, arg CreateExerciseParams) 
 		arg.Name,
 		arg.Description,
 		arg.VideoUrl,
+		arg.Type,
 		arg.JointIds,
 		arg.MuscleGroupIds,
 		arg.FocusIds,
@@ -63,6 +66,7 @@ func (q *Queries) CreateExercise(ctx context.Context, arg CreateExerciseParams) 
 		&i.Name,
 		&i.Description,
 		&i.VideoUrl,
+		&i.Type,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -98,6 +102,7 @@ SELECT
     e.name,
     e.description,
     e.video_url,
+    e.type,
     ARRAY(SELECT joint_id FROM exercise_joints WHERE exercise_id = e.id)::uuid[] AS joint_ids,
     ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids,
     ARRAY(SELECT focus_id FROM exercise_focuses WHERE exercise_id = e.id)::uuid[] AS focus_ids
@@ -110,6 +115,7 @@ type GetExerciseRow struct {
 	Name           string      `json:"name"`
 	Description    string      `json:"description"`
 	VideoUrl       string      `json:"video_url"`
+	Type           string      `json:"type"`
 	JointIds       []uuid.UUID `json:"joint_ids"`
 	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
 	FocusIds       []uuid.UUID `json:"focus_ids"`
@@ -123,6 +129,7 @@ func (q *Queries) GetExercise(ctx context.Context, id uuid.UUID) (GetExerciseRow
 		&i.Name,
 		&i.Description,
 		&i.VideoUrl,
+		&i.Type,
 		&i.JointIds,
 		&i.MuscleGroupIds,
 		&i.FocusIds,
@@ -136,6 +143,7 @@ SELECT
     e.name,
     e.description,
     e.video_url,
+    e.type,
     e.created_at,
     e.updated_at,
     ARRAY(
@@ -164,6 +172,7 @@ type ListExercisesRow struct {
 	Name         string             `json:"name"`
 	Description  string             `json:"description"`
 	VideoUrl     string             `json:"video_url"`
+	Type         string             `json:"type"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	Joints       []string           `json:"joints"`
@@ -185,6 +194,7 @@ func (q *Queries) ListExercises(ctx context.Context) ([]ListExercisesRow, error)
 			&i.Name,
 			&i.Description,
 			&i.VideoUrl,
+			&i.Type,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Joints,
@@ -298,32 +308,32 @@ func (q *Queries) ListMuscleGroups(ctx context.Context) ([]ListMuscleGroupsRow, 
 const updateExercise = `-- name: UpdateExercise :one
 WITH updated AS (
     UPDATE exercises
-    SET name = $2, description = $3, video_url = $4, updated_at = now()
+    SET name = $2, description = $3, video_url = $4, type = $5, updated_at = now()
     WHERE id = $1 AND deleted_at IS NULL
-    RETURNING id, name, description, video_url, created_at, updated_at, deleted_at
+    RETURNING id, name, description, video_url, type, created_at, updated_at, deleted_at
 ), removed_joints AS (
     DELETE FROM exercise_joints
-    WHERE exercise_id IN (SELECT id FROM updated) AND joint_id <> ALL($5::uuid[])
+    WHERE exercise_id IN (SELECT id FROM updated) AND joint_id <> ALL($6::uuid[])
 ), added_joints AS (
     INSERT INTO exercise_joints (exercise_id, joint_id)
-    SELECT id, unnest($5::uuid[]) FROM updated
+    SELECT id, unnest($6::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
 ), removed_muscle_groups AS (
     DELETE FROM exercise_muscle_groups
-    WHERE exercise_id IN (SELECT id FROM updated) AND muscle_group_id <> ALL($6::uuid[])
+    WHERE exercise_id IN (SELECT id FROM updated) AND muscle_group_id <> ALL($7::uuid[])
 ), added_muscle_groups AS (
     INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
-    SELECT id, unnest($6::uuid[]) FROM updated
+    SELECT id, unnest($7::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
 ), removed_focuses AS (
     DELETE FROM exercise_focuses
-    WHERE exercise_id IN (SELECT id FROM updated) AND focus_id <> ALL($7::uuid[])
+    WHERE exercise_id IN (SELECT id FROM updated) AND focus_id <> ALL($8::uuid[])
 ), added_focuses AS (
     INSERT INTO exercise_focuses (exercise_id, focus_id)
-    SELECT id, unnest($7::uuid[]) FROM updated
+    SELECT id, unnest($8::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
 )
-SELECT id, name, description, video_url, created_at, updated_at FROM updated
+SELECT id, name, description, video_url, type, created_at, updated_at FROM updated
 `
 
 type UpdateExerciseParams struct {
@@ -331,6 +341,7 @@ type UpdateExerciseParams struct {
 	Name           string      `json:"name"`
 	Description    string      `json:"description"`
 	VideoUrl       string      `json:"video_url"`
+	Type           string      `json:"type"`
 	JointIds       []uuid.UUID `json:"joint_ids"`
 	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
 	FocusIds       []uuid.UUID `json:"focus_ids"`
@@ -341,6 +352,7 @@ type UpdateExerciseRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	VideoUrl    string             `json:"video_url"`
+	Type        string             `json:"type"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -353,6 +365,7 @@ func (q *Queries) UpdateExercise(ctx context.Context, arg UpdateExerciseParams) 
 		arg.Name,
 		arg.Description,
 		arg.VideoUrl,
+		arg.Type,
 		arg.JointIds,
 		arg.MuscleGroupIds,
 		arg.FocusIds,
@@ -363,6 +376,7 @@ func (q *Queries) UpdateExercise(ctx context.Context, arg UpdateExerciseParams) 
 		&i.Name,
 		&i.Description,
 		&i.VideoUrl,
+		&i.Type,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
