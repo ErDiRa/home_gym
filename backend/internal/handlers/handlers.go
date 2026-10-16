@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"context"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefankarlin/my-accessories/backend/internal/auth"
 	"github.com/stefankarlin/my-accessories/backend/internal/database"
 )
 
 type Handler struct {
+	pool    *pgxpool.Pool
 	queries *database.Queries
 	tokens  *auth.TokenManager
 
@@ -15,8 +20,15 @@ type Handler struct {
 	secureCookies bool
 }
 
-func New(queries *database.Queries, tokens *auth.TokenManager, secureCookies bool) *Handler {
-	return &Handler{queries: queries, tokens: tokens, secureCookies: secureCookies}
+func New(pool *pgxpool.Pool, tokens *auth.TokenManager, secureCookies bool) *Handler {
+	return &Handler{pool: pool, queries: database.New(pool), tokens: tokens, secureCookies: secureCookies}
+}
+
+// inTx runs fn in a transaction, committing if it returns nil and rolling back otherwise.
+func (h *Handler) inTx(ctx context.Context, fn func(q *database.Queries) error) error {
+	return pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error {
+		return fn(h.queries.WithTx(tx))
+	})
 }
 
 // Routes registers the API routes on r:
@@ -32,7 +44,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.Middleware(h.tokens))
 			r.Get("/auth/me", h.Me)
-			r.With(auth.RequireUser).Route("/client", h.clientRoutes)
+			r.With(auth.RequireUser(h.queries.UserExists)).Route("/client", h.clientRoutes)
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(auth.RequireAdmin(h.queries.IsAdmin))
 				h.adminRoutes(r)

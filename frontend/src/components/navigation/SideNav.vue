@@ -9,7 +9,7 @@
 
     <nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Main">
       <RouterLink
-        v-for="item in navigation"
+        v-for="item in visibleItems"
         :key="item.name"
         :to="item.to"
         class="mb-1 flex items-center gap-3 rounded-lg border-l-4 border-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white"
@@ -38,9 +38,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { logout } from '../../api'
 import { state } from '../../session'
 import type { NavItem } from '../../navigation'
 
-defineProps<{ navigation: NavItem[] }>()
+const props = defineProps<{ navigation: NavItem[] }>()
+const visibleItems = computed(() => props.navigation.filter((item) => !item.adminOnly || state.user?.is_admin))
 </script>

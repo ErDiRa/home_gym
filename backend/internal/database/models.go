@@ -79,9 +79,50 @@ type MuscleGroup struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type Training struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Active      bool               `json:"active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type TrainingBlock struct {
+	ID       uuid.UUID `json:"id"`
+	UnitID   uuid.UUID `json:"unit_id"`
+	Position int32     `json:"position"`
+	Name     string    `json:"name"`
+	Notes    string    `json:"notes"`
+}
+
+type TrainingExercise struct {
+	ID         uuid.UUID `json:"id"`
+	BlockID    uuid.UUID `json:"block_id"`
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	Position   int32     `json:"position"`
+	Sets       int32     `json:"sets"`
+	Reps       string    `json:"reps"`
+	Notes      string    `json:"notes"`
+}
+
+type TrainingUnit struct {
+	ID         uuid.UUID     `json:"id"`
+	TrainingID uuid.UUID     `json:"training_id"`
+	Position   int32         `json:"position"`
+	Name       string        `json:"name"`
+	Notes      string        `json:"notes"`
+	Weekdays   []int16       `json:"weekdays"`
+	Dates      []pgtype.Date `json:"dates"`
+}
+
 type User struct {
 	ID           uuid.UUID          `json:"id"`
 	Email        string             `json:"email"`
+	FirstName    string             `json:"first_name"`
+	LastName     string             `json:"last_name"`
 	PasswordHash string             `json:"password_hash"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`

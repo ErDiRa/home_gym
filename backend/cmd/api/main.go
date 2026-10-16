@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefankarlin/my-accessories/backend/internal/auth"
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
 	"github.com/stefankarlin/my-accessories/backend/internal/handlers"
 )
 
@@ -51,8 +50,6 @@ func run() error {
 		return err
 	}
 
-	queries := database.New(dbpool)
-
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -67,7 +64,7 @@ func run() error {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	handlers.New(queries, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)
+	handlers.New(dbpool, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)
 
 	port := os.Getenv("PORT")
 	if port == "" {

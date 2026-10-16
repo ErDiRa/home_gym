@@ -47,7 +47,8 @@
     </Transition>
 
     <main class="px-4 py-8 sm:px-6 lg:ml-64 lg:px-8">
-      <RouterView />
+      <!-- Keyed by path so moving between e.g. two trainings mounts a fresh page. -->
+      <RouterView :key="route.path" />
     </main>
   </div>
 </template>

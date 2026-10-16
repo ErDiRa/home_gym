@@ -33,6 +33,43 @@ const router = createRouter({
           name: 'exercise-edit',
           component: () => import('./views/exercises/ExerciseFormView.vue'),
         },
+        {
+          path: 'trainings',
+          name: 'trainings',
+          component: () => import('./views/trainings/TrainingsView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          // ?client=<id> preselects the client.
+          path: 'trainings/new',
+          name: 'training-new',
+          component: () => import('./views/trainings/TrainingFormView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          path: 'trainings/:id',
+          name: 'training-edit',
+          component: () => import('./views/trainings/TrainingFormView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          path: 'clients',
+          name: 'clients',
+          component: () => import('./views/clients/ClientsView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          path: 'clients/new',
+          name: 'client-new',
+          component: () => import('./views/clients/ClientFormView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          path: 'clients/:id',
+          name: 'client-edit',
+          component: () => import('./views/clients/ClientFormView.vue'),
+          meta: { requiresAdmin: true },
+        },
       ],
     },
     {

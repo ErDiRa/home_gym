@@ -1,6 +1,19 @@
 import { toast } from 'vue-sonner'
 import { state, type User } from './session'
-import type { Exercise, ExerciseDetail, ExerciseInput, Focus, Option } from './types'
+import type {
+  Client,
+  ClientDetail,
+  ClientInput,
+  Exercise,
+  ExerciseDetail,
+  ExerciseInput,
+  Focus,
+  NewClientInput,
+  Option,
+  Training,
+  TrainingDetail,
+  TrainingInput,
+} from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -36,6 +49,7 @@ export const api = {
     request<T>(path, { method: 'POST', body: data === undefined ? undefined : JSON.stringify(data) }),
   put: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: 'PUT', body: data === undefined ? undefined : JSON.stringify(data) }),
+  delete: (path: string) => request<null>(path, { method: 'DELETE' }),
 }
 
 // Admins use the admin endpoints (which also allow writing); user sessions only have the
@@ -53,6 +67,22 @@ export const createFocus = (name: string, alias: string) => api.post<Focus>('/ad
 export const createExercise = (input: ExerciseInput) => api.post<Exercise>('/admin/exercises', input)
 export const updateExercise = (id: string, input: ExerciseInput) =>
   api.put<Exercise>(`/admin/exercises/${id}`, input)
+
+// Trainings and clients are admin-only.
+export const listTrainings = () => api.get<Training[]>('/admin/trainings')
+export const getTraining = (id: string) => api.get<TrainingDetail>(`/admin/trainings/${id}`)
+export const createTraining = (input: TrainingInput) => api.post<Training>('/admin/trainings', input)
+export const updateTraining = (id: string, input: TrainingInput) => api.put<Training>(`/admin/trainings/${id}`, input)
+export const deleteTraining = (id: string) => api.delete(`/admin/trainings/${id}`)
+// Copies a training (inactive) for a client, the same or another one.
+export const duplicateTraining = (id: string, clientId: string) =>
+  api.post<Training>(`/admin/trainings/${id}/duplicate`, { client_id: clientId })
+
+export const listClients = () => api.get<Client[]>('/admin/clients')
+export const getClient = (id: string) => api.get<ClientDetail>(`/admin/clients/${id}`)
+export const createClient = (input: NewClientInput) => api.post<Client>('/admin/clients', input)
+export const updateClient = (id: string, input: ClientInput) => api.put<Client>(`/admin/clients/${id}`, input)
+export const deleteClient = (id: string) => api.delete(`/admin/clients/${id}`)
 
 export async function login(email: string, password: string, remember: boolean) {
   state.user = await api.post<User>('/auth/login', { email, password, remember })

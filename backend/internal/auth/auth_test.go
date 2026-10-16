@@ -103,3 +103,36 @@ func TestRequireAdmin(t *testing.T) {
 		})
 	}
 }
+
+func TestRequireUser(t *testing.T) {
+	tm, _ := NewTokenManager("test-secret-test-secret")
+	userToken, _ := tm.Issue(RoleUser, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
+	adminToken, _ := tm.Issue(RoleAdmin, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
+
+	tests := []struct {
+		name   string
+		token  string
+		lookup UserLookup
+		want   int
+	}{
+		{"user", userToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
+		{"user deleted", userToken, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusUnauthorized},
+		{"lookup failure", userToken, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
+		{"admin token", adminToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusForbidden},
+		{"no cookie", "", func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := Middleware(tm)(RequireUser(tt.lookup)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.token != "" {
+				req.AddCookie(&http.Cookie{Name: CookieName, Value: tt.token})
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Errorf("status = %d, want %d", rec.Code, tt.want)
+			}
+		})
+	}
+}

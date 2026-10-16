@@ -25,8 +25,17 @@ func (h *Handler) adminRoutes(r chi.Router) {
 	r.Get("/muscle-groups", h.ListMuscleGroups)
 	r.Get("/focuses", h.ListFocuses)
 	r.Post("/focuses", h.CreateFocus)
-	r.Post("/training-plans", h.CreateTrainingPlan)
-	r.Post("/users/{userID}/trainings", h.AssignTraining)
+	r.Get("/trainings", h.ListTrainings)
+	r.Post("/trainings", h.CreateTraining)
+	r.Get("/trainings/{id}", h.GetTraining)
+	r.Put("/trainings/{id}", h.UpdateTraining)
+	r.Delete("/trainings/{id}", h.DeleteTraining)
+	r.Post("/trainings/{id}/duplicate", h.DuplicateTraining)
+	r.Get("/clients", h.ListClients)
+	r.Post("/clients", h.CreateClient)
+	r.Get("/clients/{id}", h.GetClient)
+	r.Put("/clients/{id}", h.UpdateClient)
+	r.Delete("/clients/{id}", h.DeleteClient)
 }
 
 type createExerciseRequest struct {
@@ -220,14 +229,4 @@ func (h *Handler) ListExercises(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, exercises)
-}
-
-// CreateTrainingPlan is not implemented yet.
-func (h *Handler) CreateTrainingPlan(w http.ResponseWriter, _ *http.Request) {
-	notImplemented(w)
-}
-
-// AssignTraining assigns a training plan to a user. Not implemented yet.
-func (h *Handler) AssignTraining(w http.ResponseWriter, _ *http.Request) {
-	notImplemented(w)
 }
