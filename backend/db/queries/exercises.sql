@@ -5,12 +5,13 @@ RETURNING *;
 
 -- name: ListExercises :many
 SELECT * FROM exercises
+WHERE deleted_at IS NULL
 ORDER BY name;
 
 -- name: UpsertExerciseFeedback :one
 INSERT INTO exercise_feedbacks (user_id, exercise_id, rating, notes)
 VALUES ($1, $2, $3, $4)
-ON CONFLICT (user_id, exercise_id)
+ON CONFLICT (user_id, exercise_id) WHERE deleted_at IS NULL
 DO UPDATE SET rating = EXCLUDED.rating,
               notes = EXCLUDED.notes,
               updated_at = now()

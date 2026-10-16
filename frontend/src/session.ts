@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 export interface User {
   id: string
   email: string
+  is_admin: boolean
 }
 
 // The JWT lives in an HttpOnly cookie that scripts cannot read, so the only thing

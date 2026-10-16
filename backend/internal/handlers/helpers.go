@@ -22,6 +22,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+func notImplemented(w http.ResponseWriter) {
+	writeError(w, http.StatusNotImplemented, "not implemented")
+}
+
 func serverError(w http.ResponseWriter, r *http.Request, err error) {
 	log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
 	writeError(w, http.StatusInternalServerError, "internal server error")

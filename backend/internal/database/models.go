@@ -9,12 +9,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Admin struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type Exercise struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Joint       string    `json:"joint"`
-	MuscleGroup string    `json:"muscle_group"`
-	Description string    `json:"description"`
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Joint       string             `json:"joint"`
+	MuscleGroup string             `json:"muscle_group"`
+	Description string             `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type ExerciseFeedback struct {
@@ -24,6 +33,7 @@ type ExerciseFeedback struct {
 	Rating     int32              `json:"rating"`
 	Notes      string             `json:"notes"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type User struct {
@@ -31,6 +41,7 @@ type User struct {
 	Email        string             `json:"email"`
 	PasswordHash string             `json:"password_hash"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type WorkoutLog struct {
@@ -41,4 +52,5 @@ type WorkoutLog struct {
 	SetsDone    int32              `json:"sets_done"`
 	RepsDone    int32              `json:"reps_done"`
 	WeightKg    float64            `json:"weight_kg"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }

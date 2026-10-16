@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,5 +68,37 @@ func TestSessionExpiry(t *testing.T) {
 	now = login.Add(MaxSessionAge - time.Hour)
 	if got, want := SessionExpiry(now, login), login.Add(MaxSessionAge); !got.Equal(want) {
 		t.Errorf("capped refresh = %v, want %v", got, want)
+	}
+}
+
+func TestRequireAdmin(t *testing.T) {
+	tm, _ := NewTokenManager("test-secret-test-secret")
+	userID := uuid.New()
+	token, _ := tm.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
+
+	tests := []struct {
+		name   string
+		cookie bool
+		lookup AdminLookup
+		want   int
+	}{
+		{"admin", true, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
+		{"not an admin", true, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusForbidden},
+		{"lookup failure", true, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
+		{"no cookie", false, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := Middleware(tm)(RequireAdmin(tt.lookup)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.cookie {
+				req.AddCookie(&http.Cookie{Name: CookieName, Value: token})
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Errorf("status = %d, want %d", rec.Code, tt.want)
+			}
+		})
 	}
 }

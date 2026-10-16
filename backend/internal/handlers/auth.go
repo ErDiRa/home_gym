@@ -20,8 +20,9 @@ type loginRequest struct {
 }
 
 type userResponse struct {
-	ID    uuid.UUID `json:"id"`
-	Email string    `json:"email"`
+	ID      uuid.UUID `json:"id"`
+	Email   string    `json:"email"`
+	IsAdmin bool      `json:"is_admin"`
 }
 
 // dummyHash lets Login spend the same time on unknown emails as on wrong passwords.
@@ -49,7 +50,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email}, time.Now(), req.Remember)
+	isAdmin, err := h.queries.IsAdmin(r.Context(), user.ID)
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email, IsAdmin: isAdmin}, time.Now(), req.Remember)
 }
 
 // setSession issues a fresh token and cookie for user and writes the user as the response.
@@ -95,5 +101,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		serverError(w, r, err)
 		return
 	}
-	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email}, time.Unix(claims.AuthTime, 0), claims.Remember)
+	h.setSession(w, r, userResponse{ID: user.ID, Email: user.Email, IsAdmin: user.IsAdmin}, time.Unix(claims.AuthTime, 0), claims.Remember)
 }

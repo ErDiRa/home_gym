@@ -79,7 +79,11 @@ func ClearCookie(w http.ResponseWriter, secure bool) {
 }
 
 func unauthorized(w http.ResponseWriter, msg string) {
+	writeJSONError(w, http.StatusUnauthorized, msg)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

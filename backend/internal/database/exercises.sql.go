@@ -14,7 +14,7 @@ import (
 const createExercise = `-- name: CreateExercise :one
 INSERT INTO exercises (name, joint, muscle_group, description)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, joint, muscle_group, description
+RETURNING id, name, joint, muscle_group, description, created_at, updated_at, deleted_at
 `
 
 type CreateExerciseParams struct {
@@ -38,12 +38,16 @@ func (q *Queries) CreateExercise(ctx context.Context, arg CreateExerciseParams) 
 		&i.Joint,
 		&i.MuscleGroup,
 		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listExercises = `-- name: ListExercises :many
-SELECT id, name, joint, muscle_group, description FROM exercises
+SELECT id, name, joint, muscle_group, description, created_at, updated_at, deleted_at FROM exercises
+WHERE deleted_at IS NULL
 ORDER BY name
 `
 
@@ -62,6 +66,9 @@ func (q *Queries) ListExercises(ctx context.Context) ([]Exercise, error) {
 			&i.Joint,
 			&i.MuscleGroup,
 			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -76,11 +83,11 @@ func (q *Queries) ListExercises(ctx context.Context) ([]Exercise, error) {
 const upsertExerciseFeedback = `-- name: UpsertExerciseFeedback :one
 INSERT INTO exercise_feedbacks (user_id, exercise_id, rating, notes)
 VALUES ($1, $2, $3, $4)
-ON CONFLICT (user_id, exercise_id)
+ON CONFLICT (user_id, exercise_id) WHERE deleted_at IS NULL
 DO UPDATE SET rating = EXCLUDED.rating,
               notes = EXCLUDED.notes,
               updated_at = now()
-RETURNING id, user_id, exercise_id, rating, notes, updated_at
+RETURNING id, user_id, exercise_id, rating, notes, updated_at, deleted_at
 `
 
 type UpsertExerciseFeedbackParams struct {
@@ -105,6 +112,7 @@ func (q *Queries) UpsertExerciseFeedback(ctx context.Context, arg UpsertExercise
 		&i.Rating,
 		&i.Notes,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

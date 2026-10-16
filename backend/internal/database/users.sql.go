@@ -38,12 +38,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, created_at FROM users
-WHERE email = $1
+WHERE email = $1 AND deleted_at IS NULL
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+type GetUserByEmailRow struct {
+	ID           uuid.UUID          `json:"id"`
+	Email        string             `json:"email"`
+	PasswordHash string             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
-	var i User
+	var i GetUserByEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -54,19 +61,48 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, created_at FROM users
-WHERE id = $1
+SELECT
+    u.id,
+    u.email,
+    u.created_at,
+    EXISTS (
+        SELECT 1 FROM admins a WHERE a.user_id = u.id AND a.deleted_at IS NULL
+    ) AS is_admin
+FROM users u
+WHERE u.id = $1 AND u.deleted_at IS NULL
 `
 
 type GetUserByIDRow struct {
 	ID        uuid.UUID          `json:"id"`
 	Email     string             `json:"email"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	IsAdmin   bool               `json:"is_admin"`
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i GetUserByIDRow
-	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.CreatedAt,
+		&i.IsAdmin,
+	)
 	return i, err
+}
+
+const isAdmin = `-- name: IsAdmin :one
+SELECT EXISTS (
+    SELECT 1
+    FROM admins a
+    JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
+    WHERE a.user_id = $1 AND a.deleted_at IS NULL
+)
+`
+
+func (q *Queries) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, isAdmin, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
