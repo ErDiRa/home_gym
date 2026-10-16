@@ -9,66 +9,148 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createExercise = `-- name: CreateExercise :one
-INSERT INTO exercises (name, joint, muscle_group, description)
-VALUES ($1, $2, $3, $4)
-RETURNING id, name, joint, muscle_group, description, created_at, updated_at, deleted_at
+WITH new_exercise AS (
+    INSERT INTO exercises (name, description, video_url)
+    VALUES ($1, $2, $3)
+    RETURNING id, name, description, video_url, created_at, updated_at, deleted_at
+), linked_joints AS (
+    INSERT INTO exercise_joints (exercise_id, joint_id)
+    SELECT id, unnest($4::uuid[]) FROM new_exercise
+), linked_muscle_groups AS (
+    INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
+    SELECT id, unnest($5::uuid[]) FROM new_exercise
+)
+SELECT id, name, description, video_url, created_at, updated_at FROM new_exercise
 `
 
 type CreateExerciseParams struct {
-	Name        string `json:"name"`
-	Joint       string `json:"joint"`
-	MuscleGroup string `json:"muscle_group"`
-	Description string `json:"description"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description"`
+	VideoUrl       string      `json:"video_url"`
+	JointIds       []uuid.UUID `json:"joint_ids"`
+	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
 }
 
-func (q *Queries) CreateExercise(ctx context.Context, arg CreateExerciseParams) (Exercise, error) {
+type CreateExerciseRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	VideoUrl    string             `json:"video_url"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) CreateExercise(ctx context.Context, arg CreateExerciseParams) (CreateExerciseRow, error) {
 	row := q.db.QueryRow(ctx, createExercise,
 		arg.Name,
-		arg.Joint,
-		arg.MuscleGroup,
 		arg.Description,
+		arg.VideoUrl,
+		arg.JointIds,
+		arg.MuscleGroupIds,
 	)
-	var i Exercise
+	var i CreateExerciseRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
-		&i.Joint,
-		&i.MuscleGroup,
 		&i.Description,
+		&i.VideoUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getExercise = `-- name: GetExercise :one
+SELECT
+    e.id,
+    e.name,
+    e.description,
+    e.video_url,
+    ARRAY(SELECT joint_id FROM exercise_joints WHERE exercise_id = e.id)::uuid[] AS joint_ids,
+    ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids
+FROM exercises e
+WHERE e.id = $1 AND e.deleted_at IS NULL
+`
+
+type GetExerciseRow struct {
+	ID             uuid.UUID   `json:"id"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description"`
+	VideoUrl       string      `json:"video_url"`
+	JointIds       []uuid.UUID `json:"joint_ids"`
+	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
+}
+
+func (q *Queries) GetExercise(ctx context.Context, id uuid.UUID) (GetExerciseRow, error) {
+	row := q.db.QueryRow(ctx, getExercise, id)
+	var i GetExerciseRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.VideoUrl,
+		&i.JointIds,
+		&i.MuscleGroupIds,
 	)
 	return i, err
 }
 
 const listExercises = `-- name: ListExercises :many
-SELECT id, name, joint, muscle_group, description, created_at, updated_at, deleted_at FROM exercises
-WHERE deleted_at IS NULL
-ORDER BY name
+SELECT
+    e.id,
+    e.name,
+    e.description,
+    e.video_url,
+    e.created_at,
+    e.updated_at,
+    ARRAY(
+        SELECT j.name FROM exercise_joints ej
+        JOIN joints j ON j.id = ej.joint_id AND j.deleted_at IS NULL
+        WHERE ej.exercise_id = e.id ORDER BY j.name
+    )::text[] AS joints,
+    ARRAY(
+        SELECT m.name FROM exercise_muscle_groups em
+        JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
+        WHERE em.exercise_id = e.id ORDER BY m.name
+    )::text[] AS muscle_groups
+FROM exercises e
+WHERE e.deleted_at IS NULL
+ORDER BY e.name
 `
 
-func (q *Queries) ListExercises(ctx context.Context) ([]Exercise, error) {
+type ListExercisesRow struct {
+	ID           uuid.UUID          `json:"id"`
+	Name         string             `json:"name"`
+	Description  string             `json:"description"`
+	VideoUrl     string             `json:"video_url"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Joints       []string           `json:"joints"`
+	MuscleGroups []string           `json:"muscle_groups"`
+}
+
+func (q *Queries) ListExercises(ctx context.Context) ([]ListExercisesRow, error) {
 	rows, err := q.db.Query(ctx, listExercises)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Exercise{}
+	items := []ListExercisesRow{}
 	for rows.Next() {
-		var i Exercise
+		var i ListExercisesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.Joint,
-			&i.MuscleGroup,
 			&i.Description,
+			&i.VideoUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.DeletedAt,
+			&i.Joints,
+			&i.MuscleGroups,
 		); err != nil {
 			return nil, err
 		}
@@ -78,6 +160,133 @@ func (q *Queries) ListExercises(ctx context.Context) ([]Exercise, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const listJoints = `-- name: ListJoints :many
+SELECT id, name FROM joints
+WHERE deleted_at IS NULL
+ORDER BY name
+`
+
+type ListJointsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+func (q *Queries) ListJoints(ctx context.Context) ([]ListJointsRow, error) {
+	rows, err := q.db.Query(ctx, listJoints)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJointsRow{}
+	for rows.Next() {
+		var i ListJointsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMuscleGroups = `-- name: ListMuscleGroups :many
+SELECT id, name FROM muscle_groups
+WHERE deleted_at IS NULL
+ORDER BY name
+`
+
+type ListMuscleGroupsRow struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+func (q *Queries) ListMuscleGroups(ctx context.Context) ([]ListMuscleGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listMuscleGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMuscleGroupsRow{}
+	for rows.Next() {
+		var i ListMuscleGroupsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateExercise = `-- name: UpdateExercise :one
+WITH updated AS (
+    UPDATE exercises
+    SET name = $2, description = $3, video_url = $4, updated_at = now()
+    WHERE id = $1 AND deleted_at IS NULL
+    RETURNING id, name, description, video_url, created_at, updated_at, deleted_at
+), removed_joints AS (
+    DELETE FROM exercise_joints
+    WHERE exercise_id IN (SELECT id FROM updated) AND joint_id <> ALL($5::uuid[])
+), added_joints AS (
+    INSERT INTO exercise_joints (exercise_id, joint_id)
+    SELECT id, unnest($5::uuid[]) FROM updated
+    ON CONFLICT DO NOTHING
+), removed_muscle_groups AS (
+    DELETE FROM exercise_muscle_groups
+    WHERE exercise_id IN (SELECT id FROM updated) AND muscle_group_id <> ALL($6::uuid[])
+), added_muscle_groups AS (
+    INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
+    SELECT id, unnest($6::uuid[]) FROM updated
+    ON CONFLICT DO NOTHING
+)
+SELECT id, name, description, video_url, created_at, updated_at FROM updated
+`
+
+type UpdateExerciseParams struct {
+	ID             uuid.UUID   `json:"id"`
+	Name           string      `json:"name"`
+	Description    string      `json:"description"`
+	VideoUrl       string      `json:"video_url"`
+	JointIds       []uuid.UUID `json:"joint_ids"`
+	MuscleGroupIds []uuid.UUID `json:"muscle_group_ids"`
+}
+
+type UpdateExerciseRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	VideoUrl    string             `json:"video_url"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+// The links are synced by deleting the ones no longer wanted and inserting the new ones;
+// the two never touch the same row, so they are safe in one statement.
+func (q *Queries) UpdateExercise(ctx context.Context, arg UpdateExerciseParams) (UpdateExerciseRow, error) {
+	row := q.db.QueryRow(ctx, updateExercise,
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.VideoUrl,
+		arg.JointIds,
+		arg.MuscleGroupIds,
+	)
+	var i UpdateExerciseRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.VideoUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertExerciseFeedback = `-- name: UpsertExerciseFeedback :one

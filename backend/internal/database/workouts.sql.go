@@ -16,8 +16,16 @@ const getExerciseStats = `-- name: GetExerciseStats :many
 SELECT
     e.id AS exercise_id,
     e.name,
-    e.joint,
-    e.muscle_group,
+    ARRAY(
+        SELECT j.name FROM exercise_joints ej
+        JOIN joints j ON j.id = ej.joint_id AND j.deleted_at IS NULL
+        WHERE ej.exercise_id = e.id ORDER BY j.name
+    )::text[] AS joints,
+    ARRAY(
+        SELECT m.name FROM exercise_muscle_groups em
+        JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
+        WHERE em.exercise_id = e.id ORDER BY m.name
+    )::text[] AS muscle_groups,
     COUNT(wl.id)::bigint AS times_performed,
     f.rating AS rating
 FROM exercises e
@@ -31,8 +39,8 @@ ORDER BY times_performed DESC, e.name
 type GetExerciseStatsRow struct {
 	ExerciseID     uuid.UUID   `json:"exercise_id"`
 	Name           string      `json:"name"`
-	Joint          string      `json:"joint"`
-	MuscleGroup    string      `json:"muscle_group"`
+	Joints         []string    `json:"joints"`
+	MuscleGroups   []string    `json:"muscle_groups"`
 	TimesPerformed int64       `json:"times_performed"`
 	Rating         pgtype.Int4 `json:"rating"`
 }
@@ -49,8 +57,8 @@ func (q *Queries) GetExerciseStats(ctx context.Context, userID uuid.UUID) ([]Get
 		if err := rows.Scan(
 			&i.ExerciseID,
 			&i.Name,
-			&i.Joint,
-			&i.MuscleGroup,
+			&i.Joints,
+			&i.MuscleGroups,
 			&i.TimesPerformed,
 			&i.Rating,
 		); err != nil {

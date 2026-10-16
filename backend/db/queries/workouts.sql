@@ -7,8 +7,16 @@ RETURNING *;
 SELECT
     e.id AS exercise_id,
     e.name,
-    e.joint,
-    e.muscle_group,
+    ARRAY(
+        SELECT j.name FROM exercise_joints ej
+        JOIN joints j ON j.id = ej.joint_id AND j.deleted_at IS NULL
+        WHERE ej.exercise_id = e.id ORDER BY j.name
+    )::text[] AS joints,
+    ARRAY(
+        SELECT m.name FROM exercise_muscle_groups em
+        JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
+        WHERE em.exercise_id = e.id ORDER BY m.name
+    )::text[] AS muscle_groups,
     COUNT(wl.id)::bigint AS times_performed,
     f.rating AS rating
 FROM exercises e

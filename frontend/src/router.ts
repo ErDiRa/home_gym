@@ -6,6 +6,7 @@ import { isAuthenticated, state } from './session'
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
+    requiresAdmin?: boolean
     guestOnly?: boolean
   }
 }
@@ -15,14 +16,29 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('./views/HomeView.vue'),
+      component: () => import('./layouts/AppLayout.vue'),
       meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'home', redirect: { name: 'exercises' } },
+        { path: 'exercises', name: 'exercises', component: () => import('./views/exercises/ExercisesView.vue') },
+        {
+          path: 'exercises/new',
+          name: 'exercise-new',
+          component: () => import('./views/exercises/ExerciseFormView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
+          // Admins edit the exercise; user sessions see the same form read-only.
+          path: 'exercises/:id',
+          name: 'exercise-edit',
+          component: () => import('./views/exercises/ExerciseFormView.vue'),
+        },
+      ],
     },
     {
       path: '/login',
       name: 'login',
-      component: () => import('./views/LoginView.vue'),
+      component: () => import('./views/login/LoginView.vue'),
       meta: { guestOnly: true },
     },
     { path: '/:pathMatch(.*)*', redirect: { name: 'home' } },
@@ -34,6 +50,9 @@ router.beforeEach(async (to) => {
   const authenticated = isAuthenticated()
   if (to.meta.requiresAuth && !authenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.requiresAdmin && !state.user?.is_admin) {
+    return { name: 'exercises' }
   }
   if (to.meta.guestOnly && authenticated) {
     return { name: 'home' }

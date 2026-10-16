@@ -14,7 +14,9 @@ services:
       - ./db/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/000001_init_schema.up.sql:ro
       # Dev seed (admin@example.com / test); runs after the schema (files are mounted
       # individually because a file can't be mounted into a read-only directory mount)
+      - ./db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
       - ./db/seed/seed-admin.sql:/docker-entrypoint-initdb.d/999_seed-admin.sql:ro
+      - ./db/seed/seed-exercises.sql:/docker-entrypoint-initdb.d/999_seed-exercises.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

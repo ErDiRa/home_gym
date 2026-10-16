@@ -13,6 +13,10 @@ import (
 
 // clientRoutes are mounted under /api/client for any authenticated user.
 func (h *Handler) clientRoutes(r chi.Router) {
+	r.Get("/exercises", h.ListExercises)
+	r.Get("/exercises/{id}", h.GetExercise)
+	r.Get("/joints", h.ListJoints)
+	r.Get("/muscle-groups", h.ListMuscleGroups)
 	r.Get("/trainings", h.ListAssignedTrainings)
 	r.Post("/exercises/{id}/feedback", h.UpsertFeedback)
 	r.Get("/stats/exercises", h.ExerciseStats)

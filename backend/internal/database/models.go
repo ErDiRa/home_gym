@@ -21,9 +21,8 @@ type Admin struct {
 type Exercise struct {
 	ID          uuid.UUID          `json:"id"`
 	Name        string             `json:"name"`
-	Joint       string             `json:"joint"`
-	MuscleGroup string             `json:"muscle_group"`
 	Description string             `json:"description"`
+	VideoUrl    string             `json:"video_url"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
@@ -37,6 +36,32 @@ type ExerciseFeedback struct {
 	Notes      string             `json:"notes"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type ExerciseJoint struct {
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	JointID    uuid.UUID `json:"joint_id"`
+}
+
+type ExerciseMuscleGroup struct {
+	ExerciseID    uuid.UUID `json:"exercise_id"`
+	MuscleGroupID uuid.UUID `json:"muscle_group_id"`
+}
+
+type Joint struct {
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type MuscleGroup struct {
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type User struct {

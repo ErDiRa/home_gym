@@ -61,7 +61,7 @@
 <script setup lang="ts">
 	import { ref } from 'vue';
 	import { useRoute, useRouter } from 'vue-router';
-	import { ApiError, login } from '../api';
+	import { ApiError, login } from '../../api';
 
 	const route = useRoute();
 	const router = useRouter();
