@@ -1,0 +1,37 @@
+version: "3"
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  backend:up:
+    desc: Run the backend dev environment (Postgres + API with hot reload)
+    dir: backend
+    cmds:
+      - docker compose up --build
+
+  backend:down:
+    desc: Stop the backend containers
+    dir: backend
+    cmds:
+      - docker compose down
+
+  backend:reset:
+    desc: Stop the backend containers and wipe the database volume
+    dir: backend
+    cmds:
+      - docker compose down -v
+
+  frontend:dev:
+    desc: Run Vite in dev mode
+    dir: frontend
+    cmds:
+      - npm install --no-audit --no-fund
+      - npm run dev
+
+  dev:
+    desc: Run backend containers and Vite dev server together
+    deps: [backend:up, frontend:dev]
