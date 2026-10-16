@@ -27,15 +27,50 @@ CREATE TABLE admins (
 
 CREATE UNIQUE INDEX idx_admins_email ON admins (email) WHERE deleted_at IS NULL;
 
+-- Reference lists an exercise picks from.
+CREATE TABLE joints (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_joints_name ON joints (name) WHERE deleted_at IS NULL;
+
+CREATE TABLE muscle_groups (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_muscle_groups_name ON muscle_groups (name) WHERE deleted_at IS NULL;
+
 CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT NOT NULL,
-    joint        TEXT NOT NULL,
-    muscle_group TEXT NOT NULL,
     description  TEXT NOT NULL DEFAULT '',
+    video_url    TEXT NOT NULL DEFAULT '', -- link to a video showing how to perform the exercise
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at   TIMESTAMPTZ
+);
+
+-- An exercise involves several joints and trains several muscle groups. These pure link
+-- tables are hard-deleted (no deleted_at); the soft-deleted rows are the exercises, joints
+-- and muscle groups themselves.
+CREATE TABLE exercise_joints (
+    exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    joint_id    UUID NOT NULL REFERENCES joints (id) ON DELETE RESTRICT,
+    PRIMARY KEY (exercise_id, joint_id)
+);
+
+CREATE TABLE exercise_muscle_groups (
+    exercise_id     UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    muscle_group_id UUID NOT NULL REFERENCES muscle_groups (id) ON DELETE RESTRICT,
+    PRIMARY KEY (exercise_id, muscle_group_id)
 );
 
 CREATE TABLE exercise_feedbacks (
