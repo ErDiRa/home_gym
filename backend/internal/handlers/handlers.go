@@ -8,27 +8,36 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/stefankarlin/my-accessories/backend/internal/auth"
 	"github.com/stefankarlin/my-accessories/backend/internal/database"
 )
 
-// UserIDHeader identifies the caller until real authentication is added.
-const UserIDHeader = "X-User-ID"
-
 type Handler struct {
 	queries *database.Queries
+	tokens  *auth.TokenManager
+
+	// secureCookies marks the auth cookie Secure (HTTPS only); disable for local HTTP dev.
+	secureCookies bool
 }
 
-func New(queries *database.Queries) *Handler {
-	return &Handler{queries: queries}
+func New(queries *database.Queries, tokens *auth.TokenManager, secureCookies bool) *Handler {
+	return &Handler{queries: queries, tokens: tokens, secureCookies: secureCookies}
 }
 
 // Routes registers the API routes on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
-		r.Post("/exercises", h.CreateExercise)
-		r.Get("/exercises", h.ListExercises)
-		r.Post("/exercises/{id}/feedback", h.UpsertFeedback)
-		r.Get("/stats/exercises", h.ExerciseStats)
+		r.Post("/auth/login", h.Login)
+		r.Post("/auth/logout", h.Logout)
+
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Middleware(h.tokens))
+			r.Get("/auth/me", h.Me)
+			r.Post("/exercises", h.CreateExercise)
+			r.Get("/exercises", h.ListExercises)
+			r.Post("/exercises/{id}/feedback", h.UpsertFeedback)
+			r.Get("/stats/exercises", h.ExerciseStats)
+		})
 	})
 }
 

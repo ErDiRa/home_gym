@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+
+	"github.com/stefankarlin/my-accessories/backend/internal/auth"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -35,10 +37,9 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func userIDFromRequest(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	id, err := uuid.Parse(r.Header.Get(UserIDHeader))
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, "missing or invalid "+UserIDHeader+" header")
-		return uuid.Nil, false
+	id, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
 	}
-	return id, true
+	return id, ok
 }

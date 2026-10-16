@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stefankarlin/my-accessories/backend/internal/auth"
 	"github.com/stefankarlin/my-accessories/backend/internal/database"
 	"github.com/stefankarlin/my-accessories/backend/internal/handlers"
 )
@@ -45,22 +46,28 @@ func run() error {
 		return err
 	}
 
+	tokens, err := auth.NewTokenManager(os.Getenv("JWT_SECRET"))
+	if err != nil {
+		return err
+	}
+
 	queries := database.New(dbpool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: splitEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Content-Type", handlers.UserIDHeader},
-		MaxAge:         300,
+		AllowedOrigins:   splitEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           300,
 	}))
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	handlers.New(queries).Routes(r)
+	handlers.New(queries, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)
 
 	port := os.Getenv("PORT")
 	if port == "" {

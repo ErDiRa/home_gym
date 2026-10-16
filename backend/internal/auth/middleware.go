@@ -1,0 +1,85 @@
+package auth
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// CookieName is the HttpOnly cookie that carries the JWT.
+const CookieName = "token"
+
+type ctxKey struct{}
+
+// Middleware rejects requests without a valid JWT cookie and stores the
+// authenticated user ID in the request context.
+func Middleware(tokens *TokenManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie(CookieName)
+			if err != nil {
+				unauthorized(w, "not authenticated")
+				return
+			}
+			claims, err := tokens.Parse(cookie.Value)
+			if err != nil {
+				unauthorized(w, "invalid or expired token")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, claims)))
+		})
+	}
+}
+
+// ClaimsFromContext returns the verified token claims stored by Middleware.
+func ClaimsFromContext(ctx context.Context) (*Claims, bool) {
+	claims, ok := ctx.Value(ctxKey{}).(*Claims)
+	return claims, ok
+}
+
+// UserIDFromContext returns the authenticated user ID stored by Middleware.
+func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	claims, ok := ClaimsFromContext(ctx)
+	if !ok {
+		return uuid.Nil, false
+	}
+	id, err := claims.UserID()
+	return id, err == nil
+}
+
+// SetCookie stores the token in an HttpOnly cookie. A zero ttl makes it a
+// session cookie that the browser drops on exit.
+func SetCookie(w http.ResponseWriter, token string, ttl time.Duration, secure bool) {
+	c := &http.Cookie{
+		Name:     CookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+	if ttl > 0 {
+		c.MaxAge = int(ttl.Seconds())
+	}
+	http.SetCookie(w, c)
+}
+
+func ClearCookie(w http.ResponseWriter, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName,
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func unauthorized(w http.ResponseWriter, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
