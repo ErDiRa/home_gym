@@ -38,9 +38,10 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { listExercises } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { state } from '../../session'
-import type { Exercise } from '../../types'
+import type { Exercise, Focus } from '../../types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
@@ -60,6 +61,17 @@ const columnDefs: ColDef<Exercise>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
   { field: 'joints', headerName: 'Joints', flex: 1, minWidth: 130, ...listColumn },
   { field: 'muscle_groups', headerName: 'Muscle groups', flex: 1, minWidth: 160, ...listColumn },
+  {
+    field: 'focuses',
+    headerName: 'Focus',
+    flex: 1,
+    minWidth: 160,
+    cellRenderer: FocusTagsCell,
+    // Sort, filter and search by name and alias, not by the objects.
+    valueFormatter: (p) => (p.value as Focus[] | null)?.map((f) => f.name).join(', ') ?? '',
+    getQuickFilterText: (p) => (p.value as Focus[] | null)?.map((f) => `${f.name} ${f.alias}`).join(' ') ?? '',
+    comparator: (a: Focus[], b: Focus[]) => (a[0]?.name ?? '').localeCompare(b[0]?.name ?? ''),
+  },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   {
     field: 'video_url',

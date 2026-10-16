@@ -9,6 +9,9 @@ WITH new_exercise AS (
 ), linked_muscle_groups AS (
     INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
     SELECT id, unnest(sqlc.arg(muscle_group_ids)::uuid[]) FROM new_exercise
+), linked_focuses AS (
+    INSERT INTO exercise_focuses (exercise_id, focus_id)
+    SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM new_exercise
 )
 SELECT id, name, description, video_url, created_at, updated_at FROM new_exercise;
 
@@ -29,7 +32,13 @@ SELECT
         SELECT m.name FROM exercise_muscle_groups em
         JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
         WHERE em.exercise_id = e.id ORDER BY m.name
-    )::text[] AS muscle_groups
+    )::text[] AS muscle_groups,
+    COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('id', f.id, 'name', f.name, 'alias', f.alias) ORDER BY f.name)
+        FROM exercise_focuses ef
+        JOIN focuses f ON f.id = ef.focus_id AND f.deleted_at IS NULL
+        WHERE ef.exercise_id = e.id
+    ), '[]'::jsonb) AS focuses
 FROM exercises e
 WHERE e.deleted_at IS NULL
 ORDER BY e.name;
@@ -41,7 +50,8 @@ SELECT
     e.description,
     e.video_url,
     ARRAY(SELECT joint_id FROM exercise_joints WHERE exercise_id = e.id)::uuid[] AS joint_ids,
-    ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids
+    ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids,
+    ARRAY(SELECT focus_id FROM exercise_focuses WHERE exercise_id = e.id)::uuid[] AS focus_ids
 FROM exercises e
 WHERE e.id = $1 AND e.deleted_at IS NULL;
 
@@ -67,6 +77,13 @@ WITH updated AS (
     INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_id)
     SELECT id, unnest(sqlc.arg(muscle_group_ids)::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
+), removed_focuses AS (
+    DELETE FROM exercise_focuses
+    WHERE exercise_id IN (SELECT id FROM updated) AND focus_id <> ALL(sqlc.arg(focus_ids)::uuid[])
+), added_focuses AS (
+    INSERT INTO exercise_focuses (exercise_id, focus_id)
+    SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM updated
+    ON CONFLICT DO NOTHING
 )
 SELECT id, name, description, video_url, created_at, updated_at FROM updated;
 
@@ -74,6 +91,15 @@ SELECT id, name, description, video_url, created_at, updated_at FROM updated;
 SELECT id, name FROM joints
 WHERE deleted_at IS NULL
 ORDER BY name;
+
+-- name: ListFocuses :many
+SELECT id, name, alias FROM focuses
+WHERE deleted_at IS NULL
+ORDER BY name;
+
+-- name: CreateFocus :one
+INSERT INTO focuses (name, alias) VALUES ($1, $2)
+RETURNING id, name, alias;
 
 -- name: ListMuscleGroups :many
 SELECT id, name FROM muscle_groups

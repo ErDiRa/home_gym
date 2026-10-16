@@ -38,6 +38,11 @@ type ExerciseFeedback struct {
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type ExerciseFocuse struct {
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	FocusID    uuid.UUID `json:"focus_id"`
+}
+
 type ExerciseJoint struct {
 	ExerciseID uuid.UUID `json:"exercise_id"`
 	JointID    uuid.UUID `json:"joint_id"`
@@ -46,6 +51,15 @@ type ExerciseJoint struct {
 type ExerciseMuscleGroup struct {
 	ExerciseID    uuid.UUID `json:"exercise_id"`
 	MuscleGroupID uuid.UUID `json:"muscle_group_id"`
+}
+
+type Focuse struct {
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	Alias     string             `json:"alias"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Joint struct {

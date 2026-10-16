@@ -17,6 +17,7 @@ func (h *Handler) clientRoutes(r chi.Router) {
 	r.Get("/exercises/{id}", h.GetExercise)
 	r.Get("/joints", h.ListJoints)
 	r.Get("/muscle-groups", h.ListMuscleGroups)
+	r.Get("/focuses", h.ListFocuses)
 	r.Get("/trainings", h.ListAssignedTrainings)
 	r.Post("/exercises/{id}/feedback", h.UpsertFeedback)
 	r.Get("/stats/exercises", h.ExerciseStats)

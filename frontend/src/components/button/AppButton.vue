@@ -5,9 +5,11 @@
     :type="to ? undefined : type"
     :disabled="to ? undefined : disabled"
     :class="[
-      'font-semibold shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50',
-      sizes[size],
-      variants[variant],
+      'inline-flex items-center justify-center gap-1.5 border font-medium whitespace-nowrap transition-colors',
+      'focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:outline-none',
+      'disabled:cursor-not-allowed disabled:opacity-50',
+      sizeClasses[size],
+      variantClasses[variant],
     ]"
   >
     <slot />
@@ -32,17 +34,16 @@ withDefaults(
   { variant: 'primary', size: 'lg', type: 'button', disabled: false, to: undefined },
 )
 
-const variants: Record<ButtonVariant, string> = {
-  primary: 'bg-indigo-600 text-white enabled:hover:bg-indigo-500',
-  secondary:
-    'bg-white text-gray-900 inset-ring inset-ring-gray-300 enabled:hover:bg-gray-50',
+const variantClasses: Record<ButtonVariant, string> = {
+  primary: 'border-indigo-600 bg-indigo-600 text-white hover:border-indigo-700 hover:bg-indigo-700',
+  secondary: 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-100',
 }
 
-const sizes: Record<ButtonSize, string> = {
-  xs: 'rounded-sm px-2 py-1 text-xs',
-  sm: 'rounded-sm px-2 py-1 text-sm',
-  md: 'rounded-md px-2.5 py-1.5 text-sm',
-  lg: 'rounded-md px-3 py-2 text-sm',
-  xl: 'rounded-md px-3.5 py-2.5 text-sm',
+const sizeClasses: Record<ButtonSize, string> = {
+  xs: 'h-7 rounded px-2 text-xs',
+  sm: 'h-8 rounded px-2.5 text-sm',
+  md: 'h-9 rounded-lg px-3 text-sm',
+  lg: 'h-10 rounded-lg px-4 text-sm',
+  xl: 'h-12 rounded-lg px-5 text-base',
 }
 </script>

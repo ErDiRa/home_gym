@@ -48,6 +48,19 @@ CREATE TABLE muscle_groups (
 
 CREATE UNIQUE INDEX idx_muscle_groups_name ON muscle_groups (name) WHERE deleted_at IS NULL;
 
+-- Training focus an exercise belongs to, e.g. weightlifting, functional fitness, shoulder health.
+-- Admins can add new ones.
+CREATE TABLE focuses (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    alias      TEXT NOT NULL, -- short label shown as a tag in tables; the name shows on hover
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_focuses_name ON focuses (lower(name)) WHERE deleted_at IS NULL;
+
 CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT NOT NULL,
@@ -71,6 +84,12 @@ CREATE TABLE exercise_muscle_groups (
     exercise_id     UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
     muscle_group_id UUID NOT NULL REFERENCES muscle_groups (id) ON DELETE RESTRICT,
     PRIMARY KEY (exercise_id, muscle_group_id)
+);
+
+CREATE TABLE exercise_focuses (
+    exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    focus_id    UUID NOT NULL REFERENCES focuses (id) ON DELETE RESTRICT,
+    PRIMARY KEY (exercise_id, focus_id)
 );
 
 CREATE TABLE exercise_feedbacks (

@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import { state, type User } from './session'
-import type { Exercise, ExerciseDetail, ExerciseInput, Option } from './types'
+import type { Exercise, ExerciseDetail, ExerciseInput, Focus, Option } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -45,9 +45,11 @@ const audience = () => (state.user?.is_admin ? '/admin' : '/client')
 export const listExercises = () => api.get<Exercise[]>(`${audience()}/exercises`)
 export const getExercise = (id: string) => api.get<ExerciseDetail>(`${audience()}/exercises/${id}`)
 export const listJoints = () => api.get<Option[]>(`${audience()}/joints`)
+export const listFocuses = () => api.get<Focus[]>(`${audience()}/focuses`)
 export const listMuscleGroups = () => api.get<Option[]>(`${audience()}/muscle-groups`)
 
 // Writing is admin-only.
+export const createFocus = (name: string, alias: string) => api.post<Focus>('/admin/focuses', { name, alias })
 export const createExercise = (input: ExerciseInput) => api.post<Exercise>('/admin/exercises', input)
 export const updateExercise = (id: string, input: ExerciseInput) =>
   api.put<Exercise>(`/admin/exercises/${id}`, input)

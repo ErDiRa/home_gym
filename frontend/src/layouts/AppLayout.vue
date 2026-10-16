@@ -1,55 +1,73 @@
 <template>
   <div class="min-h-screen bg-slate-50 text-slate-800">
-    <!-- Mobile sidebar -->
-    <div v-if="sidebarOpen" class="relative z-50 lg:hidden" role="dialog" aria-modal="true">
-      <div class="fixed inset-0 bg-slate-900/80" @click="sidebarOpen = false" />
-      <div class="fixed inset-y-0 left-0 flex w-72 max-w-full">
-        <SideNav :navigation="navigation" />
-        <button
-          type="button"
-          class="absolute top-4 left-full ml-4 text-white"
-          @click="sidebarOpen = false"
-        >
-          <span class="sr-only">Close sidebar</span>
-          <XMarkIcon class="size-6" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-
-    <!-- Desktop sidebar -->
-    <div class="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-72 lg:flex-col">
+    <!-- Desktop: fixed sidebar -->
+    <div class="fixed inset-y-0 left-0 hidden w-64 lg:block">
       <SideNav :navigation="navigation" />
     </div>
 
-    <!-- Mobile top bar -->
-    <div
-      class="sticky top-0 z-30 flex items-center gap-x-4 bg-white px-4 py-4 shadow-sm lg:hidden"
-    >
-      <button type="button" class="-m-2.5 p-2.5 text-slate-700" @click="sidebarOpen = true">
-        <span class="sr-only">Open sidebar</span>
+    <!-- Mobile: top bar and slide-in drawer -->
+    <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:hidden">
+      <button
+        type="button"
+        class="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+        aria-label="Open navigation"
+        :aria-expanded="drawerOpen"
+        @click="drawerOpen = true"
+      >
         <Bars3Icon class="size-6" aria-hidden="true" />
       </button>
-      <span class="text-sm/6 font-semibold text-slate-900">My Accessories</span>
-    </div>
+      <span class="font-semibold text-slate-900">My Accessories</span>
+    </header>
 
-    <main class="lg:pl-72">
-      <div class="px-4 py-8 sm:px-6 lg:px-8">
-        <RouterView />
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      leave-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="drawerOpen" class="fixed inset-0 z-40 bg-slate-950/60 lg:hidden" @click="drawerOpen = false" />
+    </Transition>
+    <Transition
+      enter-active-class="transition-transform duration-200"
+      leave-active-class="transition-transform duration-150"
+      enter-from-class="-translate-x-full"
+      leave-to-class="-translate-x-full"
+    >
+      <div v-if="drawerOpen" class="fixed inset-y-0 left-0 z-50 w-64 max-w-[85vw] lg:hidden">
+        <SideNav :navigation="navigation" />
+        <button
+          type="button"
+          class="absolute top-3 left-full ml-3 rounded-full bg-white/10 p-1.5 text-white hover:bg-white/20"
+          aria-label="Close navigation"
+          @click="drawerOpen = false"
+        >
+          <XMarkIcon class="size-5" aria-hidden="true" />
+        </button>
       </div>
+    </Transition>
+
+    <main class="px-4 py-8 sm:px-6 lg:ml-64 lg:px-8">
+      <RouterView />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 import SideNav from '../components/navigation/SideNav.vue'
 import { navigation } from '../navigation'
 
-const sidebarOpen = ref(false)
+const drawerOpen = ref(false)
 
-// Close the mobile sidebar after navigating.
+// Close the drawer after navigating and when Escape is pressed.
 const route = useRoute()
-watch(() => route.fullPath, () => (sidebarOpen.value = false))
+watch(() => route.fullPath, () => (drawerOpen.value = false))
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') drawerOpen.value = false
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>

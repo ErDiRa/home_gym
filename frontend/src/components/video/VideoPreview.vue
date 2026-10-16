@@ -1,23 +1,31 @@
 <template>
-  <div v-if="embed" :class="embed.provider === 'youtube' ? 'aspect-video' : 'h-[34rem] max-w-sm'" class="w-full">
-    <iframe
-      :src="embed.src"
-      :title="embed.provider === 'youtube' ? 'YouTube video preview' : 'Instagram video preview'"
-      class="size-full rounded-lg border border-slate-200 bg-slate-50"
-      loading="lazy"
-      referrerpolicy="strict-origin-when-cross-origin"
-      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
-      allow="encrypted-media; picture-in-picture; fullscreen"
-      allowfullscreen
-    />
-  </div>
+	<div
+		v-if="embed"
+		:class="embed.provider === 'youtube' ? 'aspect-video' : 'h-136 max-w-sm'"
+		class="w-full"
+	>
+		<iframe
+			:src="embed.src"
+			:title="
+				embed.provider === 'youtube'
+					? 'YouTube video preview'
+					: 'Instagram video preview'
+			"
+			class="size-full rounded-lg border border-slate-200 bg-slate-50"
+			loading="lazy"
+			referrerpolicy="strict-origin-when-cross-origin"
+			sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
+			allow="encrypted-media; picture-in-picture; fullscreen"
+			allowfullscreen
+		/>
+	</div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { videoEmbed } from '../../videoEmbed'
+	import { computed } from 'vue';
+	import { videoEmbed } from '../../videoEmbed';
 
-const props = defineProps<{ url: string }>()
-// Only YouTube and Instagram links are previewed; anything else shows nothing.
-const embed = computed(() => videoEmbed(props.url))
+	const props = defineProps<{ url: string }>();
+	// Only YouTube and Instagram links are previewed; anything else shows nothing.
+	const embed = computed(() => videoEmbed(props.url));
 </script>

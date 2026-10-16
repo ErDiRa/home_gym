@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -21,6 +23,8 @@ func (h *Handler) adminRoutes(r chi.Router) {
 	r.Put("/exercises/{id}", h.UpdateExercise)
 	r.Get("/joints", h.ListJoints)
 	r.Get("/muscle-groups", h.ListMuscleGroups)
+	r.Get("/focuses", h.ListFocuses)
+	r.Post("/focuses", h.CreateFocus)
 	r.Post("/training-plans", h.CreateTrainingPlan)
 	r.Post("/users/{userID}/trainings", h.AssignTraining)
 }
@@ -29,6 +33,7 @@ type createExerciseRequest struct {
 	Name           string      `json:"name"`
 	JointIDs       []uuid.UUID `json:"joint_ids"`
 	MuscleGroupIDs []uuid.UUID `json:"muscle_group_ids"`
+	FocusIDs       []uuid.UUID `json:"focus_ids"`
 	Description    string      `json:"description"`
 	VideoURL       string      `json:"video_url"`
 }
@@ -40,7 +45,7 @@ func parseExerciseRequest(w http.ResponseWriter, r *http.Request) (createExercis
 	if !decodeJSON(w, r, &req) {
 		return req, false
 	}
-	req.JointIDs, req.MuscleGroupIDs = unique(req.JointIDs), unique(req.MuscleGroupIDs)
+	req.JointIDs, req.MuscleGroupIDs, req.FocusIDs = unique(req.JointIDs), unique(req.MuscleGroupIDs), unique(req.FocusIDs)
 	if req.Name == "" || len(req.JointIDs) == 0 || len(req.MuscleGroupIDs) == 0 {
 		writeError(w, http.StatusBadRequest, "name, joint_ids and muscle_group_ids are required")
 		return req, false
@@ -61,7 +66,7 @@ func exerciseWriteError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeError(w, http.StatusNotFound, "exercise not found")
 	case errors.As(err, &pgErr) && pgErr.Code == "23503": // foreign_key_violation
-		writeError(w, http.StatusBadRequest, "unknown joint or muscle group")
+		writeError(w, http.StatusBadRequest, "unknown joint, muscle group or focus")
 	default:
 		serverError(w, r, err)
 	}
@@ -78,6 +83,7 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 		VideoUrl:       req.VideoURL,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
+		FocusIds:       req.FocusIDs,
 	})
 	if err != nil {
 		exerciseWriteError(w, r, err)
@@ -103,6 +109,7 @@ func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
 		VideoUrl:       req.VideoURL,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
+		FocusIds:       req.FocusIDs,
 	})
 	if err != nil {
 		exerciseWriteError(w, r, err)
@@ -147,6 +154,47 @@ func (h *Handler) ListJoints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, joints)
+}
+
+func (h *Handler) ListFocuses(w http.ResponseWriter, r *http.Request) {
+	focuses, err := h.queries.ListFocuses(r.Context())
+	if err != nil {
+		serverError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, focuses)
+}
+
+type createFocusRequest struct {
+	Name  string `json:"name"`
+	Alias string `json:"alias"`
+}
+
+func (h *Handler) CreateFocus(w http.ResponseWriter, r *http.Request) {
+	var req createFocusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	name, alias := strings.TrimSpace(req.Name), strings.TrimSpace(req.Alias)
+	if name == "" || len(name) > 60 {
+		writeError(w, http.StatusBadRequest, "name is required (max 60 characters)")
+		return
+	}
+	if alias == "" || utf8.RuneCountInString(alias) > 10 {
+		writeError(w, http.StatusBadRequest, "alias is required (max 10 characters)")
+		return
+	}
+	focus, err := h.queries.CreateFocus(r.Context(), database.CreateFocusParams{Name: name, Alias: alias})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+			writeError(w, http.StatusConflict, "this focus already exists")
+			return
+		}
+		serverError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, focus)
 }
 
 func (h *Handler) ListMuscleGroups(w http.ResponseWriter, r *http.Request) {

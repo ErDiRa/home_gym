@@ -1,60 +1,83 @@
 <template>
-	<div
-		class="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12"
-	>
-		<div
-			class="w-full max-w-md rounded-xl bg-white px-8 py-10 shadow-sm sm:px-12"
+	<div class="grid min-h-screen lg:grid-cols-2">
+		<!-- Brand panel (large screens only) -->
+		<aside
+			class="hidden flex-col justify-between bg-slate-900 p-12 text-slate-300 lg:flex"
 		>
-			<h1 class="mb-8 text-center text-2xl font-bold text-slate-900">
-				Sign in to your account
-			</h1>
-
-			<form class="space-y-6" @submit.prevent="submit">
-				<div>
-					<label for="email" class="block text-sm font-medium text-slate-900"
-						>Email address</label
-					>
-					<input
-						id="email"
-						v-model="email"
-						type="email"
-						autocomplete="email"
-						required
-						class="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
-					/>
-				</div>
-
-				<div>
-					<label for="password" class="block text-sm font-medium text-slate-900"
-						>Password</label
-					>
-					<input
-						id="password"
-						v-model="password"
-						type="password"
-						autocomplete="current-password"
-						required
-						class="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
-					/>
-				</div>
-
-				<p
-					v-if="error"
-					role="alert"
-					class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700"
+			<div class="flex items-center gap-2">
+				<span
+					class="grid size-9 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white"
+					>MA</span
 				>
-					{{ error }}
+				<span class="text-lg font-semibold text-white">My Accessories</span>
+			</div>
+			<div>
+				<p class="text-3xl font-semibold tracking-tight text-white">
+					Train smarter, move better.
+				</p>
+				<p class="mt-3 max-w-md text-slate-400">
+					Your exercises, trainings and progress in one place.
+				</p>
+			</div>
+			<p class="text-sm text-slate-500">&copy; My Accessories</p>
+		</aside>
+
+		<!-- Form -->
+		<main class="flex items-center justify-center bg-slate-50 px-4 py-12">
+			<div class="w-full max-w-sm">
+				<h1 class="text-2xl font-bold tracking-tight text-slate-900">
+					Welcome back
+				</h1>
+				<p class="mt-1 mb-8 text-sm text-slate-500">
+					Sign in with your email and password.
 				</p>
 
-				<button
-					type="submit"
-					:disabled="loading"
-					class="w-full rounded-md bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60"
-				>
-					{{ loading ? 'Signing in…' : 'Sign in' }}
-				</button>
-			</form>
-		</div>
+				<form class="space-y-5" @submit.prevent="submit">
+					<label class="block text-sm font-medium text-slate-800">
+						Email
+						<input
+							v-model="email"
+							type="email"
+							autocomplete="email"
+							required
+							class="mt-1 block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none"
+						/>
+					</label>
+
+					<label class="block text-sm font-medium text-slate-800">
+						Password
+						<input
+							v-model="password"
+							type="password"
+							autocomplete="current-password"
+							required
+							class="mt-1 block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none"
+						/>
+					</label>
+
+					<label class="flex items-center gap-2 text-sm text-slate-600">
+						<input
+							v-model="remember"
+							type="checkbox"
+							class="size-4 rounded border-slate-300 accent-indigo-600"
+						/>
+						Keep me signed in
+					</label>
+
+					<p
+						v-if="error"
+						role="alert"
+						class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+					>
+						{{ error }}
+					</p>
+
+					<AppButton type="submit" size="xl" class="w-full" :disabled="loading">
+						{{ loading ? 'Signing in…' : 'Sign in' }}
+					</AppButton>
+				</form>
+			</div>
+		</main>
 	</div>
 </template>
 
@@ -62,6 +85,7 @@
 	import { ref } from 'vue';
 	import { useRoute, useRouter } from 'vue-router';
 	import { ApiError, login } from '../../api';
+	import AppButton from '../../components/button/AppButton.vue';
 
 	const route = useRoute();
 	const router = useRouter();
