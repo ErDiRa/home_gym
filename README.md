@@ -64,10 +64,11 @@ The backend works out of the box with dev defaults. To override them, copy `back
 ```text
 backend/
   cmd/api/            entrypoint
-  internal/handlers/  HTTP handlers and routes
-  internal/database/  sqlc-generated code (don't edit by hand)
+  internal/handlers/  HTTP handlers and routes (thin adapters over the services)
+  internal/service/   business logic, one package per domain (training, client, ...):
+                      one file per usecase, its SQL in queries.sql and the
+                      sqlc-generated code in repos/ (don't edit by hand)
   db/migrations/      schema
-  db/queries/         SQL queries for sqlc
   db/seed/            dev seed data
 frontend/
   src/views/          pages (exercises, trainings, clients, login)

@@ -50,6 +50,25 @@
             >
               {{ label }}
             </button>
+            <template v-if="ratings">
+              <span class="ml-2 text-xs font-medium text-slate-600">{{ ratedBy ? `Rated by ${ratedBy}` : 'Client rating' }}</span>
+              <button
+                v-for="option in ratingOptions"
+                :key="option.value"
+                type="button"
+                :aria-pressed="ratingFilter.includes(option.value)"
+                :class="[
+                  'inline-flex items-center gap-0.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                  ratingFilter.includes(option.value)
+                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100',
+                ]"
+                @click="toggleRating(option.value)"
+              >
+                <StarIcon v-if="option.value" class="size-3" aria-hidden="true" />
+                {{ option.label }}
+              </button>
+            </template>
             <span class="ml-auto text-slate-500">{{ filtered.length }} {{ filtered.length === 1 ? 'exercise' : 'exercises' }}</span>
             <button v-if="filtering" type="button" class="text-indigo-600 hover:underline" @click="clearFilters">Clear filters</button>
           </div>
@@ -90,6 +109,7 @@
               <div class="flex flex-wrap items-center gap-1.5">
                 <span class="font-medium text-slate-900">{{ exercise.name }}</span>
                 <ExerciseTypeBadge :type="exercise.type" />
+                <RatingBadge v-if="ratings?.get(exercise.id)" :rating="ratings.get(exercise.id)!" />
                 <span
                   v-for="focus in exercise.focuses"
                   :key="focus.id"
@@ -140,11 +160,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
-import { CheckIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/16/solid'
+import { CheckIcon, MagnifyingGlassIcon, StarIcon, XMarkIcon } from '@heroicons/vue/16/solid'
 import AppButton from '../button/AppButton.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
+import RatingBadge from '../exercise/RatingBadge.vue'
 import MultiSelect from '../form/MultiSelect.vue'
-import { exerciseTypeLabels, type Exercise, type ExerciseType, type Option } from '../../types'
+import { exerciseTypeLabels, type Exercise, type ExerciseRating, type ExerciseType, type Option } from '../../types'
 
 // Finds exercises by search and filters and adds one or several to a block at once. The
 // selection survives changing the search, so it can be built up over several searches.
@@ -154,6 +175,8 @@ const props = defineProps<{
   exercises: Exercise[]
   inBlock: string[] // exercise ids already in the block
   limit: number | null // how many more the block takes; null = no limit
+  ratings: Map<string, ExerciseRating> | null // the client's ratings by exercise id; null = no client
+  ratedBy: string // the client's name
 }>()
 const emit = defineEmits<{ close: []; add: [exercises: Exercise[]] }>()
 
@@ -164,6 +187,7 @@ const typeFilter = ref<ExerciseType[]>([])
 const muscleFilter = ref<string[]>([]) // names, as exercises list them
 const jointFilter = ref<string[]>([]) // names
 const focusFilter = ref<string[]>([]) // ids
+const ratingFilter = ref<number[]>([]) // 1-5, 0 = not rated
 const selected = ref<string[]>([]) // ids, in the order they were picked
 const active = ref(0) // index into filtered
 
@@ -192,6 +216,10 @@ const focusOptions = computed(() => {
   return [...focuses.values()].sort(byName)
 })
 
+// Rating filter chips: 1-5, plus "Not rated" as 0 so unrated exercises can be filtered too.
+const ratingOptions = [1, 2, 3, 4, 5].map((r) => ({ value: r, label: String(r) })).concat({ value: 0, label: 'Not rated' })
+const ratingOf = (e: Exercise) => props.ratings?.get(e.id)?.rating ?? 0
+
 // What the search matches against, lower-cased once per exercise.
 const searchText = computed(
   () =>
@@ -218,13 +246,20 @@ const filtered = computed(() => {
       anyOf(
         focusFilter.value,
         (e.focuses ?? []).map((f) => f.id),
-      ),
+      ) &&
+      (!props.ratings || !ratingFilter.value.length || ratingFilter.value.includes(ratingOf(e))),
   )
 })
 watch(filtered, () => (active.value = 0))
 
 const filtering = computed(
-  () => typeFilter.value.length + muscleFilter.value.length + jointFilter.value.length + focusFilter.value.length > 0,
+  () =>
+    typeFilter.value.length +
+      muscleFilter.value.length +
+      jointFilter.value.length +
+      focusFilter.value.length +
+      ratingFilter.value.length >
+    0,
 )
 
 function clearFilters() {
@@ -232,12 +267,19 @@ function clearFilters() {
   muscleFilter.value = []
   jointFilter.value = []
   focusFilter.value = []
+  ratingFilter.value = []
 }
 
 function toggleType(type: ExerciseType) {
   typeFilter.value = typeFilter.value.includes(type)
     ? typeFilter.value.filter((t) => t !== type)
     : [...typeFilter.value, type]
+}
+
+function toggleRating(rating: number) {
+  ratingFilter.value = ratingFilter.value.includes(rating)
+    ? ratingFilter.value.filter((r) => r !== rating)
+    : [...ratingFilter.value, rating]
 }
 
 const exerciseById = computed(() => new Map(props.exercises.map((e) => [e.id, e])))

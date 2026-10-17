@@ -1,11 +1,13 @@
 FROM golang:1.26-alpine
 
+# air rebuilds and restarts the API on file changes; sqlc is here to regenerate queries in the container
 RUN apk add --no-cache git \
     && go install github.com/air-verse/air@latest \
     && go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
 
 WORKDIR /app
 
+# Dependencies first, so this layer stays cached while only the code changes
 COPY go.mod go.sum ./
 RUN go mod download
 

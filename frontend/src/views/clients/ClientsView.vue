@@ -40,6 +40,7 @@ import { listClients } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import type { Client } from '../../types'
 
+// AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()

@@ -1,4 +1,5 @@
 <template>
+	<!-- Sandboxed: the players need scripts and their own origin, but can't navigate this page. -->
 	<div
 		v-if="embed"
 		:class="embed.provider === 'youtube' ? 'aspect-video' : 'h-136 max-w-sm'"

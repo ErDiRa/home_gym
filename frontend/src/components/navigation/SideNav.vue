@@ -42,5 +42,6 @@ import { state } from '../../session'
 import type { NavItem } from '../../navigation'
 
 const props = defineProps<{ navigation: NavItem[] }>()
+// Admin-only entries are hidden for user sessions (the routes are guarded too).
 const visibleItems = computed(() => props.navigation.filter((item) => !item.adminOnly || state.user?.is_admin))
 </script>

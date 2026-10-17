@@ -47,11 +47,13 @@ func Setup(level, format string) (*slog.Logger, error) {
 func Middleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Wrap the writer to read the status and size the handler wrote.
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			start := time.Now()
 
 			defer func() {
 				status := ww.Status()
+				// No explicit WriteHeader (or nothing written at all) means net/http sent 200.
 				if status == 0 {
 					status = http.StatusOK
 				}

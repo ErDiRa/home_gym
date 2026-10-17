@@ -1,4 +1,5 @@
 <template>
+  <!-- click.stop keeps a link click from also opening the row. -->
   <span v-if="urls.length" class="inline-flex gap-2">
     <a
       v-for="(url, i) in urls"
@@ -19,6 +20,7 @@
 import { computed } from 'vue'
 import type { ICellRendererParams } from 'ag-grid-community'
 
+// AG Grid cell renderer: one link per video, the first labelled "Watch".
 const props = defineProps<{ params: ICellRendererParams }>()
 // Only http(s) links are rendered, never e.g. javascript: URLs.
 const urls = computed(() => ((props.params.value ?? []) as string[]).filter((u) => /^https?:\/\//i.test(u)))

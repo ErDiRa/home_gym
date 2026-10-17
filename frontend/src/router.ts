@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { restoreSession } from './api'
 import { isAuthenticated, state } from './session'
 
+// Typed route meta. Children inherit their parent's meta (vue-router merges it into to.meta).
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
@@ -82,6 +83,7 @@ const router = createRouter({
   ],
 })
 
+// Every navigation waits for the session restore, then redirects by the route's meta.
 router.beforeEach(async (to) => {
   await restoreSession()
   const authenticated = isAuthenticated()
@@ -89,7 +91,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAdmin && !state.user?.is_admin) {
-    return { name: 'exercises' }
+    return { name: 'exercises' } // the one page user sessions can see
   }
   if (to.meta.guestOnly && authenticated) {
     return { name: 'home' }

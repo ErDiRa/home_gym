@@ -41,6 +41,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import ActiveCell from '../../components/grid/ActiveCell.vue'
 import type { Training } from '../../types'
 
+// AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()
@@ -55,6 +56,7 @@ const columnDefs: ColDef<Training>[] = [
     headerName: 'Client',
     flex: 2,
     minWidth: 160,
+    // "Last, First" so the column sorts by last name.
     valueGetter: (p) => (p.data ? `${p.data.client_last_name}, ${p.data.client_first_name}` : ''),
   },
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
@@ -66,7 +68,7 @@ const columnDefs: ColDef<Training>[] = [
     cellRenderer: ActiveCell,
     // Filter and search by the label rather than true/false.
     valueFormatter: (p) => (p.value ? 'Active' : 'Inactive'),
-    getQuickFilterText: (p) => (p.value ? 'Active' : ''),
+    getQuickFilterText: (p) => (p.value ? 'Active' : ''), // so searching "active" skips inactive ones
   },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   { field: 'unit_count', headerName: 'Units', flex: 1, minWidth: 90 },

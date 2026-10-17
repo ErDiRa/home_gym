@@ -1,14 +1,11 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/erdira/homegym/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/service/feedback"
 )
 
 // clientRoutes are mounted under /api/client for any authenticated user.
@@ -28,57 +25,39 @@ func (h *Handler) ListAssignedTrainings(w http.ResponseWriter, r *http.Request) 
 	notImplemented(w, r)
 }
 
-type feedbackRequest struct {
-	Rating int32  `json:"rating"`
-	Notes  string `json:"notes"`
-}
-
+// UpsertFeedback stores the current user's rating (1-5) and notes for an exercise, replacing
+// any earlier rating of theirs.
 func (h *Handler) UpsertFeedback(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(w, r)
 	if !ok {
 		return
 	}
-	exerciseID, err := uuid.Parse(chi.URLParam(r, "id"))
+	exerciseID, ok := idParam(w, r, "exercise")
+	if !ok {
+		return
+	}
+	var in feedback.RatingInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	f, err := h.feedback.Rate(r.Context(), userID, exerciseID, in)
 	if err != nil {
-		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
+		serviceError(w, r, err)
 		return
 	}
-
-	var req feedbackRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-	if req.Rating < 1 || req.Rating > 5 {
-		writeError(w, r, http.StatusBadRequest, "rating must be between 1 and 5")
-		return
-	}
-
-	feedback, err := h.queries.UpsertExerciseFeedback(r.Context(), database.UpsertExerciseFeedbackParams{
-		UserID:     userID,
-		ExerciseID: exerciseID,
-		Rating:     req.Rating,
-		Notes:      req.Notes,
-	})
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
-			clientError(w, r, http.StatusNotFound, "user or exercise not found", err)
-			return
-		}
-		serverError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, feedback)
+	writeJSON(w, http.StatusOK, f)
 }
 
+// ExerciseStats lists the exercises the current user has logged, most performed first, with
+// their rating of each.
 func (h *Handler) ExerciseStats(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(w, r)
 	if !ok {
 		return
 	}
-	stats, err := h.queries.GetExerciseStats(r.Context(), userID)
+	stats, err := h.feedback.Stats(r.Context(), userID)
 	if err != nil {
-		serverError(w, r, err)
+		serviceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)

@@ -104,6 +104,8 @@
               :index="b"
               :count="unit.blocks.length"
               :exercises="exercises"
+              :ratings="ratings"
+              :rated-by="clientName"
               @move="move(unit.blocks, b, $event)"
               @remove="unit.blocks.splice(b, 1)"
             />
@@ -113,6 +115,7 @@
             Add block
           </AppButton>
         </div>
+        <!-- New units are named after the next letter: Day A, Day B... -->
         <AppButton variant="secondary" size="md" @click="units.push(newUnit(`Day ${String.fromCharCode(65 + units.length)}`))">
           <PlusIcon class="size-4" aria-hidden="true" />
           Add unit
@@ -131,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ArrowLeftIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
@@ -141,6 +144,7 @@ import {
   deleteTraining,
   duplicateTraining,
   getTraining,
+  listClientExerciseRatings,
   listClients,
   listExercises,
   updateTraining,
@@ -161,7 +165,7 @@ import {
   toRows,
   type UnitRow,
 } from '../../components/training/trainingForm'
-import type { Client, Exercise } from '../../types'
+import type { Client, Exercise, ExerciseRating } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -186,6 +190,13 @@ const duplicateOpen = ref(false)
 const duplicateClientId = ref<string | null>(null)
 const units = ref<UnitRow[]>(trainingId ? [] : [newUnit('Day A')])
 const exercises = ref<Exercise[]>([])
+// How the selected client rated exercises, by exercise id; null while no client is selected.
+const ratings = ref<Map<string, ExerciseRating> | null>(null)
+// The client's first name, for labels like "Rated by Anna".
+const clientName = computed(() => {
+  const client = clients.value.find((c) => c.id === clientId.value)
+  return client ? client.first_name : ''
+})
 const saving = ref(false)
 
 // Why the training can't be saved yet, if anything; mirrors the server's checks.
@@ -208,7 +219,7 @@ onMounted(async () => {
       listExercises(),
       listClients(),
       trainingId ? getTraining(trainingId) : undefined,
-      loadTrainingLookups(),
+      loadTrainingLookups(), // fills the shared lookup refs, so its result isn't needed here
     ])
     exercises.value = loadedExercises
     clients.value = loadedClients
@@ -224,6 +235,25 @@ onMounted(async () => {
   }
 })
 
+// Load the ratings of whichever client is selected: preselected (?client=), loaded with the
+// training, or picked in the form.
+watch(
+  clientId,
+  async (id) => {
+    ratings.value = null
+    if (!id) return
+    try {
+      const loaded = await listClientExerciseRatings(id)
+      // Ignore the answer if another client was picked meanwhile.
+      if (clientId.value === id) ratings.value = new Map(loaded.map((r) => [r.exercise_id, r]))
+    } catch {
+      toast.error("Could not load the client's exercise ratings.")
+    }
+  },
+  { immediate: true },
+)
+
+// Asks first only when the unit has exercises that would be lost.
 function removeUnit(index: number) {
   const unit = units.value[index]
   if (unit.blocks.some((b) => b.exercises.length) && !confirm(`Remove "${unit.name}" with all its blocks?`)) return

@@ -4,7 +4,8 @@
 --   anna@example.com  gym training: an active and an older inactive training, all block kinds,
 --                     ranges, kg / % 1RM / RPE / RIR loads
 --   ben@example.com   home training: kettlebell work, seconds, per-side reps, a unit on a date
---   clara@example.com no trainings, for empty states
+--   clara@example.com no trainings and no exercise ratings, for empty states
+-- Anna and Ben also rate some exercises (1-5), for the rating filter in the exercise picker.
 
 -- Helpers, dropped with the session. Units and exercises are looked up by name.
 CREATE FUNCTION pg_temp.exercise_id(ex_name text) RETURNS uuid LANGUAGE plpgsql AS $$
@@ -83,7 +84,7 @@ DO $$
 DECLARE
     anna uuid;
     ben uuid;
-    t uuid;
+    t uuid; -- the training, unit and block being filled
     u uuid;
     b uuid;
 BEGIN
@@ -99,6 +100,22 @@ BEGIN
     INSERT INTO exercise_videos (exercise_id, position, url)
     SELECT pg_temp.exercise_id('Squat'), coalesce(max(position), 0) + 1, 'https://www.youtube.com/results?search_query=Squat+tempo+31X1'
     FROM exercise_videos WHERE exercise_id = pg_temp.exercise_id('Squat');
+
+    -- Exercise ratings: Anna and Ben rate some exercises and leave the rest unrated; Clara none.
+    INSERT INTO exercise_feedbacks (user_id, exercise_id, rating, notes)
+    SELECT r.user_id, pg_temp.exercise_id(r.exercise), r.rating, r.notes
+    FROM (VALUES
+        (anna, 'Squat', 5, 'Favourite lift'),
+        (anna, 'Deadlift', 4, ''),
+        (anna, 'Bench Press', 3, 'Shoulder feels it at the bottom'),
+        (anna, 'Lateral Raise', 2, ''),
+        (anna, 'Triceps Pushdown', 1, 'Boring'),
+        (anna, 'Pull-up', 5, ''),
+        (ben, 'Kettlebell Swing', 5, ''),
+        (ben, 'Push-up', 4, ''),
+        (ben, 'Bulgarian Split Squat', 2, 'Knee hurts on the back leg'),
+        (ben, 'Ring Row', 3, '')
+    ) AS r(user_id, exercise, rating, notes);
 
     -- Anna, active: two gym days with every block kind.
     t := pg_temp.training(anna, 'Strength – Phase 2', '4 weeks, heavy compounds. Add 2.5 kg when all reps feel easy.', true);

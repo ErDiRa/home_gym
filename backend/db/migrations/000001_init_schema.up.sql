@@ -63,6 +63,7 @@ CREATE TABLE focuses (
 
 CREATE UNIQUE INDEX idx_focuses_name ON focuses (lower(name)) WHERE deleted_at IS NULL;
 
+-- The exercise library trainings pick from.
 CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT NOT NULL,
@@ -239,6 +240,8 @@ CREATE TABLE training_exercises (
 
 CREATE INDEX idx_training_exercises_block ON training_exercises (block_id, position);
 
+-- A client's rating (1-5) and notes for an exercise, at most one live row per client and
+-- exercise. Admins filter the exercise picker by the training's client's ratings.
 CREATE TABLE exercise_feedbacks (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -253,6 +256,7 @@ CREATE UNIQUE INDEX idx_exercise_feedbacks_user_exercise
     ON exercise_feedbacks (user_id, exercise_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_exercise_feedbacks_exercise ON exercise_feedbacks (exercise_id);
 
+-- What a client actually did: one row per performed exercise. Not used by the UI yet.
 CREATE TABLE workout_logs (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,

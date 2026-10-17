@@ -13,6 +13,7 @@
         <ChevronUpDownIcon class="size-4 text-slate-400" aria-hidden="true" />
       </ComboboxButton>
 
+      <!-- The query is reset once the list has closed, so it doesn't flash back to all units. -->
       <Transition leave-active-class="transition-opacity duration-100" leave-to-class="opacity-0" @after-leave="query = ''">
         <ComboboxOptions
           :class="openUp ? 'bottom-full mb-1' : 'top-full mt-1'"
@@ -70,6 +71,7 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   return q ? units.value.filter((u) => u.name.toLowerCase().includes(q)) : units.value
 })
+// Offer "Add" only for a name that doesn't exist yet (case-insensitive, like the server's index).
 const canCreate = computed(() => {
   const q = query.value.trim().toLowerCase()
   return q !== '' && !units.value.some((u) => u.name.toLowerCase() === q)

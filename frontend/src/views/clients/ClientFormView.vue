@@ -107,7 +107,7 @@ const inputClass =
   'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
 const form = reactive<ClientInput>({ first_name: '', last_name: '', email: '' })
-const password = ref('')
+const password = ref('') // only asked for when creating
 const trainings = ref<ClientTraining[]>([])
 const saving = ref(false)
 
@@ -115,6 +115,7 @@ onMounted(async () => {
   if (!clientId) return
   try {
     const client = await getClient(clientId)
+    // Copy just the editable fields; the response also has id, created_at and trainings.
     Object.assign(form, { first_name: client.first_name, last_name: client.last_name, email: client.email })
     trainings.value = client.trainings
   } catch (e) {

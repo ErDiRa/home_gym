@@ -34,6 +34,7 @@ export interface UnitRow {
   blocks: BlockRow[]
 }
 
+// Keys only need to be unique on the page, so a module-wide counter will do.
 let lastKey = 0
 export const nextKey = () => ++lastKey
 
@@ -47,6 +48,7 @@ export const emptyAmount = (): Amount => ({
   load_unit: null,
 })
 
+// Copies just the amount fields, leaving behind unit names and the row's other fields.
 const pickAmount = (a: Amount): Amount => ({
   reps_value: a.reps_value,
   reps_max: a.reps_max,
@@ -78,6 +80,8 @@ export const newUnit = (name: string): UnitRow => ({
   blocks: [newBlock()],
 })
 
+// Turns a loaded training into editable rows. The side the kind doesn't use has no sets, so it
+// borrows them from the other side: switching to another kind then starts from a sensible value.
 export function toRows(training: TrainingDetail): UnitRow[] {
   return training.units.map((u) => ({
     key: nextKey(),
@@ -115,6 +119,8 @@ function cleanAmount(a: Amount): Amount {
   return out
 }
 
+// Builds the request body from the rows, sending sets only on the side the block's kind uses
+// (the server clears reps and load on the unused side itself).
 export function toInput(fields: Omit<TrainingInput, 'units'>, units: UnitRow[]): TrainingInput {
   return {
     ...fields,
@@ -182,6 +188,7 @@ export function blockProblem(b: BlockRow): string {
     if (e) return `${e.name}: Sets must be 1-100.`
   }
 
+  // Reps and load are checked on the block when its kind shares them, else on every exercise.
   const parts: [AmountPart, boolean][] = [
     ['reps', kind.shared_reps],
     ['load', kind.shared_load],
@@ -212,6 +219,7 @@ function amountProblem(a: Amount, part: AmountPart): string {
   return ''
 }
 
+// The column range (NUMERIC(7, 2), like the server's maxAmount) and the unit's own bounds.
 const withinBounds = (v: number, u: Unit) =>
   v >= 0 && v < 100000 && (u.min_value === null || v >= u.min_value) && (u.max_value === null || v <= u.max_value)
 

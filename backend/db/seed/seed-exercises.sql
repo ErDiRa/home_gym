@@ -30,7 +30,7 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     WHERE NOT EXISTS (
         SELECT 1 FROM exercises e WHERE e.name = v.name AND e.deleted_at IS NULL
     )
-    RETURNING id, name
+    RETURNING id, name -- the link CTEs join back to v by name for the rest of the row
 ), linked_videos AS (
     INSERT INTO exercise_videos (exercise_id, position, url)
     SELECT n.id, 1, v.video_url

@@ -1,4 +1,5 @@
 <template>
+  <!-- A <button>, or a RouterLink styled the same when `to` is set (type and disabled only apply to a button). -->
   <component
     :is="to ? RouterLink : 'button'"
     :to="to"

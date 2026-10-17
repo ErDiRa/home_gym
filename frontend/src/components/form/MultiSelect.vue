@@ -94,6 +94,7 @@ import {
 import { CheckIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/vue/16/solid'
 import type { Option } from '../../types'
 
+// A searchable multi-select that shows the picks as removable chips inside the field.
 const props = withDefaults(
   defineProps<{ label: string; options: Option[]; placeholder?: string; required?: boolean; disabled?: boolean }>(),
   { placeholder: 'Select…' },
@@ -125,6 +126,7 @@ function removeLastOnEmpty() {
 // more room above it, open upwards instead (e.g. fields near the bottom of the page).
 const OPTIONS_HEIGHT = 240
 const field = ref<HTMLElement | null>(null)
+// ComboboxInput is a component; its $el is the <input>, focused when the field is clicked.
 const input = ref<{ $el: HTMLInputElement | null } | null>(null)
 const openUp = ref(false)
 

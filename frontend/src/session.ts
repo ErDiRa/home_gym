@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 
+// The signed-in account, as returned by /api/auth/login and /api/auth/me.
 export interface User {
   id: string
   email: string
@@ -8,6 +9,7 @@ export interface User {
 
 // The JWT lives in an HttpOnly cookie that scripts cannot read, so the only thing
 // kept client-side is the user the server reported, in memory.
+// restored: whether /api/auth/me has been asked yet (see restoreSession).
 type SessionState = { user: User | null; restored: boolean }
 
 // In dev, Vite may re-evaluate this module on a hot update while other modules keep the old

@@ -6,6 +6,7 @@ export const exerciseTypeLabels: Record<ExerciseType, string> = {
   strength: 'Strength',
 }
 
+// An exercise as listed: its links by name (focuses with alias), for display and filtering.
 export interface Exercise {
   id: string
   name: string
@@ -48,7 +49,8 @@ export interface ExerciseDetail extends ExerciseInput {
 
 // A training belongs to one client and is a tree: units (e.g. "Day A") hold blocks (e.g.
 // "Warm-up", "Superset"), and blocks hold one or more exercises with their prescription.
-// reps is free text, e.g. '8-10'.
+// The *Input types are what the form sends, the others what the server returns.
+
 // The kind of a training block (single, superset, complex...). Its rules come from the server,
 // so new kinds need no code: how many exercises it takes, and whether sets, reps and load are
 // set once on the block for all exercises (shared) or per exercise.
@@ -96,6 +98,7 @@ export interface TrainingExerciseInput extends Amount {
   notes: string
 }
 
+// An exercise in a block as returned, with the exercise's name and type for display.
 export interface TrainingExercise extends TrainingExerciseInput, AmountUnitNames {
   name: string
   type: ExerciseType
@@ -111,8 +114,9 @@ export interface TrainingBlockInput extends Amount {
   exercises: TrainingExerciseInput[]
 }
 
+// When a unit is done: on recurring weekdays and/or specific dates.
 export interface UnitSchedule {
-  weekdays: number[]
+  weekdays: number[] // ISO, 1 = Monday
   dates: string[] // YYYY-MM-DD
 }
 
@@ -149,6 +153,7 @@ export interface TrainingUnit extends UnitSchedule {
   blocks: TrainingBlock[]
 }
 
+// A whole training as the edit form loads it.
 export interface TrainingDetail {
   id: string
   client_id: string
@@ -170,6 +175,14 @@ export interface Training {
   client_last_name: string
   unit_count: number
   exercise_count: number
+}
+
+// How a client rated an exercise (1-5), with their notes.
+export interface ExerciseRating {
+  exercise_id: string
+  rating: number
+  notes: string
+  updated_at: string
 }
 
 // Clients are the user accounts admins manage.
@@ -203,6 +216,7 @@ export interface ClientTraining {
   unit_count: number
 }
 
+// A client with their trainings, the active one first.
 export interface ClientDetail extends ClientInput {
   id: string
   created_at: string

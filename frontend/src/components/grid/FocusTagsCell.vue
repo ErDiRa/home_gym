@@ -16,6 +16,7 @@ import { computed } from 'vue'
 import type { ICellRendererParams } from 'ag-grid-community'
 import type { Focus } from '../../types'
 
+// AG Grid cell renderer: shows focuses as alias tags, full name on hover; params.value is the cell's value.
 const props = defineProps<{ params: ICellRendererParams }>()
 const focuses = computed<Focus[]>(() => props.params.value ?? [])
 </script>

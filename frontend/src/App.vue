@@ -1,5 +1,6 @@
 <template>
   <RouterView />
+  <!-- One toaster for the whole app; anything can call toast() from vue-sonner. -->
   <Toaster position="top-right" rich-colors close-button />
 </template>
 

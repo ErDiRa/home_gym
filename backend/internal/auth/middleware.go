@@ -14,10 +14,11 @@ import (
 // CookieName is the HttpOnly cookie that carries the JWT.
 const CookieName = "token"
 
+// ctxKey is unexported so no other package can read or overwrite the claims in the context.
 type ctxKey struct{}
 
-// Middleware rejects requests without a valid JWT cookie and stores the
-// authenticated user ID in the request context.
+// Middleware rejects requests without a valid JWT cookie and stores the verified claims
+// (account ID and role) in the request context. Roles are checked by RequireUser/RequireAdmin.
 func Middleware(tokens *TokenManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,6 +70,8 @@ func SetCookie(w http.ResponseWriter, token string, ttl time.Duration, secure bo
 	http.SetCookie(w, c)
 }
 
+// ClearCookie deletes the auth cookie. Its attributes must match SetCookie's, or the browser
+// treats it as a different cookie and keeps the old one.
 func ClearCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,

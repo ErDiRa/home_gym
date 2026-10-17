@@ -12,6 +12,7 @@ export const loadUnits = ref<Unit[]>([])
 export const lastLoadUnit = ref<string | null>(null)
 
 export async function loadTrainingLookups() {
+  // The leading semicolon keeps a line starting with [ from joining the previous statement.
   ;[blockKinds.value, repUnits.value, loadUnits.value] = await Promise.all([
     listBlockKinds(),
     listRepUnits(),
@@ -19,10 +20,12 @@ export async function loadTrainingLookups() {
   ])
 }
 
+// The kind with the given code; undefined until the lookups are loaded.
 export const kindOf = (code: string) => blockKinds.value.find((k) => k.code === code)
 
 export type AmountPart = 'reps' | 'load'
 
+// The unit list for reps or load.
 export const unitsOf = (part: AmountPart) => (part === 'reps' ? repUnits : loadUnits)
 
 // Creates a unit and adds it to the list, so every picker offers it right away.

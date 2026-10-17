@@ -1,18 +1,12 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"net/url"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/erdira/homegym/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/service/exercise"
+	"github.com/erdira/homegym/backend/internal/service/lookup"
 )
 
 // adminRoutes are mounted under /api/admin behind auth.RequireAdmin.
@@ -41,208 +35,81 @@ func (h *Handler) adminRoutes(r chi.Router) {
 	r.Get("/clients/{id}", h.GetClient)
 	r.Put("/clients/{id}", h.UpdateClient)
 	r.Delete("/clients/{id}", h.DeleteClient)
-}
-
-type createExerciseRequest struct {
-	Name           string      `json:"name"`
-	JointIDs       []uuid.UUID `json:"joint_ids"`
-	MuscleGroupIDs []uuid.UUID `json:"muscle_group_ids"`
-	FocusIDs       []uuid.UUID `json:"focus_ids"`
-	Description    string      `json:"description"`
-	VideoURLs      []string    `json:"video_urls"` // in display order
-	Type           string      `json:"type"`
-}
-
-// parseExerciseRequest decodes and validates an exercise body, writing the error response
-// itself on failure. The returned request has deduplicated ids.
-func parseExerciseRequest(w http.ResponseWriter, r *http.Request) (createExerciseRequest, bool) {
-	var req createExerciseRequest
-	if !decodeJSON(w, r, &req) {
-		return req, false
-	}
-	req.JointIDs, req.MuscleGroupIDs, req.FocusIDs = unique(req.JointIDs), unique(req.MuscleGroupIDs), unique(req.FocusIDs)
-	if req.Name == "" || len(req.JointIDs) == 0 || len(req.MuscleGroupIDs) == 0 {
-		writeError(w, r, http.StatusBadRequest, "name, joint_ids and muscle_group_ids are required")
-		return req, false
-	}
-	if req.Type != "mobility" && req.Type != "strength" {
-		writeError(w, r, http.StatusBadRequest, "type must be mobility or strength")
-		return req, false
-	}
-	// Empty inputs are dropped, so the form can send the blank row it shows for adding a link.
-	videos := make([]string, 0, len(req.VideoURLs))
-	for _, v := range req.VideoURLs {
-		if v = strings.TrimSpace(v); v == "" {
-			continue
-		}
-		if u, err := url.Parse(v); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || tooLong(v, 500) {
-			writeError(w, r, http.StatusBadRequest, "video links must be http(s) URLs (max 500 characters)")
-			return req, false
-		}
-		videos = append(videos, v)
-	}
-	if len(videos) > 10 {
-		writeError(w, r, http.StatusBadRequest, "an exercise can have at most 10 video links")
-		return req, false
-	}
-	req.VideoURLs = videos
-	return req, true
-}
-
-// exerciseWriteError maps a failed create/update to a response.
-func exerciseWriteError(w http.ResponseWriter, r *http.Request, err error) {
-	var pgErr *pgconn.PgError
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		clientError(w, r, http.StatusNotFound, "exercise not found", err)
-	case errors.As(err, &pgErr) && pgErr.Code == "23503": // foreign_key_violation
-		clientError(w, r, http.StatusBadRequest, "unknown joint, muscle group or focus", err)
-	default:
-		serverError(w, r, err)
-	}
+	r.Get("/clients/{id}/exercise-ratings", h.ListClientExerciseRatings)
 }
 
 func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
-	req, ok := parseExerciseRequest(w, r)
-	if !ok {
+	var in exercise.Input
+	if !decodeJSON(w, r, &in) {
 		return
 	}
-	exercise, err := h.queries.CreateExercise(r.Context(), database.CreateExerciseParams{
-		Name:           req.Name,
-		Description:    req.Description,
-		Type:           req.Type,
-		VideoUrls:      req.VideoURLs,
-		JointIds:       req.JointIDs,
-		MuscleGroupIds: req.MuscleGroupIDs,
-		FocusIds:       req.FocusIDs,
-	})
+	e, err := h.exercises.Create(r.Context(), in)
 	if err != nil {
-		exerciseWriteError(w, r, err)
+		serviceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, exercise)
+	writeJSON(w, http.StatusCreated, e)
 }
 
 func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
-		return
-	}
-	req, ok := parseExerciseRequest(w, r)
+	id, ok := idParam(w, r, "exercise")
 	if !ok {
 		return
 	}
-	exercise, err := h.queries.UpdateExercise(r.Context(), database.UpdateExerciseParams{
-		ID:             id,
-		Name:           req.Name,
-		Description:    req.Description,
-		Type:           req.Type,
-		VideoUrls:      req.VideoURLs,
-		JointIds:       req.JointIDs,
-		MuscleGroupIds: req.MuscleGroupIDs,
-		FocusIds:       req.FocusIDs,
-	})
-	if err != nil {
-		exerciseWriteError(w, r, err)
+	var in exercise.Input
+	if !decodeJSON(w, r, &in) {
 		return
 	}
-	writeJSON(w, http.StatusOK, exercise)
+	e, err := h.exercises.Update(r.Context(), id, in)
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, e)
 }
 
-// GetExercise returns one exercise with the ids of its joints and muscle groups, for filling
-// the exercise form. It is shared by the admin and client routes.
+// GetExercise returns one exercise with the ids of its links, for filling the exercise form.
+// It is shared by the admin and client routes.
 func (h *Handler) GetExercise(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
+	id, ok := idParam(w, r, "exercise")
+	if !ok {
 		return
 	}
-	exercise, err := h.queries.GetExercise(r.Context(), id)
+	e, err := h.exercises.Get(r.Context(), id)
 	if err != nil {
-		exerciseWriteError(w, r, err)
+		serviceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, exercise)
+	writeJSON(w, http.StatusOK, e)
 }
 
-// unique returns ids without duplicates, keeping the first occurrence of each.
-func unique(ids []uuid.UUID) []uuid.UUID {
-	seen := make(map[uuid.UUID]bool, len(ids))
-	out := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if !seen[id] {
-			seen[id] = true
-			out = append(out, id)
-		}
-	}
-	return out
+// ListExercises returns all exercises with the names of their links. Shared by the admin and
+// client routes.
+func (h *Handler) ListExercises(w http.ResponseWriter, r *http.Request) {
+	list(w, r, h.exercises.List)
 }
 
 func (h *Handler) ListJoints(w http.ResponseWriter, r *http.Request) {
-	joints, err := h.queries.ListJoints(r.Context())
-	if err != nil {
-		serverError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, joints)
-}
-
-func (h *Handler) ListFocuses(w http.ResponseWriter, r *http.Request) {
-	focuses, err := h.queries.ListFocuses(r.Context())
-	if err != nil {
-		serverError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, focuses)
-}
-
-type createFocusRequest struct {
-	Name  string `json:"name"`
-	Alias string `json:"alias"`
-}
-
-func (h *Handler) CreateFocus(w http.ResponseWriter, r *http.Request) {
-	var req createFocusRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-	name, alias := strings.TrimSpace(req.Name), strings.TrimSpace(req.Alias)
-	if name == "" || len(name) > 60 {
-		writeError(w, r, http.StatusBadRequest, "name is required (max 60 characters)")
-		return
-	}
-	if alias == "" || utf8.RuneCountInString(alias) > 10 {
-		writeError(w, r, http.StatusBadRequest, "alias is required (max 10 characters)")
-		return
-	}
-	focus, err := h.queries.CreateFocus(r.Context(), database.CreateFocusParams{Name: name, Alias: alias})
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			writeError(w, r, http.StatusConflict, "this focus already exists")
-			return
-		}
-		serverError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, focus)
+	list(w, r, h.lookups.Joints)
 }
 
 func (h *Handler) ListMuscleGroups(w http.ResponseWriter, r *http.Request) {
-	groups, err := h.queries.ListMuscleGroups(r.Context())
-	if err != nil {
-		serverError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, groups)
+	list(w, r, h.lookups.MuscleGroups)
 }
 
-func (h *Handler) ListExercises(w http.ResponseWriter, r *http.Request) {
-	exercises, err := h.queries.ListExercises(r.Context())
-	if err != nil {
-		serverError(w, r, err)
+func (h *Handler) ListFocuses(w http.ResponseWriter, r *http.Request) {
+	list(w, r, h.lookups.Focuses)
+}
+
+func (h *Handler) CreateFocus(w http.ResponseWriter, r *http.Request) {
+	var in lookup.FocusInput
+	if !decodeJSON(w, r, &in) {
 		return
 	}
-	writeJSON(w, http.StatusOK, exercises)
+	focus, err := h.lookups.CreateFocus(r.Context(), in)
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, focus)
 }

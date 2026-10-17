@@ -44,6 +44,7 @@ import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { state } from '../../session'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
 
+// AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()
@@ -81,6 +82,7 @@ const columnDefs: ColDef<Exercise>[] = [
     // Sort, filter and search by name and alias, not by the objects.
     valueFormatter: (p) => (p.value as Focus[] | null)?.map((f) => f.name).join(', ') ?? '',
     getQuickFilterText: (p) => (p.value as Focus[] | null)?.map((f) => `${f.name} ${f.alias}`).join(' ') ?? '',
+    // Sorted by the first focus, which the server returns alphabetically.
     comparator: (a: Focus[], b: Focus[]) => (a[0]?.name ?? '').localeCompare(b[0]?.name ?? ''),
   },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },

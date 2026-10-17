@@ -30,6 +30,7 @@ type Claims struct {
 	Remember bool   `json:"remember"`
 }
 
+// UserID parses the subject: a user ID or an admin ID, depending on Role.
 func (c *Claims) UserID() (uuid.UUID, error) { return uuid.Parse(c.Subject) }
 
 // SessionExpiry returns when a token issued at now expires: SessionTTL from now,
@@ -47,6 +48,7 @@ type TokenManager struct {
 	secret []byte
 }
 
+// NewTokenManager signs with secret, which must be long enough to resist brute-forcing.
 func NewTokenManager(secret string) (*TokenManager, error) {
 	if len(secret) < 16 {
 		return nil, errors.New("JWT secret must be at least 16 characters")
@@ -54,6 +56,8 @@ func NewTokenManager(secret string) (*TokenManager, error) {
 	return &TokenManager{secret: []byte(secret)}, nil
 }
 
+// Issue signs a token for an account. authTime and remember are carried over unchanged when
+// the session is extended, so the 7-day cap and cookie kind survive refreshes.
 func (m *TokenManager) Issue(role string, id uuid.UUID, authTime time.Time, remember bool, expiry time.Time) (string, error) {
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -68,6 +72,8 @@ func (m *TokenManager) Issue(role string, id uuid.UUID, authTime time.Time, reme
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.secret)
 }
 
+// Parse verifies a token's signature and expiry and checks the claims the app relies on.
+// Pinning HS256 rejects tokens signed with another algorithm (e.g. "none").
 func (m *TokenManager) Parse(token string) (*Claims, error) {
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (any, error) {

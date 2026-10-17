@@ -8,6 +8,7 @@ import type {
   Exercise,
   ExerciseDetail,
   ExerciseInput,
+  ExerciseRating,
   Focus,
   NewClientInput,
   Option,
@@ -17,6 +18,7 @@ import type {
   Unit,
 } from './types'
 
+// A failed request: the HTTP status plus the server's {"error": ...} message (or the status text).
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -26,12 +28,14 @@ export class ApiError extends Error {
   }
 }
 
+// Sends a request to /api and returns the decoded JSON, throwing ApiError on a non-2xx status.
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body) headers.set('Content-Type', 'application/json')
 
   // Same-origin (Vite proxy / reverse proxy), so the auth cookie is sent automatically.
   const res = await fetch(`/api${path}`, { ...init, headers })
+  // 204 has no body; a non-JSON body (e.g. a proxy's HTML error page) becomes null.
   const body = res.status === 204 ? null : await res.json().catch(() => null)
 
   if (!res.ok) {
@@ -90,12 +94,16 @@ export const getClient = (id: string) => api.get<ClientDetail>(`/admin/clients/$
 export const createClient = (input: NewClientInput) => api.post<Client>('/admin/clients', input)
 export const updateClient = (id: string, input: ClientInput) => api.put<Client>(`/admin/clients/${id}`, input)
 export const deleteClient = (id: string) => api.delete(`/admin/clients/${id}`)
+// How a client rated exercises, for the rating filter in the exercise picker.
+export const listClientExerciseRatings = (id: string) =>
+  api.get<ExerciseRating[]>(`/admin/clients/${id}/exercise-ratings`)
 
 export async function login(email: string, password: string, remember: boolean) {
   state.user = await api.post<User>('/auth/login', { email, password, remember })
 }
 
 export async function logout() {
+  // Sign out locally even if the request fails, so the UI never stays half-logged-in.
   try {
     await api.post('/auth/logout')
   } finally {

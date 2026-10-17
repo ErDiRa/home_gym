@@ -70,6 +70,7 @@
 				</div>
 			</fieldset>
 
+			<!-- Read-only viewers only see this section when there are links to show. -->
 			<fieldset v-if="!readonly || hasVideos">
 				<legend class="text-sm font-medium text-slate-800">Video links</legend>
 				<div v-for="(_, i) in form.video_urls" :key="i" class="mt-1 space-y-2">
@@ -268,16 +269,19 @@
 	const addingFocusOpen = ref(false);
 	const newFocusInput = ref<HTMLInputElement | null>(null);
 
+	// Focus the new-focus input once it has rendered.
 	watch(addingFocusOpen, async (open) => {
 		if (open) {
 			await nextTick();
 			newFocusInput.value?.focus();
 		}
 	});
+	// True while the new focus is being saved (addingFocusOpen is whether its fields show).
 	const addingFocus = ref(false);
 
 	// The server allows at most this many video links per exercise.
 	const MAX_VIDEOS = 10;
+	// Filled by the template's ref inside v-for: one element per link input, in order.
 	const videoInputs = ref<HTMLInputElement[]>([]);
 	const hasVideos = computed(() => form.video_urls.some((u) => u.trim()));
 
@@ -287,6 +291,7 @@
 		await nextTick();
 		videoInputs.value[form.video_urls.length - 1]?.focus();
 	}
+	// The fields the server requires besides the name (which the input's `required` covers).
 	const valid = computed(
 		() =>
 			form.type !== '' &&
@@ -307,6 +312,7 @@
 			muscleGroups.value = loadedMuscleGroups;
 			focuses.value = loadedFocuses;
 			if (exercise) {
+				// The form holds everything but the id, which comes from the route.
 				const { id: _id, ...fields } = exercise;
 				Object.assign(form, fields);
 				if (!form.video_urls.length) form.video_urls = [''];
@@ -358,7 +364,7 @@
 		if (form.type === '') return;
 		const input = {
 			...form,
-			type: form.type,
+			type: form.type, // narrowed to ExerciseType by the check above
 			video_urls: form.video_urls.map((u) => u.trim()).filter(Boolean)
 		};
 		saving.value = true;

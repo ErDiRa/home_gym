@@ -63,7 +63,7 @@ function toggleWeekday(day: number) {
 function addDate(event: Event) {
   const input = event.target as HTMLInputElement
   if (input.value && !dates.value.includes(input.value)) dates.value = [...dates.value, input.value].sort()
-  input.value = ''
+  input.value = '' // empty again, ready to add the next date
 }
 
 // Dates are YYYY-MM-DD; parse them as local dates so they don't shift by a day.

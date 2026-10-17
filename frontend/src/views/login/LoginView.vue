@@ -99,7 +99,7 @@
 	const error = ref('');
 	const loading = ref(false);
 
-	// Only follow same-origin paths to avoid open redirects.
+	// Only follow same-origin paths to avoid open redirects ("//host" would be another site).
 	function redirectTarget(): string {
 		const target = route.query.redirect;
 		return typeof target === 'string' &&
@@ -114,6 +114,7 @@
 		loading.value = true;
 		try {
 			await login(email.value, password.value, remember.value);
+			// replace, so Back doesn't return to the login page.
 			await router.replace(redirectTarget());
 		} catch (e) {
 			error.value =

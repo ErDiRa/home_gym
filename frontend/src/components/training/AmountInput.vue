@@ -51,11 +51,13 @@ const amount = defineModel<Amount>({ required: true })
 const numberClass =
   'h-8 w-16 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
+// An empty or unparsable input means "not set" (null), never 0.
 const parse = (e: Event) => {
   const raw = (e.target as HTMLInputElement).value
   return raw === '' || Number.isNaN(Number(raw)) ? null : Number(raw)
 }
 
+// value, max and unit map onto the reps_* or load_* fields, depending on part.
 const value = computed({
   get: () => (props.part === 'reps' ? amount.value.reps_value : amount.value.load_value),
   set: (v) => {
@@ -80,7 +82,7 @@ const unit = computed({
     if (props.part === 'reps') amount.value.reps_unit = id
     else {
       amount.value.load_unit = id
-      if (id) lastLoadUnit.value = id
+      if (id) lastLoadUnit.value = id // becomes the default for the next load
     }
   },
 })

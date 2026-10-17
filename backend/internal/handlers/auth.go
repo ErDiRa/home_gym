@@ -3,15 +3,11 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/erdira/homegym/backend/internal/auth"
-	"github.com/erdira/homegym/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/service"
+	"github.com/erdira/homegym/backend/internal/service/account"
 )
 
 type loginRequest struct {
@@ -20,84 +16,42 @@ type loginRequest struct {
 	Remember bool   `json:"remember"`
 }
 
-type userResponse struct {
-	ID      uuid.UUID `json:"id"`
-	Email   string    `json:"email"`
-	IsAdmin bool      `json:"is_admin"`
-}
-
-// dummyHash lets Login spend the same time on unknown emails as on wrong passwords.
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
-
+// Login checks the credentials and starts a new session; the login time becomes the token's
+// auth_time, from which the 7-day cap is measured.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	email := strings.ToLower(strings.TrimSpace(req.Email))
-
-	account, role, ok := h.authenticate(w, r, email, req.Password)
-	if !ok {
+	acc, err := h.accounts.Login(r.Context(), req.Email, req.Password)
+	if err != nil {
+		serviceError(w, r, err)
 		return
 	}
-	h.setSession(w, r, role, account, time.Now(), req.Remember)
+	h.setSession(w, r, acc, time.Now(), req.Remember)
 }
 
-// authenticate checks the credentials against the users table, then the admins table,
-// and writes the error response itself on failure.
-func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request, email, password string) (userResponse, string, bool) {
-	var (
-		account userResponse
-		role    string
-		hash    string
-	)
-	user, err := h.queries.GetUserByEmail(r.Context(), email)
-	switch {
-	case err == nil:
-		account, role, hash = userResponse{ID: user.ID, Email: user.Email}, auth.RoleUser, user.PasswordHash
-	case errors.Is(err, pgx.ErrNoRows):
-		admin, err := h.queries.GetAdminByEmail(r.Context(), email)
-		switch {
-		case err == nil:
-			account, role, hash = userResponse{ID: admin.ID, Email: admin.Email, IsAdmin: true}, auth.RoleAdmin, admin.PasswordHash
-		case errors.Is(err, pgx.ErrNoRows):
-			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-			writeError(w, r, http.StatusUnauthorized, "invalid email or password")
-			return userResponse{}, "", false
-		default:
-			serverError(w, r, err)
-			return userResponse{}, "", false
-		}
-	default:
-		serverError(w, r, err)
-		return userResponse{}, "", false
-	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
-		writeError(w, r, http.StatusUnauthorized, "invalid email or password")
-		return userResponse{}, "", false
-	}
-	return account, role, true
-}
-
-// setSession issues a fresh token and cookie for user and writes the user as the response.
+// setSession issues a fresh token and cookie for the account and writes it as the response.
 // The token lasts auth.SessionTTL but never beyond auth.MaxSessionAge after authTime. With
 // "remember me" the cookie expires with the token; otherwise it is dropped when the browser closes.
-func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, role string, user userResponse, authTime time.Time, remember bool) {
+func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, acc account.Account, authTime time.Time, remember bool) {
 	now := time.Now()
 	expiry := auth.SessionExpiry(now, authTime)
-	token, err := h.tokens.Issue(role, user.ID, authTime, remember, expiry)
+	token, err := h.tokens.Issue(acc.Role(), acc.ID, authTime, remember, expiry)
 	if err != nil {
 		serverError(w, r, err)
 		return
 	}
-	var cookieTTL time.Duration
+	var cookieTTL time.Duration // zero = session cookie
 	if remember {
 		cookieTTL = expiry.Sub(now)
 	}
 	auth.SetCookie(w, token, cookieTTL, h.secureCookies)
-	writeJSON(w, http.StatusOK, user)
+	writeJSON(w, http.StatusOK, acc)
 }
 
+// Logout clears the cookie. The JWT itself stays valid until it expires (there is no server-side
+// session to revoke), but the browser no longer has it.
 func (h *Handler) Logout(w http.ResponseWriter, _ *http.Request) {
 	auth.ClearCookie(w, h.secureCookies)
 	w.WriteHeader(http.StatusNoContent)
@@ -117,25 +71,17 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
-
-	var account userResponse
-	if claims.Role == auth.RoleAdmin {
-		var admin database.GetAdminByIDRow
-		admin, err = h.queries.GetAdminByID(r.Context(), id)
-		account = userResponse{ID: admin.ID, Email: admin.Email, IsAdmin: true}
-	} else {
-		var user database.GetUserByIDRow
-		user, err = h.queries.GetUserByID(r.Context(), id)
-		account = userResponse{ID: user.ID, Email: user.Email}
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	acc, err := h.accounts.Current(r.Context(), claims.Role, id)
+	// The account was deleted since login: end the session instead of extending it.
+	var svcErr *service.Error
+	if errors.As(err, &svcErr) && svcErr.Kind == service.KindNotFound {
 		auth.ClearCookie(w, h.secureCookies)
-		writeError(w, r, http.StatusUnauthorized, "account no longer exists")
+		clientError(w, r, http.StatusUnauthorized, svcErr.Msg, svcErr.Err)
 		return
 	}
 	if err != nil {
 		serverError(w, r, err)
 		return
 	}
-	h.setSession(w, r, claims.Role, account, time.Unix(claims.AuthTime, 0), claims.Remember)
+	h.setSession(w, r, acc, time.Unix(claims.AuthTime, 0), claims.Remember)
 }

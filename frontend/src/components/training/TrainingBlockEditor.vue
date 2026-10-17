@@ -61,6 +61,7 @@
         <div class="mb-2 flex items-center gap-2">
           <span class="w-7 shrink-0 text-sm font-semibold text-indigo-600">{{ exerciseLabel(block.exercises.length, index, i) }}</span>
           <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{{ item.name }}</span>
+          <RatingBadge v-if="ratings?.get(item.exercise_id)" :rating="ratings.get(item.exercise_id)!" />
           <ExerciseTypeBadge :type="item.type" />
           <MoveRemoveButtons
             :index="i"
@@ -125,6 +126,8 @@
       :exercises="exercises"
       :in-block="block.exercises.map((e) => e.exercise_id)"
       :limit="remaining"
+      :ratings="ratings"
+      :rated-by="ratedBy"
       @close="pickerOpen = false"
       @add="addExercises"
     />
@@ -136,14 +139,21 @@ import { computed, ref } from 'vue'
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
+import RatingBadge from '../exercise/RatingBadge.vue'
 import AmountInput from './AmountInput.vue'
 import ExercisePickerDialog from './ExercisePickerDialog.vue'
 import MoveRemoveButtons from './MoveRemoveButtons.vue'
 import { blockKinds, kindOf } from './lookups'
 import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
-import type { Exercise } from '../../types'
+import type { Exercise, ExerciseRating } from '../../types'
 
-const props = defineProps<{ index: number; count: number; exercises: Exercise[] }>()
+const props = defineProps<{
+  index: number
+  count: number
+  exercises: Exercise[]
+  ratings: Map<string, ExerciseRating> | null // the client's ratings by exercise id; null = no client
+  ratedBy: string // the client's name
+}>()
 const emit = defineEmits<{ move: [by: -1 | 1]; remove: [] }>()
 // Edited in place; the parent owns the training's rows.
 const block = defineModel<BlockRow>({ required: true })
