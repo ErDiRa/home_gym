@@ -19,21 +19,21 @@ type Admin struct {
 }
 
 type BlockKind struct {
-	Code         string      `json:"code"`
-	Name         string      `json:"name"`
-	Description  string      `json:"description"`
-	Position     int32       `json:"position"`
-	MinExercises int32       `json:"min_exercises"`
-	MaxExercises pgtype.Int4 `json:"max_exercises"`
-	SharedReps   bool        `json:"shared_reps"`
-	SharedLoad   bool        `json:"shared_load"`
+	Code         string `json:"code"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	Position     int32  `json:"position"`
+	MinExercises int32  `json:"min_exercises"`
+	MaxExercises *int32 `json:"max_exercises"`
+	SharedSets   bool   `json:"shared_sets"`
+	SharedReps   bool   `json:"shared_reps"`
+	SharedLoad   bool   `json:"shared_load"`
 }
 
 type Exercise struct {
 	ID          uuid.UUID          `json:"id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
-	VideoUrl    string             `json:"video_url"`
 	Type        string             `json:"type"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
@@ -63,6 +63,13 @@ type ExerciseJoint struct {
 type ExerciseMuscleGroup struct {
 	ExerciseID    uuid.UUID `json:"exercise_id"`
 	MuscleGroupID uuid.UUID `json:"muscle_group_id"`
+}
+
+type ExerciseVideo struct {
+	ID         uuid.UUID `json:"id"`
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	Position   int32     `json:"position"`
+	Url        string    `json:"url"`
 }
 
 type Focuse struct {
@@ -127,7 +134,7 @@ type TrainingBlock struct {
 	Position  int32      `json:"position"`
 	Kind      string     `json:"kind"`
 	Name      string     `json:"name"`
-	Sets      int32      `json:"sets"`
+	Sets      *int32     `json:"sets"`
 	RepsValue *float64   `json:"reps_value"`
 	RepsMax   *float64   `json:"reps_max"`
 	RepsUnit  *uuid.UUID `json:"reps_unit"`
@@ -143,6 +150,7 @@ type TrainingExercise struct {
 	BlockID    uuid.UUID  `json:"block_id"`
 	ExerciseID uuid.UUID  `json:"exercise_id"`
 	Position   int32      `json:"position"`
+	Sets       *int32     `json:"sets"`
 	RepsValue  *float64   `json:"reps_value"`
 	RepsMax    *float64   `json:"reps_max"`
 	RepsUnit   *uuid.UUID `json:"reps_unit"`
@@ -150,6 +158,7 @@ type TrainingExercise struct {
 	LoadValue  *float64   `json:"load_value"`
 	LoadMax    *float64   `json:"load_max"`
 	LoadUnit   *uuid.UUID `json:"load_unit"`
+	Tempo      string     `json:"tempo"`
 	Notes      string     `json:"notes"`
 }
 

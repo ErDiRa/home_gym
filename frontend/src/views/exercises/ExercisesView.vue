@@ -85,8 +85,8 @@ const columnDefs: ColDef<Exercise>[] = [
   },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   {
-    field: 'video_url',
-    headerName: 'Video',
+    field: 'video_urls',
+    headerName: 'Videos',
     flex: 1,
     minWidth: 110,
     sortable: false,

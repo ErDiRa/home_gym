@@ -67,7 +67,6 @@ CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT NOT NULL,
     description  TEXT NOT NULL DEFAULT '',
-    video_url    TEXT NOT NULL DEFAULT '', -- link to a video showing how to perform the exercise
     type         TEXT NOT NULL CHECK (type IN ('mobility', 'strength')), -- mainly improves mobility or strength
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -88,6 +87,16 @@ CREATE TABLE exercise_muscle_groups (
     muscle_group_id UUID NOT NULL REFERENCES muscle_groups (id) ON DELETE RESTRICT,
     PRIMARY KEY (exercise_id, muscle_group_id)
 );
+
+-- Links to videos showing how to perform an exercise, in display order.
+CREATE TABLE exercise_videos (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    position    INT NOT NULL,
+    url         TEXT NOT NULL
+);
+
+CREATE INDEX idx_exercise_videos_exercise ON exercise_videos (exercise_id, position);
 
 CREATE TABLE exercise_focuses (
     exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
@@ -137,14 +146,15 @@ CREATE TABLE block_kinds (
     position      INT NOT NULL,
     min_exercises INT NOT NULL CHECK (min_exercises >= 1),
     max_exercises INT CHECK (max_exercises >= min_exercises), -- NULL = no limit
+    shared_sets   BOOLEAN NOT NULL,
     shared_reps   BOOLEAN NOT NULL,
     shared_load   BOOLEAN NOT NULL
 );
 
-INSERT INTO block_kinds (code, name, description, position, min_exercises, max_exercises, shared_reps, shared_load) VALUES
-    ('single', 'Single', 'One exercise on its own', 1, 1, 1, false, false),
-    ('superset', 'Superset', 'Exercises done alternating: same sets, own reps and load', 2, 2, NULL, false, false),
-    ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true);
+INSERT INTO block_kinds (code, name, description, position, min_exercises, max_exercises, shared_sets, shared_reps, shared_load) VALUES
+    ('single', 'Single', 'Exercises done one after another: all sets of one before the next, each with its own sets', 1, 1, NULL, false, false, false),
+    ('superset', 'Superset', 'Exercises done alternating: same sets, own reps and load', 2, 2, NULL, true, false, false),
+    ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true, true);
 
 -- Units a planned amount is measured in: rep_units for reps (reps, seconds, metres...),
 -- load_units for load (kg, % 1RM, RPE...). Admins can add new ones. min/max_value bound the
@@ -180,16 +190,16 @@ INSERT INTO load_units (name, min_value, max_value) VALUES
     ('kg', 0, NULL), ('lb', 0, NULL), ('% 1RM', 0, 200), ('RPE', 1, 10), ('RIR', 0, 10);
 
 -- Blocks and exercises both carry a planned amount: reps (a value or a range in a rep unit,
--- optionally per side) and load (a value or a range in a load unit). A block's sets apply to
--- all of its exercises. Whether reps and load sit on the block or on each exercise depends on
--- the block's kind (shared_reps / shared_load); the other side stays empty.
+-- optionally per side) and load (a value or a range in a load unit), and so do sets. Whether
+-- sets, reps and load sit on the block (for all its exercises) or on each exercise depends on
+-- the block's kind (shared_sets / shared_reps / shared_load); the other side stays empty.
 CREATE TABLE training_blocks (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     unit_id    UUID NOT NULL REFERENCES training_units (id) ON DELETE CASCADE,
     position   INT NOT NULL,
     kind       TEXT NOT NULL REFERENCES block_kinds (code) ON DELETE RESTRICT,
     name       TEXT NOT NULL,
-    sets       INT NOT NULL CHECK (sets BETWEEN 1 AND 100),
+    sets       INT CHECK (sets BETWEEN 1 AND 100),
     reps_value NUMERIC(7, 2),
     reps_max   NUMERIC(7, 2),
     reps_unit  UUID REFERENCES rep_units (id) ON DELETE RESTRICT,
@@ -211,6 +221,7 @@ CREATE TABLE training_exercises (
     block_id    UUID NOT NULL REFERENCES training_blocks (id) ON DELETE CASCADE,
     exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE RESTRICT,
     position    INT NOT NULL,
+    sets        INT CHECK (sets BETWEEN 1 AND 100),
     reps_value  NUMERIC(7, 2),
     reps_max    NUMERIC(7, 2),
     reps_unit   UUID REFERENCES rep_units (id) ON DELETE RESTRICT,
@@ -218,6 +229,7 @@ CREATE TABLE training_exercises (
     load_value  NUMERIC(7, 2),
     load_max    NUMERIC(7, 2),
     load_unit   UUID REFERENCES load_units (id) ON DELETE RESTRICT,
+    tempo       TEXT NOT NULL DEFAULT '', -- e.g. '31X1': eccentric, pause, concentric, pause (X = explosive)
     notes       TEXT NOT NULL DEFAULT '',
     CHECK ((reps_value IS NULL) = (reps_unit IS NULL)),
     CHECK (reps_max IS NULL OR (reps_value IS NOT NULL AND reps_max > reps_value)),

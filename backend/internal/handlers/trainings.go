@@ -23,8 +23,8 @@ import (
 // A training belongs to one client and is a tree: units (e.g. "Day A", done on weekdays
 // and/or dates) hold blocks, and blocks hold one or more exercises. A block has a kind
 // (single, superset, complex, see block_kinds) that decides how many exercises it takes and
-// whether reps and load are set once on the block or per exercise; its sets apply to all of
-// its exercises. The same shape is sent to and returned from the API.
+// whether sets, reps and load are set once on the block or per exercise. The same shape is
+// sent to and returned from the API.
 
 // amount is the planned reps and load of a block or exercise. A value is nil when not set;
 // a max turns it into a range (e.g. 8-10 reps). Units are rep_units / load_units ids.
@@ -43,14 +43,16 @@ func (a *amount) clearLoad() { a.LoadValue, a.LoadMax, a.LoadUnit = nil, nil, ni
 
 type trainingExerciseRequest struct {
 	ExerciseID uuid.UUID `json:"exercise_id"`
+	Sets       *int32    `json:"sets"` // nil when the block's kind shares sets
 	amount
+	Tempo string `json:"tempo"` // free text, e.g. '31X1'
 	Notes string `json:"notes"`
 }
 
 type trainingBlockRequest struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
-	Sets int32  `json:"sets"`
+	Sets *int32 `json:"sets"` // nil unless the kind shares sets
 	amount
 	Notes     string                    `json:"notes"`
 	Exercises []trainingExerciseRequest `json:"exercises"`
@@ -137,8 +139,8 @@ func parseTrainingRequest(w http.ResponseWriter, r *http.Request, lk trainingLoo
 	return req, true
 }
 
-// checkBlock trims and validates a block against its kind, clearing reps and load on the side
-// (block or exercises) the kind doesn't use. It returns a message for the first problem.
+// checkBlock trims and validates a block against its kind, clearing sets, reps and load on the
+// side (block or exercises) the kind doesn't use. It returns a message for the first problem.
 func checkBlock(b *trainingBlockRequest, lk trainingLookups) string {
 	b.Name, b.Notes = strings.TrimSpace(b.Name), strings.TrimSpace(b.Notes)
 	kind, ok := lk.kinds[b.Kind]
@@ -148,12 +150,17 @@ func checkBlock(b *trainingBlockRequest, lk trainingLookups) string {
 	if tooLong(b.Name, 100) {
 		return "the name can have at most 100 characters"
 	}
-	if b.Sets < 1 || b.Sets > 100 {
-		return "sets must be 1-100"
-	}
 	n := int32(len(b.Exercises))
-	if n < kind.MinExercises || (kind.MaxExercises.Valid && n > kind.MaxExercises.Int32) {
+	if n < kind.MinExercises || (kind.MaxExercises != nil && n > *kind.MaxExercises) {
 		return exerciseCountRule(kind)
+	}
+
+	if kind.SharedSets {
+		if !validSets(b.Sets) {
+			return "sets must be 1-100"
+		}
+	} else {
+		b.Sets = nil
 	}
 
 	if kind.SharedReps {
@@ -172,9 +179,17 @@ func checkBlock(b *trainingBlockRequest, lk trainingLookups) string {
 	}
 	for k := range b.Exercises {
 		e := &b.Exercises[k]
-		e.Notes = strings.TrimSpace(e.Notes)
+		e.Tempo, e.Notes = strings.TrimSpace(e.Tempo), strings.TrimSpace(e.Notes)
 		if e.ExerciseID == uuid.Nil {
 			return "every exercise needs an exercise_id"
+		}
+		if tooLong(e.Tempo, 20) {
+			return fmt.Sprintf("exercise %d: the tempo can have at most 20 characters", k+1)
+		}
+		if kind.SharedSets {
+			e.Sets = nil
+		} else if !validSets(e.Sets) {
+			return fmt.Sprintf("exercise %d: sets must be 1-100", k+1)
 		}
 		if kind.SharedReps {
 			e.clearReps()
@@ -190,15 +205,17 @@ func checkBlock(b *trainingBlockRequest, lk trainingLookups) string {
 	return ""
 }
 
+func validSets(sets *int32) bool { return sets != nil && *sets >= 1 && *sets <= 100 }
+
 // exerciseCountRule describes how many exercises a kind of block takes.
 func exerciseCountRule(kind database.ListBlockKindsRow) string {
 	switch {
-	case !kind.MaxExercises.Valid:
-		return fmt.Sprintf("a %s block needs at least %d exercises", kind.Name, kind.MinExercises)
-	case kind.MaxExercises.Int32 == kind.MinExercises:
+	case kind.MaxExercises == nil:
+		return fmt.Sprintf("a %s block needs at least %d %s", kind.Name, kind.MinExercises, plural(kind.MinExercises, "exercise"))
+	case *kind.MaxExercises == kind.MinExercises:
 		return fmt.Sprintf("a %s block takes exactly %d %s", kind.Name, kind.MinExercises, plural(kind.MinExercises, "exercise"))
 	default:
-		return fmt.Sprintf("a %s block takes %d to %d exercises", kind.Name, kind.MinExercises, kind.MaxExercises.Int32)
+		return fmt.Sprintf("a %s block takes %d to %d exercises", kind.Name, kind.MinExercises, *kind.MaxExercises)
 	}
 }
 
@@ -359,9 +376,9 @@ func saveTrainingUnits(ctx context.Context, q *database.Queries, trainingID uuid
 			}
 			for k, e := range b.Exercises {
 				err := q.InsertTrainingExercise(ctx, database.InsertTrainingExerciseParams{
-					BlockID: blockID, ExerciseID: e.ExerciseID, Position: int32(k + 1),
+					BlockID: blockID, ExerciseID: e.ExerciseID, Position: int32(k + 1), Sets: e.Sets,
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
-					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, Notes: e.Notes,
+					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, Tempo: e.Tempo, Notes: e.Notes,
 				})
 				if err != nil {
 					return err
@@ -409,7 +426,9 @@ type trainingExerciseResponse struct {
 	ExerciseID uuid.UUID `json:"exercise_id"`
 	Name       string    `json:"name"`
 	Type       string    `json:"type"`
+	Sets       *int32    `json:"sets"`
 	amountResponse
+	Tempo string `json:"tempo"`
 	Notes string `json:"notes"`
 }
 
@@ -417,7 +436,7 @@ type trainingBlockResponse struct {
 	ID   uuid.UUID `json:"id"`
 	Kind string    `json:"kind"`
 	Name string    `json:"name"`
-	Sets int32     `json:"sets"`
+	Sets *int32    `json:"sets"`
 	amountResponse
 	Notes     string                     `json:"notes"`
 	Exercises []trainingExerciseResponse `json:"exercises"`
@@ -460,7 +479,7 @@ func loadTraining(ctx context.Context, q *database.Queries, id uuid.UUID) (train
 	exercisesByBlock := map[uuid.UUID][]trainingExerciseResponse{}
 	for _, e := range exercises {
 		exercisesByBlock[e.BlockID] = append(exercisesByBlock[e.BlockID], trainingExerciseResponse{
-			ExerciseID: e.ExerciseID, Name: e.Name, Type: e.Type, Notes: e.Notes,
+			ExerciseID: e.ExerciseID, Name: e.Name, Type: e.Type, Sets: e.Sets, Tempo: e.Tempo, Notes: e.Notes,
 			amountResponse: amountResponse{
 				amount: amount{
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
@@ -651,7 +670,7 @@ func copyUnits(units []trainingUnitResponse) []trainingUnitRequest {
 			block := trainingBlockRequest{Kind: b.Kind, Name: b.Name, Sets: b.Sets, amount: b.amount, Notes: b.Notes}
 			for _, e := range b.Exercises {
 				block.Exercises = append(block.Exercises, trainingExerciseRequest{
-					ExerciseID: e.ExerciseID, amount: e.amount, Notes: e.Notes,
+					ExerciseID: e.ExerciseID, Sets: e.Sets, amount: e.amount, Tempo: e.Tempo, Notes: e.Notes,
 				})
 			}
 			unit.Blocks = append(unit.Blocks, block)

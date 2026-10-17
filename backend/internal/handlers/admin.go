@@ -49,7 +49,7 @@ type createExerciseRequest struct {
 	MuscleGroupIDs []uuid.UUID `json:"muscle_group_ids"`
 	FocusIDs       []uuid.UUID `json:"focus_ids"`
 	Description    string      `json:"description"`
-	VideoURL       string      `json:"video_url"`
+	VideoURLs      []string    `json:"video_urls"` // in display order
 	Type           string      `json:"type"`
 }
 
@@ -69,12 +69,23 @@ func parseExerciseRequest(w http.ResponseWriter, r *http.Request) (createExercis
 		writeError(w, r, http.StatusBadRequest, "type must be mobility or strength")
 		return req, false
 	}
-	if req.VideoURL != "" {
-		if u, err := url.Parse(req.VideoURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			writeError(w, r, http.StatusBadRequest, "video_url must be an http(s) URL")
+	// Empty inputs are dropped, so the form can send the blank row it shows for adding a link.
+	videos := make([]string, 0, len(req.VideoURLs))
+	for _, v := range req.VideoURLs {
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+		if u, err := url.Parse(v); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || tooLong(v, 500) {
+			writeError(w, r, http.StatusBadRequest, "video links must be http(s) URLs (max 500 characters)")
 			return req, false
 		}
+		videos = append(videos, v)
 	}
+	if len(videos) > 10 {
+		writeError(w, r, http.StatusBadRequest, "an exercise can have at most 10 video links")
+		return req, false
+	}
+	req.VideoURLs = videos
 	return req, true
 }
 
@@ -99,8 +110,8 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 	exercise, err := h.queries.CreateExercise(r.Context(), database.CreateExerciseParams{
 		Name:           req.Name,
 		Description:    req.Description,
-		VideoUrl:       req.VideoURL,
 		Type:           req.Type,
+		VideoUrls:      req.VideoURLs,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
 		FocusIds:       req.FocusIDs,
@@ -126,8 +137,8 @@ func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
 		ID:             id,
 		Name:           req.Name,
 		Description:    req.Description,
-		VideoUrl:       req.VideoURL,
 		Type:           req.Type,
+		VideoUrls:      req.VideoURLs,
 		JointIds:       req.JointIDs,
 		MuscleGroupIds: req.MuscleGroupIDs,
 		FocusIds:       req.FocusIDs,

@@ -1,8 +1,12 @@
 -- name: CreateExercise :one
 WITH new_exercise AS (
-    INSERT INTO exercises (name, description, video_url, type)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO exercises (name, description, type)
+    VALUES ($1, $2, $3)
     RETURNING *
+), linked_videos AS (
+    INSERT INTO exercise_videos (exercise_id, position, url)
+    SELECT n.id, v.position, v.url
+    FROM new_exercise n, unnest(sqlc.arg(video_urls)::text[]) WITH ORDINALITY AS v(url, position)
 ), linked_joints AS (
     INSERT INTO exercise_joints (exercise_id, joint_id)
     SELECT id, unnest(sqlc.arg(joint_ids)::uuid[]) FROM new_exercise
@@ -13,15 +17,15 @@ WITH new_exercise AS (
     INSERT INTO exercise_focuses (exercise_id, focus_id)
     SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM new_exercise
 )
-SELECT id, name, description, video_url, type, created_at, updated_at FROM new_exercise;
+SELECT id, name, description, type, sqlc.arg(video_urls)::text[] AS video_urls, created_at, updated_at FROM new_exercise;
 
 -- name: ListExercises :many
 SELECT
     e.id,
     e.name,
     e.description,
-    e.video_url,
     e.type,
+    ARRAY(SELECT url FROM exercise_videos WHERE exercise_id = e.id ORDER BY position)::text[] AS video_urls,
     e.created_at,
     e.updated_at,
     ARRAY(
@@ -49,8 +53,8 @@ SELECT
     e.id,
     e.name,
     e.description,
-    e.video_url,
     e.type,
+    ARRAY(SELECT url FROM exercise_videos WHERE exercise_id = e.id ORDER BY position)::text[] AS video_urls,
     ARRAY(SELECT joint_id FROM exercise_joints WHERE exercise_id = e.id)::uuid[] AS joint_ids,
     ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids,
     ARRAY(SELECT focus_id FROM exercise_focuses WHERE exercise_id = e.id)::uuid[] AS focus_ids
@@ -59,12 +63,19 @@ WHERE e.id = $1 AND e.deleted_at IS NULL;
 
 -- name: UpdateExercise :one
 -- The links are synced by deleting the ones no longer wanted and inserting the new ones;
--- the two never touch the same row, so they are safe in one statement.
+-- the two never touch the same row, so they are safe in one statement. Videos are ordered,
+-- so they are all replaced.
 WITH updated AS (
     UPDATE exercises
-    SET name = $2, description = $3, video_url = $4, type = $5, updated_at = now()
-    WHERE id = $1 AND deleted_at IS NULL
+    SET name = $2, description = $3, type = $4, updated_at = now()
+    WHERE exercises.id = $1 AND exercises.deleted_at IS NULL
     RETURNING *
+), removed_videos AS (
+    DELETE FROM exercise_videos ev USING updated u WHERE ev.exercise_id = u.id
+), added_videos AS (
+    INSERT INTO exercise_videos (exercise_id, position, url)
+    SELECT u.id, v.position, v.url
+    FROM updated u, unnest(sqlc.arg(video_urls)::text[]) WITH ORDINALITY AS v(url, position)
 ), removed_joints AS (
     DELETE FROM exercise_joints
     WHERE exercise_id IN (SELECT id FROM updated) AND joint_id <> ALL(sqlc.arg(joint_ids)::uuid[])
@@ -87,7 +98,7 @@ WITH updated AS (
     SELECT id, unnest(sqlc.arg(focus_ids)::uuid[]) FROM updated
     ON CONFLICT DO NOTHING
 )
-SELECT id, name, description, video_url, type, created_at, updated_at FROM updated;
+SELECT id, name, description, type, sqlc.arg(video_urls)::text[] AS video_urls, created_at, updated_at FROM updated;
 
 -- name: ListJoints :many
 SELECT id, name FROM joints

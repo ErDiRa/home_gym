@@ -32,8 +32,8 @@
       <MoveRemoveButtons :index="index" :count="count" :label="`block ${letter}`" @move="emit('move', $event)" @remove="emit('remove')" />
     </div>
 
-    <div class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
-      <label class="text-xs font-medium text-slate-600">
+    <div v-if="kind?.shared_sets || kind?.shared_reps || kind?.shared_load" class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+      <label v-if="kind?.shared_sets" class="text-xs font-medium text-slate-600">
         Sets<span class="text-red-600" aria-hidden="true"> *</span>
         <input
           v-model.number="block.sets"
@@ -59,7 +59,7 @@
     <ol v-if="block.exercises.length" class="mb-3 space-y-2">
       <li v-for="(item, i) in block.exercises" :key="item.key" class="rounded-md border border-slate-200 bg-white p-2">
         <div class="mb-2 flex items-center gap-2">
-          <span class="w-7 shrink-0 text-sm font-semibold text-indigo-600">{{ exerciseLabel(kind, index, i) }}</span>
+          <span class="w-7 shrink-0 text-sm font-semibold text-indigo-600">{{ exerciseLabel(block.exercises.length, index, i) }}</span>
           <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{{ item.name }}</span>
           <ExerciseTypeBadge :type="item.type" />
           <MoveRemoveButtons
@@ -71,18 +71,41 @@
           />
         </div>
         <div class="flex flex-wrap items-end gap-x-4 gap-y-2 pl-9">
+          <label v-if="!kind?.shared_sets" class="text-xs font-medium text-slate-600">
+            Sets<span class="text-red-600" aria-hidden="true"> *</span>
+            <input
+              v-model.number="item.sets"
+              type="number"
+              min="1"
+              max="100"
+              required
+              :aria-label="`${exerciseLabel(block.exercises.length, index, i)} sets`"
+              :class="[inputClass, 'mt-1 block h-8 w-16']"
+            />
+          </label>
           <AmountInput
             v-if="!kind?.shared_reps"
             v-model="block.exercises[i]"
             part="reps"
-            :label="exerciseLabel(kind, index, i)"
+            :label="exerciseLabel(block.exercises.length, index, i)"
           />
           <AmountInput
             v-if="!kind?.shared_load"
             v-model="block.exercises[i]"
             part="load"
-            :label="exerciseLabel(kind, index, i)"
+            :label="exerciseLabel(block.exercises.length, index, i)"
           />
+          <label class="text-xs font-medium text-slate-600" title="Eccentric, pause, concentric, pause in seconds; X = explosive">
+            Tempo
+            <input
+              v-model="item.tempo"
+              type="text"
+              maxlength="20"
+              placeholder="31X1"
+              :aria-label="`${exerciseLabel(block.exercises.length, index, i)} tempo`"
+              :class="[inputClass, 'mt-1 block h-8 w-20']"
+            />
+          </label>
           <label class="min-w-40 flex-1 text-xs font-medium text-slate-600">
             Notes
             <input v-model="item.notes" type="text" placeholder="e.g. slow eccentric" :class="[inputClass, 'mt-1 block h-8 w-full']" />
@@ -92,23 +115,33 @@
     </ol>
     <p v-if="problem" class="mb-3 text-xs text-amber-700">{{ problem }}</p>
 
-    <SearchSelect v-if="!full" :options="exercises" placeholder="Add exercise…" @select="addExercise">
-      <template #option-extra="{ option }">
-        <span class="text-xs text-slate-400">{{ exerciseTypeLabels[option.type] }}</span>
-      </template>
-    </SearchSelect>
+    <AppButton v-if="!full" variant="secondary" size="sm" @click="pickerOpen = true">
+      <PlusIcon class="size-4" aria-hidden="true" />
+      Add exercises…
+    </AppButton>
+    <ExercisePickerDialog
+      :open="pickerOpen"
+      :title="`Add exercises to block ${letter}`"
+      :exercises="exercises"
+      :in-block="block.exercises.map((e) => e.exercise_id)"
+      :limit="remaining"
+      @close="pickerOpen = false"
+      @add="addExercises"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { PlusIcon } from '@heroicons/vue/24/outline'
+import AppButton from '../button/AppButton.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
-import SearchSelect from '../form/SearchSelect.vue'
 import AmountInput from './AmountInput.vue'
+import ExercisePickerDialog from './ExercisePickerDialog.vue'
 import MoveRemoveButtons from './MoveRemoveButtons.vue'
 import { blockKinds, kindOf } from './lookups'
 import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
-import { exerciseTypeLabels, type Exercise } from '../../types'
+import type { Exercise } from '../../types'
 
 const props = defineProps<{ index: number; count: number; exercises: Exercise[] }>()
 const emit = defineEmits<{ move: [by: -1 | 1]; remove: [] }>()
@@ -123,6 +156,17 @@ const kind = computed(() => kindOf(block.value.kind))
 // Switching kinds never drops exercises; a mismatch shows up here instead.
 const problem = computed(() => blockProblem(block.value))
 const full = computed(() => kind.value?.max_exercises != null && block.value.exercises.length >= kind.value.max_exercises)
+// How many more exercises the kind takes; null = no limit.
+const remaining = computed(() =>
+  kind.value?.max_exercises == null ? null : Math.max(kind.value.max_exercises - block.value.exercises.length, 0),
+)
+
+const pickerOpen = ref(false)
+
+function addExercises(exercises: Exercise[]) {
+  exercises.forEach(addExercise)
+  pickerOpen.value = false
+}
 
 function addExercise(exercise: Exercise) {
   block.value.exercises.push({
@@ -130,6 +174,8 @@ function addExercise(exercise: Exercise) {
     exercise_id: exercise.id,
     name: exercise.name,
     type: exercise.type,
+    sets: block.value.sets,
+    tempo: '',
     notes: '',
     ...emptyAmount(),
   })

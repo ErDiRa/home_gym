@@ -16,7 +16,8 @@
       >
         <Bars3Icon class="size-6" aria-hidden="true" />
       </button>
-      <span class="font-semibold text-slate-900">My Accessories</span>
+      <img src="../assets/logo.svg" alt="" class="size-7" />
+      <span class="font-semibold text-slate-900">HomeGym</span>
     </header>
 
     <Transition

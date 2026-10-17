@@ -15,13 +15,19 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     ('Triceps Pushdown', ARRAY['Elbow'], ARRAY['Triceps'], 'Cable pushdown with a rope or bar.', 'https://www.youtube.com/results?search_query=Triceps+Pushdown+exercise+form', ARRAY['Weightlifting', 'Elbow health'], 'strength'),
     ('Calf Raise', ARRAY['Ankle'], ARRAY['Calves'], 'Standing calf raise on a step.', 'https://www.youtube.com/results?search_query=Calf+Raise+exercise+form', ARRAY['Functional fitness'], 'strength')
 ), new_exercises AS (
-    INSERT INTO exercises (name, description, video_url, type)
-    SELECT v.name, v.description, v.video_url, v.type
+    INSERT INTO exercises (name, description, type)
+    SELECT v.name, v.description, v.type
     FROM v
     WHERE NOT EXISTS (
         SELECT 1 FROM exercises e WHERE e.name = v.name AND e.deleted_at IS NULL
     )
     RETURNING id, name
+), linked_videos AS (
+    INSERT INTO exercise_videos (exercise_id, position, url)
+    SELECT n.id, 1, v.video_url
+    FROM new_exercises n
+    JOIN v ON v.name = n.name
+    WHERE v.video_url <> ''
 ), linked_focuses AS (
     INSERT INTO exercise_focuses (exercise_id, focus_id)
     SELECT n.id, f.id

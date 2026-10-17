@@ -70,7 +70,41 @@
 				</div>
 			</fieldset>
 
-			<VideoPreview :url="form.video_url" />
+			<fieldset v-if="!readonly || hasVideos">
+				<legend class="text-sm font-medium text-slate-800">Video links</legend>
+				<div v-for="(_, i) in form.video_urls" :key="i" class="mt-1 space-y-2">
+					<div class="flex items-center gap-2">
+						<input
+							ref="videoInputs"
+							v-model="form.video_urls[i]"
+							type="url"
+							:disabled="readonly"
+							placeholder="https://www.youtube.com/watch?v=…"
+							:aria-label="`Video link ${i + 1}`"
+							:class="[inputClass, 'mt-0!']"
+						/>
+						<button
+							v-if="!readonly && form.video_urls.length > 1"
+							type="button"
+							:aria-label="`Remove video link ${i + 1}`"
+							class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+							@click="form.video_urls.splice(i, 1)"
+						>
+							<XMarkIcon class="size-4" aria-hidden="true" />
+						</button>
+					</div>
+					<VideoPreview :url="form.video_urls[i]" />
+				</div>
+				<button
+					v-if="!readonly && form.video_urls.length < MAX_VIDEOS"
+					type="button"
+					class="mt-2 inline-flex items-center gap-x-1 rounded-md px-1 py-0.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 focus-visible:ring-2 focus-visible:ring-indigo-200 focus-visible:outline-none"
+					@click="addVideo"
+				>
+					<PlusIcon class="size-4" aria-hidden="true" />
+					Add video link
+				</button>
+			</fieldset>
 
 			<div>
 				<MultiSelect
@@ -165,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ArrowLeftIcon, PlusIcon } from '@heroicons/vue/24/outline';
+	import { ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 	import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 	import { useRoute, useRouter } from 'vue-router';
 	import { toast } from 'vue-sonner';
@@ -199,7 +233,7 @@
 		readonly.value ? 'Exercise' : exerciseId ? 'Edit exercise' : 'New exercise'
 	);
 
-	type FormKey = 'name' | 'description' | 'video_url';
+	type FormKey = 'name' | 'description';
 	const fields: {
 		key: FormKey;
 		label: string;
@@ -209,13 +243,7 @@
 		placeholder?: string;
 	}[] = [
 		{ key: 'name', label: 'Name', required: true },
-		{ key: 'description', label: 'Description', multiline: true },
-		{
-			key: 'video_url',
-			label: 'Video link',
-			type: 'url',
-			placeholder: 'https://www.youtube.com/watch?v=…'
-		}
+		{ key: 'description', label: 'Description', multiline: true }
 	];
 	const inputClass =
 		'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200';
@@ -225,7 +253,8 @@
 		// Empty until picked, so a new exercise needs an explicit choice.
 		type: '' as ExerciseType | '',
 		description: '',
-		video_url: '',
+		// Always at least one (possibly empty) input; blanks are dropped on save.
+		video_urls: [''] as string[],
 		joint_ids: [] as string[],
 		muscle_group_ids: [] as string[],
 		focus_ids: [] as string[]
@@ -246,6 +275,18 @@
 		}
 	});
 	const addingFocus = ref(false);
+
+	// The server allows at most this many video links per exercise.
+	const MAX_VIDEOS = 10;
+	const videoInputs = ref<HTMLInputElement[]>([]);
+	const hasVideos = computed(() => form.video_urls.some((u) => u.trim()));
+
+	// Shows another link input and focuses it.
+	async function addVideo() {
+		form.video_urls.push('');
+		await nextTick();
+		videoInputs.value[form.video_urls.length - 1]?.focus();
+	}
 	const valid = computed(
 		() =>
 			form.type !== '' &&
@@ -268,6 +309,7 @@
 			if (exercise) {
 				const { id: _id, ...fields } = exercise;
 				Object.assign(form, fields);
+				if (!form.video_urls.length) form.video_urls = [''];
 			}
 		} catch (e) {
 			toast.error(
@@ -314,7 +356,11 @@
 
 	async function submit() {
 		if (form.type === '') return;
-		const input = { ...form, type: form.type };
+		const input = {
+			...form,
+			type: form.type,
+			video_urls: form.video_urls.map((u) => u.trim()).filter(Boolean)
+		};
 		saving.value = true;
 		try {
 			await (exerciseId

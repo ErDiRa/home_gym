@@ -5,13 +5,11 @@
 			class="hidden flex-col justify-between bg-slate-900 p-12 text-slate-300 lg:flex"
 		>
 			<div class="flex items-center gap-2">
-				<span
-					class="grid size-9 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white"
-					>MA</span
-				>
-				<span class="text-lg font-semibold text-white">My Accessories</span>
+				<img src="../../assets/logo.svg" alt="" class="size-9" />
+				<span class="text-lg font-semibold text-white">HomeGym</span>
 			</div>
 			<div>
+				<img src="../../assets/logo.svg" alt="" class="mb-8 size-28 rounded-3xl shadow-xl shadow-indigo-950/50" />
 				<p class="text-3xl font-semibold tracking-tight text-white">
 					Train smarter, move better.
 				</p>
@@ -19,12 +17,17 @@
 					Your exercises, trainings and progress in one place.
 				</p>
 			</div>
-			<p class="text-sm text-slate-500">&copy; My Accessories</p>
+			<p class="text-sm text-slate-500">&copy; HomeGym</p>
 		</aside>
 
 		<!-- Form -->
 		<main class="flex items-center justify-center bg-slate-50 px-4 py-12">
 			<div class="w-full max-w-sm">
+				<!-- Brand for small screens, where the brand panel is hidden -->
+				<div class="mb-8 flex items-center gap-3 lg:hidden">
+					<img src="../../assets/logo.svg" alt="" class="size-16" />
+					<span class="text-2xl font-semibold tracking-tight text-slate-900">HomeGym</span>
+				</div>
 				<h1 class="text-2xl font-bold tracking-tight text-slate-900">
 					Welcome back
 				</h1>

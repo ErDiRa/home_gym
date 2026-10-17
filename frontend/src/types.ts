@@ -14,7 +14,7 @@ export interface Exercise {
   muscle_groups: string[]
   focuses: Focus[]
   description: string
-  video_url: string
+  video_urls: string[] // in display order
 }
 
 // A training focus; the short alias is shown as a tag, the full name on hover.
@@ -35,7 +35,7 @@ export interface ExerciseInput {
   name: string
   type: ExerciseType
   description: string
-  video_url: string
+  video_urls: string[] // in display order
   joint_ids: string[]
   muscle_group_ids: string[]
   focus_ids: string[]
@@ -50,14 +50,15 @@ export interface ExerciseDetail extends ExerciseInput {
 // "Warm-up", "Superset"), and blocks hold one or more exercises with their prescription.
 // reps is free text, e.g. '8-10'.
 // The kind of a training block (single, superset, complex...). Its rules come from the server,
-// so new kinds need no code: how many exercises it takes, and whether reps and load are set
-// once on the block for all exercises (shared) or per exercise.
+// so new kinds need no code: how many exercises it takes, and whether sets, reps and load are
+// set once on the block for all exercises (shared) or per exercise.
 export interface BlockKind {
   code: string
   name: string
   description: string
   min_exercises: number
   max_exercises: number | null // null = no limit
+  shared_sets: boolean
   shared_reps: boolean
   shared_load: boolean
 }
@@ -90,6 +91,8 @@ export interface AmountUnitNames {
 
 export interface TrainingExerciseInput extends Amount {
   exercise_id: string
+  sets: number | null // null when the block's kind shares sets
+  tempo: string // free text, e.g. '31X1'
   notes: string
 }
 
@@ -98,12 +101,12 @@ export interface TrainingExercise extends TrainingExerciseInput, AmountUnitNames
   type: ExerciseType
 }
 
-// A block's sets apply to all its exercises; its amount is only used when its kind shares
-// reps or load.
+// A block's sets and amount are only used when its kind shares them; otherwise each exercise
+// has its own.
 export interface TrainingBlockInput extends Amount {
   kind: string
   name: string
-  sets: number
+  sets: number | null
   notes: string
   exercises: TrainingExerciseInput[]
 }
@@ -134,7 +137,7 @@ export interface TrainingBlock extends Amount, AmountUnitNames {
   id: string
   kind: string
   name: string
-  sets: number
+  sets: number | null
   notes: string
   exercises: TrainingExercise[]
 }

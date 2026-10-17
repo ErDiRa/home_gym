@@ -1,6 +1,6 @@
 -- Dev seed: sample clients with trainings (needs the schema's block kinds and units, and
 -- seed-exercises.sql / seed-exercise-archive.sql). Clients log in with password "test".
--- Skipped when anna@example.com already exists.
+-- Skipped when anna@example.com already exists. Squat also gets a second video link.
 --   anna@example.com  gym training: an active and an older inactive training, all block kinds,
 --                     ranges, kg / % 1RM / RPE / RIR loads
 --   ben@example.com   home training: kettlebell work, seconds, per-side reps, a unit on a date
@@ -45,7 +45,7 @@ CREATE FUNCTION pg_temp.unit(
     RETURNING id
 $$;
 
--- Reps and load are only set on a block whose kind shares them (complex).
+-- Sets, reps and load are only set on a block whose kind shares them (sets: not single).
 CREATE FUNCTION pg_temp.block(
     unit uuid, pos int, kind text, sets int, name text DEFAULT '', notes text DEFAULT '',
     reps numeric DEFAULT NULL, reps_max numeric DEFAULT NULL, reps_unit text DEFAULT 'reps', per_side boolean DEFAULT false,
@@ -62,17 +62,18 @@ CREATE FUNCTION pg_temp.block(
     RETURNING id
 $$;
 
--- Reps and load stay empty for the exercises of a complex.
+-- Sets are only set for the exercises of a single block; reps and load stay empty in a complex.
 CREATE FUNCTION pg_temp.exercise(
-    block uuid, pos int, exercise text,
+    block uuid, pos int, exercise text, sets int DEFAULT NULL,
     reps numeric DEFAULT NULL, reps_max numeric DEFAULT NULL, reps_unit text DEFAULT 'reps', per_side boolean DEFAULT false,
-    load numeric DEFAULT NULL, load_max numeric DEFAULT NULL, load_unit text DEFAULT 'kg', notes text DEFAULT ''
+    load numeric DEFAULT NULL, load_max numeric DEFAULT NULL, load_unit text DEFAULT 'kg', tempo text DEFAULT '',
+    notes text DEFAULT ''
 ) RETURNS void LANGUAGE sql AS $$
     INSERT INTO training_exercises (
-        block_id, exercise_id, position, notes,
+        block_id, exercise_id, position, sets, tempo, notes,
         reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit
     ) VALUES (
-        block, pg_temp.exercise_id(exercise), pos, notes,
+        block, pg_temp.exercise_id(exercise), pos, sets, tempo, notes,
         reps, reps_max, CASE WHEN reps IS NOT NULL THEN pg_temp.rep_unit(reps_unit) END, per_side,
         load, load_max, CASE WHEN load IS NOT NULL THEN pg_temp.load_unit(load_unit) END
     )
@@ -94,14 +95,20 @@ BEGIN
     ben := pg_temp.client('ben@example.com', 'Ben', 'Beispiel');
     PERFORM pg_temp.client('clara@example.com', 'Clara', 'Leer');
 
+    -- An exercise with several videos.
+    INSERT INTO exercise_videos (exercise_id, position, url)
+    SELECT pg_temp.exercise_id('Squat'), coalesce(max(position), 0) + 1, 'https://www.youtube.com/results?search_query=Squat+tempo+31X1'
+    FROM exercise_videos WHERE exercise_id = pg_temp.exercise_id('Squat');
+
     -- Anna, active: two gym days with every block kind.
     t := pg_temp.training(anna, 'Strength – Phase 2', '4 weeks, heavy compounds. Add 2.5 kg when all reps feel easy.', true);
 
     u := pg_temp.unit(t, 1, 'Day A', weekdays => '{1,4}');
-    b := pg_temp.block(u, 1, 'single', 5, name => 'Main lift', notes => '3 min rest');
-    PERFORM pg_temp.exercise(b, 1, 'Squat', reps => 5, load => 80, load_max => 85, load_unit => '% 1RM');
+    b := pg_temp.block(u, 1, 'single', NULL, name => 'Main lift', notes => '3 min rest');
+    PERFORM pg_temp.exercise(b, 1, 'Squat', sets => 5, reps => 5, load => 80, load_max => 85, load_unit => '% 1RM', tempo => '31X1');
+    PERFORM pg_temp.exercise(b, 2, 'Deadlift', sets => 3, reps => 3, load => 120);
     b := pg_temp.block(u, 2, 'superset', 3, notes => '90s rest after B2');
-    PERFORM pg_temp.exercise(b, 1, 'Bench Press', reps => 8, reps_max => 10, load => 60);
+    PERFORM pg_temp.exercise(b, 1, 'Bench Press', reps => 8, reps_max => 10, load => 60, tempo => '30X1');
     PERFORM pg_temp.exercise(b, 2, 'Barbell Row', reps => 10, load => 50);
     b := pg_temp.block(u, 3, 'superset', 3, name => 'Accessories');
     PERFORM pg_temp.exercise(b, 1, 'Lateral Raise', reps => 12, reps_max => 15, load => 8);
@@ -114,32 +121,32 @@ BEGIN
     PERFORM pg_temp.exercise(b, 1, 'Deadlift');
     PERFORM pg_temp.exercise(b, 2, 'Barbell Row');
     PERFORM pg_temp.exercise(b, 3, 'Overhead Press');
-    b := pg_temp.block(u, 2, 'single', 4);
-    PERFORM pg_temp.exercise(b, 1, 'Hip Thrust', reps => 8, reps_max => 12, load => 100);
+    b := pg_temp.block(u, 2, 'single', NULL);
+    PERFORM pg_temp.exercise(b, 1, 'Hip Thrust', sets => 4, reps => 8, reps_max => 12, load => 100, tempo => '21X2');
     b := pg_temp.block(u, 3, 'superset', 3);
     PERFORM pg_temp.exercise(b, 1, 'Pull-up', reps => 6, reps_max => 8, load => 2, load_unit => 'RIR');
-    PERFORM pg_temp.exercise(b, 2, 'Bicep Curl', reps => 10, load => 12, notes => 'Slow eccentric');
+    PERFORM pg_temp.exercise(b, 2, 'Bicep Curl', reps => 10, load => 12, tempo => '4010', notes => 'Slow eccentric');
 
     -- Anna, inactive: the previous phase.
     t := pg_temp.training(anna, 'Strength – Phase 1', 'Technique phase, moderate loads.', false);
     u := pg_temp.unit(t, 1, 'Full body', weekdays => '{1,3,5}');
-    b := pg_temp.block(u, 1, 'single', 3);
-    PERFORM pg_temp.exercise(b, 1, 'Squat', reps => 8, load => 70, load_unit => '% 1RM');
+    b := pg_temp.block(u, 1, 'single', NULL);
+    PERFORM pg_temp.exercise(b, 1, 'Squat', sets => 3, reps => 8, load => 70, load_unit => '% 1RM');
     b := pg_temp.block(u, 2, 'superset', 3);
     PERFORM pg_temp.exercise(b, 1, 'Bench Press', reps => 10, load => 7, load_unit => 'RPE');
     PERFORM pg_temp.exercise(b, 2, 'Barbell Row', reps => 10, load => 7, load_unit => 'RPE');
-    b := pg_temp.block(u, 3, 'single', 3);
-    PERFORM pg_temp.exercise(b, 1, 'Leg Extension', reps => 12, reps_max => 15);
+    b := pg_temp.block(u, 3, 'single', NULL);
+    PERFORM pg_temp.exercise(b, 1, 'Leg Extension', sets => 3, reps => 12, reps_max => 15);
 
     -- Ben, active: home training with kettlebells and bodyweight.
     t := pg_temp.training(ben, 'Home functional', 'Kettlebell (16 kg), rings and a box.', true);
 
     u := pg_temp.unit(t, 1, 'Session 1', weekdays => '{6}', dates => ARRAY[current_date + 3]::date[],
         notes => 'Extra session before the holidays');
-    b := pg_temp.block(u, 1, 'single', 2, name => 'Warm-up');
-    PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing', reps => 20, load => 6, load_unit => 'RPE');
+    b := pg_temp.block(u, 1, 'single', NULL, name => 'Warm-up');
+    PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing', sets => 2, reps => 20, load => 6, load_unit => 'RPE');
     b := pg_temp.block(u, 2, 'superset', 4, notes => '60s rest after each round');
-    PERFORM pg_temp.exercise(b, 1, 'Kettlebell Bulgarian Split Squat', reps => 8, per_side => true, load => 16);
+    PERFORM pg_temp.exercise(b, 1, 'Kettlebell Bulgarian Split Squat', reps => 8, per_side => true, load => 16, tempo => '3110');
     PERFORM pg_temp.exercise(b, 2, 'Ring Row', reps => 10, reps_max => 12);
     b := pg_temp.block(u, 3, 'superset', 3, name => 'Finisher');
     PERFORM pg_temp.exercise(b, 1, 'Walking Lunges', reps => 30, reps_unit => 's');
@@ -150,8 +157,8 @@ BEGIN
     PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing');
     PERFORM pg_temp.exercise(b, 2, 'Kickstand Romanian Deadlift');
     PERFORM pg_temp.exercise(b, 3, 'Split Squats');
-    b := pg_temp.block(u, 2, 'single', 3);
-    PERFORM pg_temp.exercise(b, 1, 'Liegestütze (erhöht)', reps => 10, reps_max => 15);
-    b := pg_temp.block(u, 3, 'single', 3);
-    PERFORM pg_temp.exercise(b, 1, 'Single Leg Box Pistol', reps => 5, per_side => true, notes => 'Lower box if needed');
+    b := pg_temp.block(u, 2, 'single', NULL);
+    PERFORM pg_temp.exercise(b, 1, 'Liegestütze (erhöht)', sets => 3, reps => 10, reps_max => 15);
+    b := pg_temp.block(u, 3, 'single', NULL);
+    PERFORM pg_temp.exercise(b, 1, 'Single Leg Box Pistol', sets => 3, reps => 5, per_side => true, notes => 'Lower box if needed');
 END $$;

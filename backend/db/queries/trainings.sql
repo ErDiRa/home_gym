@@ -54,10 +54,10 @@ WHERE tu.training_id = $1
 ORDER BY tb.unit_id, tb.position;
 
 -- name: ListTrainingExercises :many
-SELECT te.block_id, te.exercise_id, e.name, e.type,
+SELECT te.block_id, te.exercise_id, e.name, e.type, te.sets,
        te.reps_value, te.reps_max, te.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, te.per_side,
        te.load_value, te.load_max, te.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       te.notes
+       te.tempo, te.notes
 FROM training_exercises te
 JOIN exercises e ON e.id = te.exercise_id
 JOIN training_blocks tb ON tb.id = te.block_id
@@ -112,7 +112,7 @@ INSERT INTO training_blocks (
     unit_id, position, kind, name, sets,
     reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
 ) VALUES (
-    sqlc.arg(unit_id), sqlc.arg(position), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(sets),
+    sqlc.arg(unit_id), sqlc.arg(position), sqlc.arg(kind), sqlc.arg(name), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
     sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(notes)
 )
@@ -120,10 +120,10 @@ RETURNING id;
 
 -- name: InsertTrainingExercise :exec
 INSERT INTO training_exercises (
-    block_id, exercise_id, position,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+    block_id, exercise_id, position, sets,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
 ) VALUES (
-    sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position),
+    sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
-    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(notes)
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(tempo), sqlc.arg(notes)
 );

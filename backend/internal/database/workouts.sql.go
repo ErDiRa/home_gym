@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getExerciseStats = `-- name: GetExerciseStats :many
@@ -37,12 +36,12 @@ ORDER BY times_performed DESC, e.name
 `
 
 type GetExerciseStatsRow struct {
-	ExerciseID     uuid.UUID   `json:"exercise_id"`
-	Name           string      `json:"name"`
-	Joints         []string    `json:"joints"`
-	MuscleGroups   []string    `json:"muscle_groups"`
-	TimesPerformed int64       `json:"times_performed"`
-	Rating         pgtype.Int4 `json:"rating"`
+	ExerciseID     uuid.UUID `json:"exercise_id"`
+	Name           string    `json:"name"`
+	Joints         []string  `json:"joints"`
+	MuscleGroups   []string  `json:"muscle_groups"`
+	TimesPerformed int64     `json:"times_performed"`
+	Rating         *int32    `json:"rating"`
 }
 
 func (q *Queries) GetExerciseStats(ctx context.Context, userID uuid.UUID) ([]GetExerciseStatsRow, error) {

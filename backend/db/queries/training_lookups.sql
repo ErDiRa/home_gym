@@ -1,5 +1,5 @@
 -- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
 FROM block_kinds
 ORDER BY position;
 

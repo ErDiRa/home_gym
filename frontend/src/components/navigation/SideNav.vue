@@ -1,10 +1,8 @@
 <template>
   <aside class="flex h-full w-full flex-col bg-slate-900 text-slate-300">
     <div class="flex h-16 shrink-0 items-center gap-2 px-5">
-      <span class="grid size-8 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white">
-        MA
-      </span>
-      <span class="font-semibold tracking-tight text-white">My Accessories</span>
+      <img src="../../assets/logo.svg" alt="" class="size-8" />
+      <span class="font-semibold tracking-tight text-white">HomeGym</span>
     </div>
 
     <nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Main">

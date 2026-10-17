@@ -2,12 +2,16 @@ import type { Amount, BlockKind, ExerciseType, TrainingDetail, TrainingInput, Un
 import { blockKinds, kindOf, unitsOf, type AmountPart } from './lookups'
 
 // Editable rows of the training form. key keeps v-for stable while rows move, since the same
-// exercise may appear several times and new units and blocks have no id yet.
+// exercise may appear several times and new units and blocks have no id yet. Blocks and
+// exercises both keep sets, so switching kinds doesn't lose them; toInput sends the side the
+// kind uses.
 export interface ExerciseRow extends Amount {
   key: number
   exercise_id: string
   name: string
   type: ExerciseType
+  sets: number
+  tempo: string
   notes: string
 }
 
@@ -53,11 +57,13 @@ const pickAmount = (a: Amount): Amount => ({
   load_unit: a.load_unit,
 })
 
+export const DEFAULT_SETS = 3
+
 export const newBlock = (): BlockRow => ({
   key: nextKey(),
   kind: blockKinds.value[0]?.code ?? 'single',
   name: '',
-  sets: 3,
+  sets: DEFAULT_SETS,
   notes: '',
   exercises: [],
   ...emptyAmount(),
@@ -84,7 +90,7 @@ export function toRows(training: TrainingDetail): UnitRow[] {
       key: nextKey(),
       kind: b.kind,
       name: b.name,
-      sets: b.sets,
+      sets: b.sets ?? b.exercises[0]?.sets ?? DEFAULT_SETS,
       notes: b.notes,
       ...pickAmount(b),
       exercises: b.exercises.map((e) => ({
@@ -92,6 +98,8 @@ export function toRows(training: TrainingDetail): UnitRow[] {
         exercise_id: e.exercise_id,
         name: e.name,
         type: e.type,
+        sets: e.sets ?? b.sets ?? DEFAULT_SETS,
+        tempo: e.tempo,
         notes: e.notes,
         ...pickAmount(e),
       })),
@@ -116,14 +124,23 @@ export function toInput(fields: Omit<TrainingInput, 'units'>, units: UnitRow[]):
       notes,
       weekdays,
       dates,
-      blocks: blocks.map((b) => ({
-        kind: b.kind,
-        name: b.name,
-        sets: b.sets,
-        notes: b.notes,
-        ...cleanAmount(b),
-        exercises: b.exercises.map((e) => ({ exercise_id: e.exercise_id, notes: e.notes, ...cleanAmount(e) })),
-      })),
+      blocks: blocks.map((b) => {
+        const sharedSets = kindOf(b.kind)?.shared_sets ?? true
+        return {
+          kind: b.kind,
+          name: b.name,
+          sets: sharedSets ? b.sets : null,
+          notes: b.notes,
+          ...cleanAmount(b),
+          exercises: b.exercises.map((e) => ({
+            exercise_id: e.exercise_id,
+            sets: sharedSets ? null : e.sets,
+            tempo: e.tempo,
+            notes: e.notes,
+            ...cleanAmount(e),
+          })),
+        }
+      }),
     })),
   }
 }
@@ -137,15 +154,16 @@ export function move<T>(list: T[], index: number, by: -1 | 1) {
 // Labels a block by its position in the unit: A, B, ... Z, then 27, 28...
 export const blockLetter = (index: number) => (index < 26 ? String.fromCharCode(65 + index) : String(index + 1))
 
-// Labels an exercise: just the block's letter when the kind takes one exercise, else A1, A2...
-export function exerciseLabel(kind: BlockKind | undefined, blockIndex: number, index: number) {
+// Labels an exercise: just the block's letter when it's the block's only exercise, else A1, A2...
+export function exerciseLabel(count: number, blockIndex: number, index: number) {
   const letter = blockLetter(blockIndex)
-  return kind?.max_exercises === 1 ? letter : `${letter}${index + 1}`
+  return count === 1 ? letter : `${letter}${index + 1}`
 }
 
 // Describes how many exercises a kind of block takes.
 export function exerciseCountRule(kind: BlockKind) {
-  if (kind.max_exercises === null) return `A ${kind.name} block needs at least ${kind.min_exercises} exercises.`
+  if (kind.max_exercises === null)
+    return `A ${kind.name} block needs at least ${kind.min_exercises} exercise${kind.min_exercises === 1 ? '' : 's'}.`
   if (kind.max_exercises === kind.min_exercises)
     return `A ${kind.name} block takes exactly ${kind.min_exercises} exercise${kind.min_exercises === 1 ? '' : 's'}.`
   return `A ${kind.name} block takes ${kind.min_exercises} to ${kind.max_exercises} exercises.`
@@ -155,9 +173,14 @@ export function exerciseCountRule(kind: BlockKind) {
 export function blockProblem(b: BlockRow): string {
   const kind = kindOf(b.kind)
   if (!kind) return 'Choose a block kind.'
-  if (!(b.sets >= 1 && b.sets <= 100)) return 'Sets must be 1-100.'
   const n = b.exercises.length
   if (n < kind.min_exercises || (kind.max_exercises !== null && n > kind.max_exercises)) return exerciseCountRule(kind)
+  if (kind.shared_sets) {
+    if (!validSets(b.sets)) return 'Sets must be 1-100.'
+  } else {
+    const e = b.exercises.find((e) => !validSets(e.sets))
+    if (e) return `${e.name}: Sets must be 1-100.`
+  }
 
   const parts: [AmountPart, boolean][] = [
     ['reps', kind.shared_reps],
@@ -172,6 +195,8 @@ export function blockProblem(b: BlockRow): string {
   }
   return ''
 }
+
+const validSets = (sets: number) => Number.isInteger(sets) && sets >= 1 && sets <= 100
 
 // Checks the reps (required) or load (optional) of an amount.
 function amountProblem(a: Amount, part: AmountPart): string {

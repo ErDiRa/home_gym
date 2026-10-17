@@ -161,7 +161,7 @@ type InsertTrainingBlockParams struct {
 	Position  int32      `json:"position"`
 	Kind      string     `json:"kind"`
 	Name      string     `json:"name"`
-	Sets      int32      `json:"sets"`
+	Sets      *int32     `json:"sets"`
 	RepsValue *float64   `json:"reps_value"`
 	RepsMax   *float64   `json:"reps_max"`
 	RepsUnit  *uuid.UUID `json:"reps_unit"`
@@ -195,12 +195,12 @@ func (q *Queries) InsertTrainingBlock(ctx context.Context, arg InsertTrainingBlo
 
 const insertTrainingExercise = `-- name: InsertTrainingExercise :exec
 INSERT INTO training_exercises (
-    block_id, exercise_id, position,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+    block_id, exercise_id, position, sets,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
 ) VALUES (
-    $1, $2, $3,
-    $4, $5, $6, $7,
-    $8, $9, $10, $11
+    $1, $2, $3, $4,
+    $5, $6, $7, $8,
+    $9, $10, $11, $12, $13
 )
 `
 
@@ -208,6 +208,7 @@ type InsertTrainingExerciseParams struct {
 	BlockID    uuid.UUID  `json:"block_id"`
 	ExerciseID uuid.UUID  `json:"exercise_id"`
 	Position   int32      `json:"position"`
+	Sets       *int32     `json:"sets"`
 	RepsValue  *float64   `json:"reps_value"`
 	RepsMax    *float64   `json:"reps_max"`
 	RepsUnit   *uuid.UUID `json:"reps_unit"`
@@ -215,6 +216,7 @@ type InsertTrainingExerciseParams struct {
 	LoadValue  *float64   `json:"load_value"`
 	LoadMax    *float64   `json:"load_max"`
 	LoadUnit   *uuid.UUID `json:"load_unit"`
+	Tempo      string     `json:"tempo"`
 	Notes      string     `json:"notes"`
 }
 
@@ -223,6 +225,7 @@ func (q *Queries) InsertTrainingExercise(ctx context.Context, arg InsertTraining
 		arg.BlockID,
 		arg.ExerciseID,
 		arg.Position,
+		arg.Sets,
 		arg.RepsValue,
 		arg.RepsMax,
 		arg.RepsUnit,
@@ -230,6 +233,7 @@ func (q *Queries) InsertTrainingExercise(ctx context.Context, arg InsertTraining
 		arg.LoadValue,
 		arg.LoadMax,
 		arg.LoadUnit,
+		arg.Tempo,
 		arg.Notes,
 	)
 	return err
@@ -328,7 +332,7 @@ type ListTrainingBlocksRow struct {
 	UnitID       uuid.UUID  `json:"unit_id"`
 	Kind         string     `json:"kind"`
 	Name         string     `json:"name"`
-	Sets         int32      `json:"sets"`
+	Sets         *int32     `json:"sets"`
 	RepsValue    *float64   `json:"reps_value"`
 	RepsMax      *float64   `json:"reps_max"`
 	RepsUnit     *uuid.UUID `json:"reps_unit"`
@@ -378,10 +382,10 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 }
 
 const listTrainingExercises = `-- name: ListTrainingExercises :many
-SELECT te.block_id, te.exercise_id, e.name, e.type,
+SELECT te.block_id, te.exercise_id, e.name, e.type, te.sets,
        te.reps_value, te.reps_max, te.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, te.per_side,
        te.load_value, te.load_max, te.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       te.notes
+       te.tempo, te.notes
 FROM training_exercises te
 JOIN exercises e ON e.id = te.exercise_id
 JOIN training_blocks tb ON tb.id = te.block_id
@@ -397,6 +401,7 @@ type ListTrainingExercisesRow struct {
 	ExerciseID   uuid.UUID  `json:"exercise_id"`
 	Name         string     `json:"name"`
 	Type         string     `json:"type"`
+	Sets         *int32     `json:"sets"`
 	RepsValue    *float64   `json:"reps_value"`
 	RepsMax      *float64   `json:"reps_max"`
 	RepsUnit     *uuid.UUID `json:"reps_unit"`
@@ -406,6 +411,7 @@ type ListTrainingExercisesRow struct {
 	LoadMax      *float64   `json:"load_max"`
 	LoadUnit     *uuid.UUID `json:"load_unit"`
 	LoadUnitName string     `json:"load_unit_name"`
+	Tempo        string     `json:"tempo"`
 	Notes        string     `json:"notes"`
 }
 
@@ -423,6 +429,7 @@ func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUI
 			&i.ExerciseID,
 			&i.Name,
 			&i.Type,
+			&i.Sets,
 			&i.RepsValue,
 			&i.RepsMax,
 			&i.RepsUnit,
@@ -432,6 +439,7 @@ func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUI
 			&i.LoadMax,
 			&i.LoadUnit,
 			&i.LoadUnitName,
+			&i.Tempo,
 			&i.Notes,
 		); err != nil {
 			return nil, err

@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createLoadUnit = `-- name: CreateLoadUnit :one
@@ -73,19 +72,20 @@ func (q *Queries) CreateRepUnit(ctx context.Context, arg CreateRepUnitParams) (C
 }
 
 const listBlockKinds = `-- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
 FROM block_kinds
 ORDER BY position
 `
 
 type ListBlockKindsRow struct {
-	Code         string      `json:"code"`
-	Name         string      `json:"name"`
-	Description  string      `json:"description"`
-	MinExercises int32       `json:"min_exercises"`
-	MaxExercises pgtype.Int4 `json:"max_exercises"`
-	SharedReps   bool        `json:"shared_reps"`
-	SharedLoad   bool        `json:"shared_load"`
+	Code         string `json:"code"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	MinExercises int32  `json:"min_exercises"`
+	MaxExercises *int32 `json:"max_exercises"`
+	SharedSets   bool   `json:"shared_sets"`
+	SharedReps   bool   `json:"shared_reps"`
+	SharedLoad   bool   `json:"shared_load"`
 }
 
 func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, error) {
@@ -103,6 +103,7 @@ func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, erro
 			&i.Description,
 			&i.MinExercises,
 			&i.MaxExercises,
+			&i.SharedSets,
 			&i.SharedReps,
 			&i.SharedLoad,
 		); err != nil {
