@@ -45,16 +45,16 @@ func parseClientRequest(w http.ResponseWriter, r *http.Request, withPassword boo
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.FirstName, req.LastName = strings.TrimSpace(req.FirstName), strings.TrimSpace(req.LastName)
 	if addr, err := mail.ParseAddress(req.Email); err != nil || addr.Address != req.Email {
-		writeError(w, http.StatusBadRequest, "a valid email is required")
+		writeError(w, r, http.StatusBadRequest, "a valid email is required")
 		return req, false
 	}
 	if req.FirstName == "" || req.LastName == "" || tooLong(req.FirstName, 100) || tooLong(req.LastName, 100) {
-		writeError(w, http.StatusBadRequest, "first_name and last_name are required (max 100 characters)")
+		writeError(w, r, http.StatusBadRequest, "first_name and last_name are required (max 100 characters)")
 		return req, false
 	}
 	// bcrypt only uses the first 72 bytes.
 	if withPassword && (utf8.RuneCountInString(req.Password) < 8 || len(req.Password) > 72) {
-		writeError(w, http.StatusBadRequest, "password must be 8 to 72 characters")
+		writeError(w, r, http.StatusBadRequest, "password must be 8 to 72 characters")
 		return req, false
 	}
 	return req, true
@@ -82,9 +82,9 @@ func clientWriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, errEmailTaken), errors.As(err, &pgErr) && pgErr.Code == "23505": // unique_violation
-		writeError(w, http.StatusConflict, "this email is already in use")
+		clientError(w, r, http.StatusConflict, "this email is already in use", err)
 	case errors.Is(err, pgx.ErrNoRows):
-		writeError(w, http.StatusNotFound, "client not found")
+		clientError(w, r, http.StatusNotFound, "client not found", err)
 	default:
 		serverError(w, r, err)
 	}
@@ -181,7 +181,7 @@ func (h *Handler) DeleteClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeError(w, http.StatusNotFound, "client not found")
+		writeError(w, r, http.StatusNotFound, "client not found")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -190,7 +190,7 @@ func (h *Handler) DeleteClient(w http.ResponseWriter, r *http.Request) {
 func clientIDParam(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid client id")
+		clientError(w, r, http.StatusBadRequest, "invalid client id", err)
 	}
 	return id, err == nil
 }

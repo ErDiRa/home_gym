@@ -17,24 +17,24 @@ func RequireAdmin(isAdmin AdminLookup) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := ClaimsFromContext(r.Context())
 			if !ok {
-				unauthorized(w, "not authenticated")
+				unauthorized(w, r, "not authenticated", nil)
 				return
 			}
 			if claims.Role != RoleAdmin {
-				writeJSONError(w, http.StatusForbidden, "admin access required")
+				writeJSONError(w, r, http.StatusForbidden, "admin access required", nil)
 				return
 			}
 			adminID, err := claims.UserID()
 			if err != nil {
-				unauthorized(w, "invalid token")
+				unauthorized(w, r, "invalid token", err)
 				return
 			}
 			admin, err := isAdmin(r.Context(), adminID)
 			switch {
 			case err != nil:
-				writeJSONError(w, http.StatusInternalServerError, "internal server error")
+				writeJSONError(w, r, http.StatusInternalServerError, "internal server error", err)
 			case !admin:
-				writeJSONError(w, http.StatusForbidden, "admin access required")
+				writeJSONError(w, r, http.StatusForbidden, "admin access required", nil)
 			default:
 				next.ServeHTTP(w, r)
 			}
@@ -53,24 +53,24 @@ func RequireUser(userExists UserLookup) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := ClaimsFromContext(r.Context())
 			if !ok {
-				unauthorized(w, "not authenticated")
+				unauthorized(w, r, "not authenticated", nil)
 				return
 			}
 			if claims.Role != RoleUser {
-				writeJSONError(w, http.StatusForbidden, "user access required")
+				writeJSONError(w, r, http.StatusForbidden, "user access required", nil)
 				return
 			}
 			userID, err := claims.UserID()
 			if err != nil {
-				unauthorized(w, "invalid token")
+				unauthorized(w, r, "invalid token", err)
 				return
 			}
 			exists, err := userExists(r.Context(), userID)
 			switch {
 			case err != nil:
-				writeJSONError(w, http.StatusInternalServerError, "internal server error")
+				writeJSONError(w, r, http.StatusInternalServerError, "internal server error", err)
 			case !exists:
-				unauthorized(w, "account no longer exists")
+				unauthorized(w, r, "account no longer exists", nil)
 			default:
 				next.ServeHTTP(w, r)
 			}

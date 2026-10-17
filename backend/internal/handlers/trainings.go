@@ -72,7 +72,7 @@ func parseTrainingRequest(w http.ResponseWriter, r *http.Request) (trainingReque
 		return req, false
 	}
 	fail := func(msg string) (trainingRequest, bool) {
-		writeError(w, http.StatusBadRequest, msg)
+		writeError(w, r, http.StatusBadRequest, msg)
 		return req, false
 	}
 
@@ -232,13 +232,13 @@ func trainingWriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		writeError(w, http.StatusNotFound, "training not found")
+		clientError(w, r, http.StatusNotFound, "training not found", err)
 	case errors.Is(err, errUnknownUnit):
-		writeError(w, http.StatusBadRequest, "unknown unit")
+		clientError(w, r, http.StatusBadRequest, "unknown unit", err)
 	case errors.Is(err, errUnknownClient):
-		writeError(w, http.StatusBadRequest, "unknown client")
+		clientError(w, r, http.StatusBadRequest, "unknown client", err)
 	case errors.As(err, &pgErr) && pgErr.Code == "23503": // foreign_key_violation
-		writeError(w, http.StatusBadRequest, "unknown exercise")
+		clientError(w, r, http.StatusBadRequest, "unknown exercise", err)
 	default:
 		serverError(w, r, err)
 	}
@@ -332,7 +332,7 @@ func loadTraining(ctx context.Context, q *database.Queries, id uuid.UUID) (train
 func (h *Handler) GetTraining(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid training id")
+		clientError(w, r, http.StatusBadRequest, "invalid training id", err)
 		return
 	}
 	training, err := loadTraining(r.Context(), h.queries, id)
@@ -394,7 +394,7 @@ func (h *Handler) CreateTraining(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateTraining(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid training id")
+		clientError(w, r, http.StatusBadRequest, "invalid training id", err)
 		return
 	}
 	req, ok := parseTrainingRequest(w, r)
@@ -431,7 +431,7 @@ type duplicateTrainingRequest struct {
 func (h *Handler) DuplicateTraining(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid training id")
+		clientError(w, r, http.StatusBadRequest, "invalid training id", err)
 		return
 	}
 	var req duplicateTrainingRequest
@@ -486,7 +486,7 @@ func copyUnits(units []trainingUnitResponse) []trainingUnitRequest {
 func (h *Handler) DeleteTraining(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid training id")
+		clientError(w, r, http.StatusBadRequest, "invalid training id", err)
 		return
 	}
 	n, err := h.queries.DeleteTraining(r.Context(), id)
@@ -495,7 +495,7 @@ func (h *Handler) DeleteTraining(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		writeError(w, http.StatusNotFound, "training not found")
+		writeError(w, r, http.StatusNotFound, "training not found")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

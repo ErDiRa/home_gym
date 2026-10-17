@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,15 +18,22 @@ import (
 
 	"github.com/erdira/homegym/backend/internal/auth"
 	"github.com/erdira/homegym/backend/internal/handlers"
+	"github.com/erdira/homegym/backend/internal/logging"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		slog.Error("server stopped", "err", err)
+		os.Exit(1)
 	}
 }
 
 func run() error {
+	logger, err := logging.Setup(os.Getenv("LOG_LEVEL"), os.Getenv("LOG_FORMAT"))
+	if err != nil {
+		return err
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -51,7 +58,8 @@ func run() error {
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(middleware.RequestID)
+	r.Use(logging.Middleware(logger))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   splitEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
@@ -78,7 +86,7 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("listening on :%s", port)
+		logger.Info("listening", "port", port)
 		errCh <- srv.ListenAndServe()
 	}()
 
@@ -86,6 +94,7 @@ func run() error {
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
+		logger.Info("shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)

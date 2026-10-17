@@ -24,8 +24,8 @@ func (h *Handler) clientRoutes(r chi.Router) {
 }
 
 // ListAssignedTrainings returns the trainings assigned to the current user. Not implemented yet.
-func (h *Handler) ListAssignedTrainings(w http.ResponseWriter, _ *http.Request) {
-	notImplemented(w)
+func (h *Handler) ListAssignedTrainings(w http.ResponseWriter, r *http.Request) {
+	notImplemented(w, r)
 }
 
 type feedbackRequest struct {
@@ -40,7 +40,7 @@ func (h *Handler) UpsertFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 	exerciseID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid exercise id")
+		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *Handler) UpsertFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Rating < 1 || req.Rating > 5 {
-		writeError(w, http.StatusBadRequest, "rating must be between 1 and 5")
+		writeError(w, r, http.StatusBadRequest, "rating must be between 1 and 5")
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *Handler) UpsertFeedback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
-			writeError(w, http.StatusNotFound, "user or exercise not found")
+			clientError(w, r, http.StatusNotFound, "user or exercise not found", err)
 			return
 		}
 		serverError(w, r, err)

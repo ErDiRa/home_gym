@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/erdira/homegym/backend/internal/logging"
 )
 
 // CookieName is the HttpOnly cookie that carries the JWT.
@@ -21,12 +23,12 @@ func Middleware(tokens *TokenManager) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(CookieName)
 			if err != nil {
-				unauthorized(w, "not authenticated")
+				unauthorized(w, r, "not authenticated", err)
 				return
 			}
 			claims, err := tokens.Parse(cookie.Value)
 			if err != nil {
-				unauthorized(w, "invalid or expired token")
+				unauthorized(w, r, "invalid or expired token", err)
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, claims)))
@@ -78,11 +80,13 @@ func ClearCookie(w http.ResponseWriter, secure bool) {
 	})
 }
 
-func unauthorized(w http.ResponseWriter, msg string) {
-	writeJSONError(w, http.StatusUnauthorized, msg)
+func unauthorized(w http.ResponseWriter, r *http.Request, msg string, err error) {
+	writeJSONError(w, r, http.StatusUnauthorized, msg, err)
 }
 
-func writeJSONError(w http.ResponseWriter, status int, msg string) {
+// writeJSONError sends a JSON error response and logs it with the underlying cause (may be nil).
+func writeJSONError(w http.ResponseWriter, r *http.Request, status int, msg string, err error) {
+	logging.RequestError(r, status, msg, err)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})

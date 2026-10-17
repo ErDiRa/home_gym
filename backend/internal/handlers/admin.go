@@ -57,16 +57,16 @@ func parseExerciseRequest(w http.ResponseWriter, r *http.Request) (createExercis
 	}
 	req.JointIDs, req.MuscleGroupIDs, req.FocusIDs = unique(req.JointIDs), unique(req.MuscleGroupIDs), unique(req.FocusIDs)
 	if req.Name == "" || len(req.JointIDs) == 0 || len(req.MuscleGroupIDs) == 0 {
-		writeError(w, http.StatusBadRequest, "name, joint_ids and muscle_group_ids are required")
+		writeError(w, r, http.StatusBadRequest, "name, joint_ids and muscle_group_ids are required")
 		return req, false
 	}
 	if req.Type != "mobility" && req.Type != "strength" {
-		writeError(w, http.StatusBadRequest, "type must be mobility or strength")
+		writeError(w, r, http.StatusBadRequest, "type must be mobility or strength")
 		return req, false
 	}
 	if req.VideoURL != "" {
 		if u, err := url.Parse(req.VideoURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			writeError(w, http.StatusBadRequest, "video_url must be an http(s) URL")
+			writeError(w, r, http.StatusBadRequest, "video_url must be an http(s) URL")
 			return req, false
 		}
 	}
@@ -78,9 +78,9 @@ func exerciseWriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		writeError(w, http.StatusNotFound, "exercise not found")
+		clientError(w, r, http.StatusNotFound, "exercise not found", err)
 	case errors.As(err, &pgErr) && pgErr.Code == "23503": // foreign_key_violation
-		writeError(w, http.StatusBadRequest, "unknown joint, muscle group or focus")
+		clientError(w, r, http.StatusBadRequest, "unknown joint, muscle group or focus", err)
 	default:
 		serverError(w, r, err)
 	}
@@ -110,7 +110,7 @@ func (h *Handler) CreateExercise(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid exercise id")
+		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
 		return
 	}
 	req, ok := parseExerciseRequest(w, r)
@@ -139,7 +139,7 @@ func (h *Handler) UpdateExercise(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetExercise(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid exercise id")
+		clientError(w, r, http.StatusBadRequest, "invalid exercise id", err)
 		return
 	}
 	exercise, err := h.queries.GetExercise(r.Context(), id)
@@ -193,18 +193,18 @@ func (h *Handler) CreateFocus(w http.ResponseWriter, r *http.Request) {
 	}
 	name, alias := strings.TrimSpace(req.Name), strings.TrimSpace(req.Alias)
 	if name == "" || len(name) > 60 {
-		writeError(w, http.StatusBadRequest, "name is required (max 60 characters)")
+		writeError(w, r, http.StatusBadRequest, "name is required (max 60 characters)")
 		return
 	}
 	if alias == "" || utf8.RuneCountInString(alias) > 10 {
-		writeError(w, http.StatusBadRequest, "alias is required (max 10 characters)")
+		writeError(w, r, http.StatusBadRequest, "alias is required (max 10 characters)")
 		return
 	}
 	focus, err := h.queries.CreateFocus(r.Context(), database.CreateFocusParams{Name: name, Alias: alias})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			writeError(w, http.StatusConflict, "this focus already exists")
+			writeError(w, r, http.StatusConflict, "this focus already exists")
 			return
 		}
 		serverError(w, r, err)

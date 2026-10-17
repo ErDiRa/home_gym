@@ -62,7 +62,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request, email, pa
 			account, role, hash = userResponse{ID: admin.ID, Email: admin.Email, IsAdmin: true}, auth.RoleAdmin, admin.PasswordHash
 		case errors.Is(err, pgx.ErrNoRows):
 			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-			writeError(w, http.StatusUnauthorized, "invalid email or password")
+			writeError(w, r, http.StatusUnauthorized, "invalid email or password")
 			return userResponse{}, "", false
 		default:
 			serverError(w, r, err)
@@ -73,7 +73,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request, email, pa
 		return userResponse{}, "", false
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
-		writeError(w, http.StatusUnauthorized, "invalid email or password")
+		writeError(w, r, http.StatusUnauthorized, "invalid email or password")
 		return userResponse{}, "", false
 	}
 	return account, role, true
@@ -109,12 +109,12 @@ func (h *Handler) Logout(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
 	id, err := claims.UserID()
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		writeError(w, r, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
 
@@ -130,7 +130,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		auth.ClearCookie(w, h.secureCookies)
-		writeError(w, http.StatusUnauthorized, "account no longer exists")
+		writeError(w, r, http.StatusUnauthorized, "account no longer exists")
 		return
 	}
 	if err != nil {
