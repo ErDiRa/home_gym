@@ -42,18 +42,28 @@ WHERE training_id = $1
 ORDER BY position;
 
 -- name: ListTrainingBlocks :many
-SELECT tb.id, tb.unit_id, tb.name, tb.notes
+SELECT tb.id, tb.unit_id, tb.kind, tb.name, tb.sets,
+       tb.reps_value, tb.reps_max, tb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, tb.per_side,
+       tb.load_value, tb.load_max, tb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       tb.notes
 FROM training_blocks tb
 JOIN training_units tu ON tu.id = tb.unit_id
+LEFT JOIN rep_units ru ON ru.id = tb.reps_unit
+LEFT JOIN load_units lu ON lu.id = tb.load_unit
 WHERE tu.training_id = $1
 ORDER BY tb.unit_id, tb.position;
 
 -- name: ListTrainingExercises :many
-SELECT te.block_id, te.exercise_id, e.name, e.type, te.sets, te.reps, te.notes
+SELECT te.block_id, te.exercise_id, e.name, e.type,
+       te.reps_value, te.reps_max, te.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, te.per_side,
+       te.load_value, te.load_max, te.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       te.notes
 FROM training_exercises te
 JOIN exercises e ON e.id = te.exercise_id
 JOIN training_blocks tb ON tb.id = te.block_id
 JOIN training_units tu ON tu.id = tb.unit_id
+LEFT JOIN rep_units ru ON ru.id = te.reps_unit
+LEFT JOIN load_units lu ON lu.id = te.load_unit
 WHERE tu.training_id = $1
 ORDER BY te.block_id, te.position;
 
@@ -98,13 +108,22 @@ USING training_units tu
 WHERE tu.id = tb.unit_id AND tu.training_id = $1;
 
 -- name: InsertTrainingBlock :one
-INSERT INTO training_blocks (unit_id, position, name, notes)
-VALUES ($1, $2, $3, $4)
+INSERT INTO training_blocks (
+    unit_id, position, kind, name, sets,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+) VALUES (
+    sqlc.arg(unit_id), sqlc.arg(position), sqlc.arg(kind), sqlc.arg(name), sqlc.arg(sets),
+    sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(notes)
+)
 RETURNING id;
 
--- name: InsertBlockExercises :exec
--- The arrays are parallel: element i of each describes the exercise at position i.
-INSERT INTO training_exercises (block_id, exercise_id, position, sets, reps, notes)
-SELECT sqlc.arg(block_id), (sqlc.arg(exercise_ids)::uuid[])[i], i,
-       (sqlc.arg(sets)::int[])[i], (sqlc.arg(reps)::text[])[i], (sqlc.arg(notes)::text[])[i]
-FROM generate_subscripts(sqlc.arg(exercise_ids)::uuid[], 1) AS i;
+-- name: InsertTrainingExercise :exec
+INSERT INTO training_exercises (
+    block_id, exercise_id, position,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+) VALUES (
+    sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position),
+    sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(notes)
+);

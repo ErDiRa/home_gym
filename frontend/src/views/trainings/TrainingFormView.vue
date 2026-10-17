@@ -150,7 +150,17 @@ import SelectField from '../../components/form/SelectField.vue'
 import MoveRemoveButtons from '../../components/training/MoveRemoveButtons.vue'
 import TrainingBlockEditor from '../../components/training/TrainingBlockEditor.vue'
 import UnitScheduleEditor from '../../components/training/UnitScheduleEditor.vue'
-import { move, newBlock, newUnit, toInput, toRows, type UnitRow } from '../../components/training/trainingForm'
+import { loadTrainingLookups } from '../../components/training/lookups'
+import {
+  blockLetter,
+  blockProblem,
+  move,
+  newBlock,
+  newUnit,
+  toInput,
+  toRows,
+  type UnitRow,
+} from '../../components/training/trainingForm'
 import type { Client, Exercise } from '../../types'
 
 const router = useRouter()
@@ -183,9 +193,12 @@ const problem = computed(() => {
   if (!clientId.value) return 'Select a client.'
   if (!name.value.trim()) return 'Give the training a name.'
   if (units.value.some((u) => !u.name.trim())) return 'Every unit needs a name.'
-  if (units.value.some((u) => u.blocks.some((b) => !b.exercises.length))) return 'Every block needs at least one exercise.'
-  if (units.value.some((u) => u.blocks.some((b) => b.exercises.some((e) => !e.reps.trim() || !(e.sets >= 1)))))
-    return 'Every exercise needs sets and reps.'
+  for (const u of units.value) {
+    for (const [b, block] of u.blocks.entries()) {
+      const p = blockProblem(block)
+      if (p) return `${u.name}, block ${blockLetter(b)}: ${p}`
+    }
+  }
   return ''
 })
 
@@ -195,6 +208,7 @@ onMounted(async () => {
       listExercises(),
       listClients(),
       trainingId ? getTraining(trainingId) : undefined,
+      loadTrainingLookups(),
     ])
     exercises.value = loadedExercises
     clients.value = loadedClients

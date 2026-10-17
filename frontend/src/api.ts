@@ -1,6 +1,7 @@
 import { toast } from 'vue-sonner'
 import { state, type User } from './session'
 import type {
+  BlockKind,
   Client,
   ClientDetail,
   ClientInput,
@@ -13,6 +14,7 @@ import type {
   Training,
   TrainingDetail,
   TrainingInput,
+  Unit,
 } from './types'
 
 export class ApiError extends Error {
@@ -69,6 +71,11 @@ export const updateExercise = (id: string, input: ExerciseInput) =>
   api.put<Exercise>(`/admin/exercises/${id}`, input)
 
 // Trainings and clients are admin-only.
+export const listBlockKinds = () => api.get<BlockKind[]>('/admin/block-kinds')
+export const listRepUnits = () => api.get<Unit[]>('/admin/rep-units')
+export const createRepUnit = (name: string) => api.post<Unit>('/admin/rep-units', { name })
+export const listLoadUnits = () => api.get<Unit[]>('/admin/load-units')
+export const createLoadUnit = (name: string) => api.post<Unit>('/admin/load-units', { name })
 export const listTrainings = () => api.get<Training[]>('/admin/trainings')
 export const getTraining = (id: string) => api.get<TrainingDetail>(`/admin/trainings/${id}`)
 export const createTraining = (input: TrainingInput) => api.post<Training>('/admin/trainings', input)

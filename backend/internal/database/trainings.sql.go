@@ -144,56 +144,95 @@ func (q *Queries) GetTraining(ctx context.Context, id uuid.UUID) (GetTrainingRow
 	return i, err
 }
 
-const insertBlockExercises = `-- name: InsertBlockExercises :exec
-INSERT INTO training_exercises (block_id, exercise_id, position, sets, reps, notes)
-SELECT $1, ($2::uuid[])[i], i,
-       ($3::int[])[i], ($4::text[])[i], ($5::text[])[i]
-FROM generate_subscripts($2::uuid[], 1) AS i
-`
-
-type InsertBlockExercisesParams struct {
-	BlockID     uuid.UUID   `json:"block_id"`
-	ExerciseIds []uuid.UUID `json:"exercise_ids"`
-	Sets        []int32     `json:"sets"`
-	Reps        []string    `json:"reps"`
-	Notes       []string    `json:"notes"`
-}
-
-// The arrays are parallel: element i of each describes the exercise at position i.
-func (q *Queries) InsertBlockExercises(ctx context.Context, arg InsertBlockExercisesParams) error {
-	_, err := q.db.Exec(ctx, insertBlockExercises,
-		arg.BlockID,
-		arg.ExerciseIds,
-		arg.Sets,
-		arg.Reps,
-		arg.Notes,
-	)
-	return err
-}
-
 const insertTrainingBlock = `-- name: InsertTrainingBlock :one
-INSERT INTO training_blocks (unit_id, position, name, notes)
-VALUES ($1, $2, $3, $4)
+INSERT INTO training_blocks (
+    unit_id, position, kind, name, sets,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9,
+    $10, $11, $12, $13
+)
 RETURNING id
 `
 
 type InsertTrainingBlockParams struct {
-	UnitID   uuid.UUID `json:"unit_id"`
-	Position int32     `json:"position"`
-	Name     string    `json:"name"`
-	Notes    string    `json:"notes"`
+	UnitID    uuid.UUID  `json:"unit_id"`
+	Position  int32      `json:"position"`
+	Kind      string     `json:"kind"`
+	Name      string     `json:"name"`
+	Sets      int32      `json:"sets"`
+	RepsValue *float64   `json:"reps_value"`
+	RepsMax   *float64   `json:"reps_max"`
+	RepsUnit  *uuid.UUID `json:"reps_unit"`
+	PerSide   bool       `json:"per_side"`
+	LoadValue *float64   `json:"load_value"`
+	LoadMax   *float64   `json:"load_max"`
+	LoadUnit  *uuid.UUID `json:"load_unit"`
+	Notes     string     `json:"notes"`
 }
 
 func (q *Queries) InsertTrainingBlock(ctx context.Context, arg InsertTrainingBlockParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, insertTrainingBlock,
 		arg.UnitID,
 		arg.Position,
+		arg.Kind,
 		arg.Name,
+		arg.Sets,
+		arg.RepsValue,
+		arg.RepsMax,
+		arg.RepsUnit,
+		arg.PerSide,
+		arg.LoadValue,
+		arg.LoadMax,
+		arg.LoadUnit,
 		arg.Notes,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const insertTrainingExercise = `-- name: InsertTrainingExercise :exec
+INSERT INTO training_exercises (
+    block_id, exercise_id, position,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+) VALUES (
+    $1, $2, $3,
+    $4, $5, $6, $7,
+    $8, $9, $10, $11
+)
+`
+
+type InsertTrainingExerciseParams struct {
+	BlockID    uuid.UUID  `json:"block_id"`
+	ExerciseID uuid.UUID  `json:"exercise_id"`
+	Position   int32      `json:"position"`
+	RepsValue  *float64   `json:"reps_value"`
+	RepsMax    *float64   `json:"reps_max"`
+	RepsUnit   *uuid.UUID `json:"reps_unit"`
+	PerSide    bool       `json:"per_side"`
+	LoadValue  *float64   `json:"load_value"`
+	LoadMax    *float64   `json:"load_max"`
+	LoadUnit   *uuid.UUID `json:"load_unit"`
+	Notes      string     `json:"notes"`
+}
+
+func (q *Queries) InsertTrainingExercise(ctx context.Context, arg InsertTrainingExerciseParams) error {
+	_, err := q.db.Exec(ctx, insertTrainingExercise,
+		arg.BlockID,
+		arg.ExerciseID,
+		arg.Position,
+		arg.RepsValue,
+		arg.RepsMax,
+		arg.RepsUnit,
+		arg.PerSide,
+		arg.LoadValue,
+		arg.LoadMax,
+		arg.LoadUnit,
+		arg.Notes,
+	)
+	return err
 }
 
 const insertTrainingUnit = `-- name: InsertTrainingUnit :one
@@ -272,18 +311,34 @@ func (q *Queries) ListClientTrainings(ctx context.Context, userID uuid.UUID) ([]
 }
 
 const listTrainingBlocks = `-- name: ListTrainingBlocks :many
-SELECT tb.id, tb.unit_id, tb.name, tb.notes
+SELECT tb.id, tb.unit_id, tb.kind, tb.name, tb.sets,
+       tb.reps_value, tb.reps_max, tb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, tb.per_side,
+       tb.load_value, tb.load_max, tb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       tb.notes
 FROM training_blocks tb
 JOIN training_units tu ON tu.id = tb.unit_id
+LEFT JOIN rep_units ru ON ru.id = tb.reps_unit
+LEFT JOIN load_units lu ON lu.id = tb.load_unit
 WHERE tu.training_id = $1
 ORDER BY tb.unit_id, tb.position
 `
 
 type ListTrainingBlocksRow struct {
-	ID     uuid.UUID `json:"id"`
-	UnitID uuid.UUID `json:"unit_id"`
-	Name   string    `json:"name"`
-	Notes  string    `json:"notes"`
+	ID           uuid.UUID  `json:"id"`
+	UnitID       uuid.UUID  `json:"unit_id"`
+	Kind         string     `json:"kind"`
+	Name         string     `json:"name"`
+	Sets         int32      `json:"sets"`
+	RepsValue    *float64   `json:"reps_value"`
+	RepsMax      *float64   `json:"reps_max"`
+	RepsUnit     *uuid.UUID `json:"reps_unit"`
+	RepsUnitName string     `json:"reps_unit_name"`
+	PerSide      bool       `json:"per_side"`
+	LoadValue    *float64   `json:"load_value"`
+	LoadMax      *float64   `json:"load_max"`
+	LoadUnit     *uuid.UUID `json:"load_unit"`
+	LoadUnitName string     `json:"load_unit_name"`
+	Notes        string     `json:"notes"`
 }
 
 func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingBlocksRow, error) {
@@ -298,7 +353,18 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 		if err := rows.Scan(
 			&i.ID,
 			&i.UnitID,
+			&i.Kind,
 			&i.Name,
+			&i.Sets,
+			&i.RepsValue,
+			&i.RepsMax,
+			&i.RepsUnit,
+			&i.RepsUnitName,
+			&i.PerSide,
+			&i.LoadValue,
+			&i.LoadMax,
+			&i.LoadUnit,
+			&i.LoadUnitName,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -312,23 +378,35 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 }
 
 const listTrainingExercises = `-- name: ListTrainingExercises :many
-SELECT te.block_id, te.exercise_id, e.name, e.type, te.sets, te.reps, te.notes
+SELECT te.block_id, te.exercise_id, e.name, e.type,
+       te.reps_value, te.reps_max, te.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, te.per_side,
+       te.load_value, te.load_max, te.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       te.notes
 FROM training_exercises te
 JOIN exercises e ON e.id = te.exercise_id
 JOIN training_blocks tb ON tb.id = te.block_id
 JOIN training_units tu ON tu.id = tb.unit_id
+LEFT JOIN rep_units ru ON ru.id = te.reps_unit
+LEFT JOIN load_units lu ON lu.id = te.load_unit
 WHERE tu.training_id = $1
 ORDER BY te.block_id, te.position
 `
 
 type ListTrainingExercisesRow struct {
-	BlockID    uuid.UUID `json:"block_id"`
-	ExerciseID uuid.UUID `json:"exercise_id"`
-	Name       string    `json:"name"`
-	Type       string    `json:"type"`
-	Sets       int32     `json:"sets"`
-	Reps       string    `json:"reps"`
-	Notes      string    `json:"notes"`
+	BlockID      uuid.UUID  `json:"block_id"`
+	ExerciseID   uuid.UUID  `json:"exercise_id"`
+	Name         string     `json:"name"`
+	Type         string     `json:"type"`
+	RepsValue    *float64   `json:"reps_value"`
+	RepsMax      *float64   `json:"reps_max"`
+	RepsUnit     *uuid.UUID `json:"reps_unit"`
+	RepsUnitName string     `json:"reps_unit_name"`
+	PerSide      bool       `json:"per_side"`
+	LoadValue    *float64   `json:"load_value"`
+	LoadMax      *float64   `json:"load_max"`
+	LoadUnit     *uuid.UUID `json:"load_unit"`
+	LoadUnitName string     `json:"load_unit_name"`
+	Notes        string     `json:"notes"`
 }
 
 func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingExercisesRow, error) {
@@ -345,8 +423,15 @@ func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUI
 			&i.ExerciseID,
 			&i.Name,
 			&i.Type,
-			&i.Sets,
-			&i.Reps,
+			&i.RepsValue,
+			&i.RepsMax,
+			&i.RepsUnit,
+			&i.RepsUnitName,
+			&i.PerSide,
+			&i.LoadValue,
+			&i.LoadMax,
+			&i.LoadUnit,
+			&i.LoadUnitName,
 			&i.Notes,
 		); err != nil {
 			return nil, err

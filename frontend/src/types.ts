@@ -49,25 +49,65 @@ export interface ExerciseDetail extends ExerciseInput {
 // A training belongs to one client and is a tree: units (e.g. "Day A") hold blocks (e.g.
 // "Warm-up", "Superset"), and blocks hold one or more exercises with their prescription.
 // reps is free text, e.g. '8-10'.
-export interface TrainingExerciseInput {
+// The kind of a training block (single, superset, complex...). Its rules come from the server,
+// so new kinds need no code: how many exercises it takes, and whether reps and load are set
+// once on the block for all exercises (shared) or per exercise.
+export interface BlockKind {
+  code: string
+  name: string
+  description: string
+  min_exercises: number
+  max_exercises: number | null // null = no limit
+  shared_reps: boolean
+  shared_load: boolean
+}
+
+// A unit planned reps (reps, s, m...) or load (kg, % 1RM, RPE...) are measured in. min/max bound
+// the values planned in it.
+export interface Unit {
+  id: string
+  name: string
+  min_value: number | null
+  max_value: number | null
+}
+
+// Planned reps and load. A value is null when not set; a max turns it into a range (8-10).
+export interface Amount {
+  reps_value: number | null
+  reps_max: number | null
+  reps_unit: string | null
+  per_side: boolean
+  load_value: number | null
+  load_max: number | null
+  load_unit: string | null
+}
+
+// The unit names of an amount, as returned by the server.
+export interface AmountUnitNames {
+  reps_unit_name: string
+  load_unit_name: string
+}
+
+export interface TrainingExerciseInput extends Amount {
   exercise_id: string
-  sets: number
-  reps: string
   notes: string
 }
 
-export interface TrainingExercise extends TrainingExerciseInput {
+export interface TrainingExercise extends TrainingExerciseInput, AmountUnitNames {
   name: string
   type: ExerciseType
 }
 
-export interface TrainingBlockInput {
+// A block's sets apply to all its exercises; its amount is only used when its kind shares
+// reps or load.
+export interface TrainingBlockInput extends Amount {
+  kind: string
   name: string
+  sets: number
   notes: string
   exercises: TrainingExerciseInput[]
 }
 
-// When a unit is done: recurring weekdays (ISO, 1 = Monday) and/or specific dates.
 export interface UnitSchedule {
   weekdays: number[]
   dates: string[] // YYYY-MM-DD
@@ -90,9 +130,11 @@ export interface TrainingInput {
   units: TrainingUnitInput[]
 }
 
-export interface TrainingBlock {
+export interface TrainingBlock extends Amount, AmountUnitNames {
   id: string
+  kind: string
   name: string
+  sets: number
   notes: string
   exercises: TrainingExercise[]
 }

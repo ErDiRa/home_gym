@@ -127,12 +127,81 @@ CREATE TABLE training_units (
 
 CREATE INDEX idx_training_units_training ON training_units (training_id, position);
 
+-- Kind of a training block. The rules that set a kind apart live in its row (how many
+-- exercises it takes, whether reps and load are set once on the block for all exercises), so
+-- a new kind is a new row. The rows are part of the schema: the app needs them.
+CREATE TABLE block_kinds (
+    code          TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    position      INT NOT NULL,
+    min_exercises INT NOT NULL CHECK (min_exercises >= 1),
+    max_exercises INT CHECK (max_exercises >= min_exercises), -- NULL = no limit
+    shared_reps   BOOLEAN NOT NULL,
+    shared_load   BOOLEAN NOT NULL
+);
+
+INSERT INTO block_kinds (code, name, description, position, min_exercises, max_exercises, shared_reps, shared_load) VALUES
+    ('single', 'Single', 'One exercise on its own', 1, 1, 1, false, false),
+    ('superset', 'Superset', 'Exercises done alternating: same sets, own reps and load', 2, 2, NULL, false, false),
+    ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true);
+
+-- Units a planned amount is measured in: rep_units for reps (reps, seconds, metres...),
+-- load_units for load (kg, % 1RM, RPE...). Admins can add new ones. min/max_value bound the
+-- values planned in the unit (NULL = unbounded).
+CREATE TABLE rep_units (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    min_value  NUMERIC(7, 2),
+    max_value  NUMERIC(7, 2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), -- keeps insertion order within one INSERT
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_rep_units_name ON rep_units (lower(name)) WHERE deleted_at IS NULL;
+
+INSERT INTO rep_units (name, min_value, max_value) VALUES
+    ('reps', 1, NULL), ('s', 1, NULL), ('min', NULL, NULL), ('m', NULL, NULL);
+
+CREATE TABLE load_units (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       TEXT NOT NULL,
+    min_value  NUMERIC(7, 2),
+    max_value  NUMERIC(7, 2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), -- keeps insertion order within one INSERT
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX idx_load_units_name ON load_units (lower(name)) WHERE deleted_at IS NULL;
+
+INSERT INTO load_units (name, min_value, max_value) VALUES
+    ('kg', 0, NULL), ('lb', 0, NULL), ('% 1RM', 0, 200), ('RPE', 1, 10), ('RIR', 0, 10);
+
+-- Blocks and exercises both carry a planned amount: reps (a value or a range in a rep unit,
+-- optionally per side) and load (a value or a range in a load unit). A block's sets apply to
+-- all of its exercises. Whether reps and load sit on the block or on each exercise depends on
+-- the block's kind (shared_reps / shared_load); the other side stays empty.
 CREATE TABLE training_blocks (
-    id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    unit_id  UUID NOT NULL REFERENCES training_units (id) ON DELETE CASCADE,
-    position INT NOT NULL,
-    name     TEXT NOT NULL,
-    notes    TEXT NOT NULL DEFAULT ''
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id    UUID NOT NULL REFERENCES training_units (id) ON DELETE CASCADE,
+    position   INT NOT NULL,
+    kind       TEXT NOT NULL REFERENCES block_kinds (code) ON DELETE RESTRICT,
+    name       TEXT NOT NULL,
+    sets       INT NOT NULL CHECK (sets BETWEEN 1 AND 100),
+    reps_value NUMERIC(7, 2),
+    reps_max   NUMERIC(7, 2),
+    reps_unit  UUID REFERENCES rep_units (id) ON DELETE RESTRICT,
+    per_side   BOOLEAN NOT NULL DEFAULT false,
+    load_value NUMERIC(7, 2),
+    load_max   NUMERIC(7, 2),
+    load_unit  UUID REFERENCES load_units (id) ON DELETE RESTRICT,
+    notes      TEXT NOT NULL DEFAULT '',
+    CHECK ((reps_value IS NULL) = (reps_unit IS NULL)),
+    CHECK (reps_max IS NULL OR (reps_value IS NOT NULL AND reps_max > reps_value)),
+    CHECK ((load_value IS NULL) = (load_unit IS NULL)),
+    CHECK (load_max IS NULL OR (load_value IS NOT NULL AND load_max > load_value))
 );
 
 CREATE INDEX idx_training_blocks_unit ON training_blocks (unit_id, position);
@@ -142,9 +211,18 @@ CREATE TABLE training_exercises (
     block_id    UUID NOT NULL REFERENCES training_blocks (id) ON DELETE CASCADE,
     exercise_id UUID NOT NULL REFERENCES exercises (id) ON DELETE RESTRICT,
     position    INT NOT NULL,
-    sets        INT NOT NULL CHECK (sets > 0),
-    reps        TEXT NOT NULL, -- free text, e.g. '8-10', '30s' or '6/side'
-    notes       TEXT NOT NULL DEFAULT ''
+    reps_value  NUMERIC(7, 2),
+    reps_max    NUMERIC(7, 2),
+    reps_unit   UUID REFERENCES rep_units (id) ON DELETE RESTRICT,
+    per_side    BOOLEAN NOT NULL DEFAULT false,
+    load_value  NUMERIC(7, 2),
+    load_max    NUMERIC(7, 2),
+    load_unit   UUID REFERENCES load_units (id) ON DELETE RESTRICT,
+    notes       TEXT NOT NULL DEFAULT '',
+    CHECK ((reps_value IS NULL) = (reps_unit IS NULL)),
+    CHECK (reps_max IS NULL OR (reps_value IS NOT NULL AND reps_max > reps_value)),
+    CHECK ((load_value IS NULL) = (load_unit IS NULL)),
+    CHECK (load_max IS NULL OR (load_value IS NOT NULL AND load_max > load_value))
 );
 
 CREATE INDEX idx_training_exercises_block ON training_exercises (block_id, position);
