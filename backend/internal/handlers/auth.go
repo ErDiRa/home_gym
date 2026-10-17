@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/auth"
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/auth"
+	"github.com/erdira/homegym/backend/internal/database"
 )
 
 type loginRequest struct {

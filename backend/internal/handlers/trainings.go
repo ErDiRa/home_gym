@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/database"
 )
 
 // A training belongs to one client and is a tree: units (e.g. "Day A", done on weekdays

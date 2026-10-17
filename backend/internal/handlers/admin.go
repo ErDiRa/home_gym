@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/database"
 )
 
 // adminRoutes are mounted under /api/admin behind auth.RequireAdmin.

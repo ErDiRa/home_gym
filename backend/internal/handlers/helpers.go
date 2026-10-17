@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/auth"
+	"github.com/erdira/homegym/backend/internal/auth"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

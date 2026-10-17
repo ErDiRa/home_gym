@@ -16,8 +16,8 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/auth"
-	"github.com/stefankarlin/my-accessories/backend/internal/handlers"
+	"github.com/erdira/homegym/backend/internal/auth"
+	"github.com/erdira/homegym/backend/internal/handlers"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/stefankarlin/my-accessories/backend
+module github.com/erdira/homegym/backend
 
 go 1.26.0
 

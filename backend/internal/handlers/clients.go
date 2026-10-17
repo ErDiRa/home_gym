@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/database"
 )
 
 // Clients are the rows of the users table, managed by admins.

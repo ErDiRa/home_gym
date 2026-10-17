@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/stefankarlin/my-accessories/backend/internal/database"
+	"github.com/erdira/homegym/backend/internal/database"
 )
 
 // clientRoutes are mounted under /api/client for any authenticated user.
