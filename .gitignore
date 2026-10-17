@@ -27,6 +27,7 @@ pnpm-debug.log*
 /.output/
 /.nuxt/
 /dist/
+frontend/dist/
 
 # Environment variables
 .env
@@ -55,20 +56,5 @@ temp/
 # --- Coverage ---
 coverage/
 coverage.out
-frontend/dist/assets/HomeView-IXckFT8X.js
-frontend/dist/assets/index-Bisrr6Cp.css
-frontend/dist/assets/index-BkRqmsGp.css
-frontend/dist/assets/index-BvUV5adY.js
-frontend/dist/assets/index-srygHVmP.js
-frontend/dist/assets/LoginView-ZQLSlQb3.js
 CLAUDE.md
 Übungsarchiv.xlsx
-frontend/dist/assets/AppButton.vue_vue_type_script_setup_true_lang-DnALs4lh.js
-frontend/dist/assets/AppLayout-bO7zML9-.js
-frontend/dist/assets/ExerciseFormView-aIBHlj0R.js
-frontend/dist/assets/ExercisesView-DBSN9L9-.js
-frontend/dist/assets/index-DSNEXnS1.js
-frontend/dist/assets/index-U6Uuo3jg.css
-frontend/dist/assets/LoginView-CIG27MYx.js
-frontend/dist/assets/types-C64j5SvA.js
-frontend/dist/index.html
