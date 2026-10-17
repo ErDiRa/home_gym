@@ -111,7 +111,7 @@ func TestValidate(t *testing.T) {
 	lk := lookups{kinds: map[string]repos.ListBlockKindsRow{"single": {Code: "single", Name: "Single", MinExercises: 1}}}
 	unitID := uuid.New()
 	valid := func() Input {
-		return Input{ClientID: uuid.New(), Name: "  Strength  ", Units: []UnitInput{
+		return Input{ClientID: uuid.New(), Name: "  Strength  ", StartDate: "2026-03-01", EndDate: "2026-03-28", Units: []UnitInput{
 			{Name: " Day A ", Weekdays: []int16{5, 1, 1}, Dates: []string{"2026-03-02", "2026-03-01", "2026-03-02"}},
 		}}
 	}
@@ -131,6 +131,12 @@ func TestValidate(t *testing.T) {
 		}, "a unit appears twice"},
 		{"bad weekday", func(in *Input) { in.Units[0].Weekdays = []int16{8} }, "weekdays must be 1 (Monday) to 7 (Sunday)"},
 		{"bad date", func(in *Input) { in.Units[0].Dates = []string{"01.03.2026"} }, "dates must be formatted YYYY-MM-DD"},
+		{"missing start", func(in *Input) { in.StartDate = "" }, "start_date and end_date are required (YYYY-MM-DD)"},
+		{"bad end", func(in *Input) { in.EndDate = "28.03.2026" }, "start_date and end_date are required (YYYY-MM-DD)"},
+		{"end before start", func(in *Input) { in.EndDate = "2026-02-28" }, "end_date must not be before start_date"},
+		{"one-day period", func(in *Input) { in.EndDate = "2026-03-02" }, ""},
+		{"unit date before period", func(in *Input) { in.StartDate = "2026-03-02" }, "Day A: dates must lie within the training period"},
+		{"unit date after period", func(in *Input) { in.Units[0].Dates = []string{"2026-03-29"} }, "Day A: dates must lie within the training period"},
 		{"bad block names unit and letter", func(in *Input) {
 			in.Units[0].Blocks = []BlockInput{{Kind: "single"}}
 		}, "Day A, block A: a Single block needs at least 1 exercise"},

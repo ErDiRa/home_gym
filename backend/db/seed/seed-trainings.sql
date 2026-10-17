@@ -1,7 +1,8 @@
 -- Dev seed: sample clients with trainings (needs the schema's block kinds and units, and
 -- seed-exercises.sql). Clients log in with password "test".
 -- Skipped when anna@example.com already exists. Squat also gets a second video link.
---   anna@example.com  gym training: an active and an older inactive training, all block kinds,
+--   anna@example.com  gym training: an active 4-week training from this week's Monday and the
+--                     previous 4 weeks' inactive one, all block kinds,
 --                     ranges, kg / % 1RM / RPE / RIR loads
 --   ben@example.com   home training: kettlebell work, seconds, per-side reps, a unit on a date
 --   clara@example.com no trainings and no exercise ratings, for empty states
@@ -32,9 +33,15 @@ CREATE FUNCTION pg_temp.client(email text, first_name text, last_name text) RETU
     RETURNING id
 $$;
 
-CREATE FUNCTION pg_temp.training(client uuid, name text, description text, active boolean) RETURNS uuid LANGUAGE sql AS $$
-    INSERT INTO trainings (user_id, name, description, active)
-    VALUES (client, name, description, active)
+-- The period is given in weeks from its first day; this_monday() is the start of the current week.
+CREATE FUNCTION pg_temp.this_monday() RETURNS date LANGUAGE sql AS $$
+    SELECT date_trunc('week', current_date)::date
+$$;
+
+CREATE FUNCTION pg_temp.training(client uuid, name text, description text, active boolean, start_date date, weeks int)
+RETURNS uuid LANGUAGE sql AS $$
+    INSERT INTO trainings (user_id, name, description, active, start_date, end_date)
+    VALUES (client, name, description, active, start_date, start_date + weeks * 7 - 1)
     RETURNING id
 $$;
 
@@ -118,7 +125,8 @@ BEGIN
     ) AS r(user_id, exercise, rating, notes);
 
     -- Anna, active: two gym days with every block kind.
-    t := pg_temp.training(anna, 'Strength – Phase 2', '4 weeks, heavy compounds. Add 2.5 kg when all reps feel easy.', true);
+    t := pg_temp.training(anna, 'Strength – Phase 2', '4 weeks, heavy compounds. Add 2.5 kg when all reps feel easy.', true,
+        pg_temp.this_monday(), 4);
 
     u := pg_temp.unit(t, 1, 'Day A', weekdays => '{1,4}');
     b := pg_temp.block(u, 1, 'single', NULL, name => 'Main lift', notes => '3 min rest');
@@ -145,7 +153,8 @@ BEGIN
     PERFORM pg_temp.exercise(b, 2, 'Bicep Curl', reps => 10, load => 12, tempo => '4010', notes => 'Slow eccentric');
 
     -- Anna, inactive: the previous phase.
-    t := pg_temp.training(anna, 'Strength – Phase 1', 'Technique phase, moderate loads.', false);
+    t := pg_temp.training(anna, 'Strength – Phase 1', 'Technique phase, moderate loads.', false,
+        pg_temp.this_monday() - 28, 4);
     u := pg_temp.unit(t, 1, 'Full body', weekdays => '{1,3,5}');
     b := pg_temp.block(u, 1, 'single', NULL);
     PERFORM pg_temp.exercise(b, 1, 'Squat', sets => 3, reps => 8, load => 70, load_unit => '% 1RM');
@@ -156,7 +165,8 @@ BEGIN
     PERFORM pg_temp.exercise(b, 1, 'Leg Extension', sets => 3, reps => 12, reps_max => 15);
 
     -- Ben, active: home training with kettlebells and bodyweight.
-    t := pg_temp.training(ben, 'Home functional', 'Kettlebell (16 kg), rings and a box.', true);
+    t := pg_temp.training(ben, 'Home functional', 'Kettlebell (16 kg), rings and a box.', true,
+        pg_temp.this_monday(), 8);
 
     u := pg_temp.unit(t, 1, 'Session 1', weekdays => '{6}', dates => ARRAY[current_date + 3]::date[],
         notes => 'Extra session before the holidays');

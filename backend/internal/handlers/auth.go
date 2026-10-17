@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -16,14 +17,24 @@ type loginRequest struct {
 	Remember bool   `json:"remember"`
 }
 
-// Login checks the credentials and starts a new session; the login time becomes the token's
-// auth_time, from which the 7-day cap is measured.
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+// LoginAdmin signs an admin in to the admin app; user accounts fail like wrong credentials.
+func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
+	h.login(w, r, h.accounts.LoginAdmin)
+}
+
+// LoginUser signs a user in to the client app; admin accounts fail like wrong credentials.
+func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	h.login(w, r, h.accounts.LoginUser)
+}
+
+// login checks the credentials with check and starts a new session; the login time becomes the
+// token's auth_time, from which the 7-day cap is measured.
+func (h *Handler) login(w http.ResponseWriter, r *http.Request, check func(ctx context.Context, email, password string) (account.Account, error)) {
 	var req loginRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	acc, err := h.accounts.Login(r.Context(), req.Email, req.Password)
+	acc, err := check(r.Context(), req.Email, req.Password)
 	if err != nil {
 		serviceError(w, r, err)
 		return

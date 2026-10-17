@@ -123,6 +123,8 @@ type Training struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`

@@ -20,9 +20,19 @@ func (h *Handler) clientRoutes(r chi.Router) {
 	r.Get("/stats/exercises", h.ExerciseStats)
 }
 
-// ListAssignedTrainings returns the trainings assigned to the current user. Not implemented yet.
+// ListAssignedTrainings returns the trainings the current user follows (their active one),
+// each with its units, blocks and exercises.
 func (h *Handler) ListAssignedTrainings(w http.ResponseWriter, r *http.Request) {
-	notImplemented(w, r)
+	userID, ok := userIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	trainings, err := h.trainings.Assigned(r.Context(), userID)
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, trainings)
 }
 
 // UpsertFeedback stores the current user's rating (1-5) and notes for an exercise, replacing

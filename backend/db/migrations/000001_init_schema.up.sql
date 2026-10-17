@@ -106,16 +106,20 @@ CREATE TABLE exercise_focuses (
 );
 
 -- A training is written for one client. A client can have several (e.g. one per phase), of
--- which at most one is active.
+-- which at most one is active. It runs over a period (e.g. a 4-week block), both days included;
+-- the period is independent of the active flag.
 CREATE TABLE trainings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     active      BOOLEAN NOT NULL DEFAULT false,
+    start_date  DATE NOT NULL,
+    end_date    DATE NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at  TIMESTAMPTZ
+    deleted_at  TIMESTAMPTZ,
+    CONSTRAINT trainings_period_check CHECK (end_date >= start_date)
 );
 
 CREATE INDEX idx_trainings_user ON trainings (user_id) WHERE deleted_at IS NULL;

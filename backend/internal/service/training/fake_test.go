@@ -20,6 +20,7 @@ type fakeQueries struct {
 
 	// Canned results.
 	training      repos.GetTrainingRow
+	assignedIDs   []uuid.UUID
 	getErr        error
 	units         []repos.ListTrainingUnitsRow
 	blocks        []repos.ListTrainingBlocksRow
@@ -103,6 +104,11 @@ func (f *fakeQueries) GetTraining(_ context.Context, id uuid.UUID) (repos.GetTra
 	return f.training, f.getErr
 }
 
+func (f *fakeQueries) ListAssignedTrainingIDs(context.Context, uuid.UUID) ([]uuid.UUID, error) {
+	f.calls = append(f.calls, "ListAssignedTrainingIDs")
+	return f.assignedIDs, nil
+}
+
 func (f *fakeQueries) ListTrainingUnits(context.Context, uuid.UUID) ([]repos.ListTrainingUnitsRow, error) {
 	f.calls = append(f.calls, "ListTrainingUnits")
 	return f.units, nil
@@ -121,7 +127,8 @@ func (f *fakeQueries) ListTrainingExercises(context.Context, uuid.UUID) ([]repos
 func (f *fakeQueries) CreateTraining(_ context.Context, arg repos.CreateTrainingParams) (repos.CreateTrainingRow, error) {
 	f.calls = append(f.calls, "CreateTraining")
 	f.created = append(f.created, arg)
-	return repos.CreateTrainingRow{ID: uuid.New(), ClientID: arg.UserID, Name: arg.Name, Description: arg.Description, Active: arg.Active}, nil
+	return repos.CreateTrainingRow{ID: uuid.New(), ClientID: arg.UserID, Name: arg.Name, Description: arg.Description, Active: arg.Active,
+		StartDate: arg.StartDate, EndDate: arg.EndDate}, nil
 }
 
 func (f *fakeQueries) UpdateTraining(_ context.Context, arg repos.UpdateTrainingParams) (repos.UpdateTrainingRow, error) {
@@ -130,7 +137,8 @@ func (f *fakeQueries) UpdateTraining(_ context.Context, arg repos.UpdateTraining
 		return repos.UpdateTrainingRow{}, f.updateErr
 	}
 	f.updated = append(f.updated, arg)
-	return repos.UpdateTrainingRow{ID: arg.ID, ClientID: arg.UserID, Name: arg.Name, Description: arg.Description, Active: arg.Active}, nil
+	return repos.UpdateTrainingRow{ID: arg.ID, ClientID: arg.UserID, Name: arg.Name, Description: arg.Description, Active: arg.Active,
+		StartDate: arg.StartDate, EndDate: arg.EndDate}, nil
 }
 
 func (f *fakeQueries) DeactivateClientTrainings(_ context.Context, userID uuid.UUID) error {

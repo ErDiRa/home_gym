@@ -25,6 +25,7 @@ import (
 type TrainingService interface {
 	List(ctx context.Context) ([]trainingrepos.ListTrainingsRow, error)
 	Get(ctx context.Context, id uuid.UUID) (training.Training, error)
+	Assigned(ctx context.Context, clientID uuid.UUID) ([]training.Training, error)
 	Create(ctx context.Context, in training.Input) (trainingrepos.CreateTrainingRow, error)
 	Update(ctx context.Context, id uuid.UUID, in training.Input) (trainingrepos.UpdateTrainingRow, error)
 	Duplicate(ctx context.Context, id, clientID uuid.UUID) (trainingrepos.CreateTrainingRow, error)
@@ -65,7 +66,8 @@ type FeedbackService interface {
 }
 
 type AccountService interface {
-	Login(ctx context.Context, email, password string) (account.Account, error)
+	LoginUser(ctx context.Context, email, password string) (account.Account, error)
+	LoginAdmin(ctx context.Context, email, password string) (account.Account, error)
 	Current(ctx context.Context, role string, id uuid.UUID) (account.Account, error)
 	IsAdmin(ctx context.Context, id uuid.UUID) (bool, error)
 	UserExists(ctx context.Context, id uuid.UUID) (bool, error)

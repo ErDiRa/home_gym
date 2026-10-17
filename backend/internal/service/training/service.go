@@ -26,6 +26,7 @@ import (
 type Queries interface {
 	ListTrainings(ctx context.Context) ([]repos.ListTrainingsRow, error)
 	GetTraining(ctx context.Context, id uuid.UUID) (repos.GetTrainingRow, error)
+	ListAssignedTrainingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	ListTrainingUnits(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingUnitsRow, error)
 	ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingBlocksRow, error)
 	ListTrainingExercises(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingExercisesRow, error)
@@ -119,7 +120,11 @@ type Input struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Active      bool        `json:"active"`
+	StartDate   string      `json:"start_date"` // YYYY-MM-DD, first day of the period
+	EndDate     string      `json:"end_date"`   // YYYY-MM-DD, last day of the period
 	Units       []UnitInput `json:"units"`
+
+	start, end pgtype.Date // StartDate and EndDate, parsed by validate
 }
 
 // AmountWithUnits is an Amount with the names of its units, for display.

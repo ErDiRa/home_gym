@@ -5,6 +5,8 @@ SELECT
     t.name,
     t.description,
     t.active,
+    t.start_date,
+    t.end_date,
     t.updated_at,
     u.id AS client_id,
     u.first_name AS client_first_name,
@@ -17,11 +19,11 @@ SELECT
 FROM trainings t
 JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
 WHERE t.deleted_at IS NULL
-ORDER BY u.last_name, u.first_name, t.active DESC, t.updated_at DESC;
+ORDER BY u.last_name, u.first_name, t.active DESC, t.start_date DESC;
 
 -- name: GetTraining :one
 -- Only trainings of live clients.
-SELECT t.id, t.user_id AS client_id, t.name, t.description, t.active, t.created_at, t.updated_at
+SELECT t.id, t.user_id AS client_id, t.name, t.description, t.active, t.start_date, t.end_date, t.created_at, t.updated_at
 FROM trainings t
 JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
 WHERE t.id = $1 AND t.deleted_at IS NULL;
@@ -58,15 +60,15 @@ WHERE tu.training_id = $1
 ORDER BY te.block_id, te.position;
 
 -- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id AS client_id, name, description, active, created_at, updated_at;
+INSERT INTO trainings (user_id, name, description, active, start_date, end_date)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at;
 
 -- name: UpdateTraining :one
 UPDATE trainings
-SET user_id = $2, name = $3, description = $4, active = $5, updated_at = now()
+SET user_id = $2, name = $3, description = $4, active = $5, start_date = $6, end_date = $7, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, user_id AS client_id, name, description, active, created_at, updated_at;
+RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at;
 
 -- name: DeactivateClientTrainings :exec
 -- Run before saving a training as active, so the client keeps at most one active one.
@@ -143,3 +145,8 @@ ORDER BY created_at, name;
 SELECT EXISTS (
     SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL
 );
+
+-- name: ListAssignedTrainingIDs :many
+-- What a client sees: their active training (at most one); inactive ones are drafts or done.
+SELECT id FROM trainings
+WHERE user_id = $1 AND active AND deleted_at IS NULL;

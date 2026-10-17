@@ -31,6 +31,7 @@ func (s *Service) Create(ctx context.Context, in Input) (repos.CreateTrainingRow
 		var err error
 		training, err = q.CreateTraining(ctx, repos.CreateTrainingParams{
 			UserID: in.ClientID, Name: in.Name, Description: in.Description, Active: in.Active,
+			StartDate: in.start, EndDate: in.end,
 		})
 		if err != nil {
 			return err

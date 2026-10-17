@@ -34,13 +34,20 @@ tasks:
       - docker compose up --build -d --wait db
       - docker compose up --build -d backend
 
-  frontend:dev:
-    desc: Run Vite in dev mode
-    dir: frontend
+  admin:dev:
+    desc: Run the admin frontend in dev mode (Vite on :5173)
+    dir: frontend/admin
+    cmds:
+      - npm install --no-audit --no-fund
+      - npm run dev
+
+  client:dev:
+    desc: Run the client frontend in dev mode (Vite on :5174)
+    dir: frontend/client
     cmds:
       - npm install --no-audit --no-fund
       - npm run dev
 
   dev:
-    desc: Run backend containers and Vite dev server together
-    deps: [backend:up, frontend:dev]
+    desc: Run backend containers and both Vite dev servers together
+    deps: [backend:up, admin:dev, client:dev]

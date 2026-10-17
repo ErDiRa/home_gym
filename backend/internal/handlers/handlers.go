@@ -36,20 +36,28 @@ func New(s Services, tokens *auth.TokenManager, secureCookies bool) *Handler {
 
 // Routes registers the API routes on r:
 //
-//	/api/auth/*    login, logout and session restore
-//	/api/client/*  endpoints for authenticated users
+//	/api/client/*  endpoints for authenticated users (the client app)
 //	/api/admin/*   endpoints for admins only (separate accounts, not linked to users)
+//
+// Each audience has its own auth/login, auth/logout (public) and auth/me (guarded); a login
+// only accepts accounts of its own audience, so neither app reveals the other's accounts.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
-		r.Post("/auth/login", h.Login)
-		r.Post("/auth/logout", h.Logout)
-
-		r.Group(func(r chi.Router) {
-			r.Use(auth.Middleware(h.tokens))
-			r.Get("/auth/me", h.Me)
-			r.With(auth.RequireUser(h.accounts.UserExists)).Route("/client", h.clientRoutes)
-			r.Route("/admin", func(r chi.Router) {
-				r.Use(auth.RequireAdmin(h.accounts.IsAdmin))
+		r.Route("/client", func(r chi.Router) {
+			r.Post("/auth/login", h.LoginUser)
+			r.Post("/auth/logout", h.Logout)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.Middleware(h.tokens), auth.RequireUser(h.accounts.UserExists))
+				r.Get("/auth/me", h.Me)
+				h.clientRoutes(r)
+			})
+		})
+		r.Route("/admin", func(r chi.Router) {
+			r.Post("/auth/login", h.LoginAdmin)
+			r.Post("/auth/logout", h.Logout)
+			r.Group(func(r chi.Router) {
+				r.Use(auth.Middleware(h.tokens), auth.RequireAdmin(h.accounts.IsAdmin))
+				r.Get("/auth/me", h.Me)
 				h.adminRoutes(r)
 			})
 		})

@@ -47,6 +47,9 @@ func (f *fakeQueries) GetUserByID(_ context.Context, id uuid.UUID) (repos.GetUse
 }
 
 func (f *fakeQueries) GetAdminByEmail(_ context.Context, email string) (repos.GetAdminByEmailRow, error) {
+	if f.err != nil {
+		return repos.GetAdminByEmailRow{}, f.err
+	}
 	a, ok := f.admins[email]
 	if !ok {
 		return a, pgx.ErrNoRows

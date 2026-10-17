@@ -16,7 +16,9 @@ import (
 func TestDuplicate(t *testing.T) {
 	f, _, _ := newFake()
 	id, unitID, blockID, exerciseID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-	f.training = repos.GetTrainingRow{ID: id, ClientID: uuid.New(), Name: "Strength", Description: "Base", Active: true}
+	f.training = repos.GetTrainingRow{ID: id, ClientID: uuid.New(), Name: "Strength", Description: "Base", Active: true,
+		StartDate: pgtype.Date{Time: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+		EndDate:   pgtype.Date{Time: time.Date(2026, 3, 28, 0, 0, 0, 0, time.UTC), Valid: true}}
 	f.units = []repos.ListTrainingUnitsRow{{ID: unitID, Name: "Day A", Weekdays: []int16{2},
 		Dates: []pgtype.Date{{Time: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Valid: true}}}}
 	f.blocks = []repos.ListTrainingBlocksRow{{ID: blockID, UnitID: unitID, Kind: "superset", Sets: ptr[int32](3)}}
@@ -30,11 +32,17 @@ func TestDuplicate(t *testing.T) {
 	if got.ID == id || got.ClientID != client || got.Name != "Strength" || got.Description != "Base" {
 		t.Errorf("copy = %+v", got)
 	}
+	// The copy is the next 4-week phase: it starts the day after the source ends.
+	if start, end := got.StartDate.Time.Format(time.DateOnly), got.EndDate.Time.Format(time.DateOnly); start != "2026-03-29" || end != "2026-04-25" {
+		t.Errorf("period = %s to %s, want 2026-03-29 to 2026-04-25", start, end)
+	}
 	if got.Active || f.called("DeactivateClientTrainings") {
 		t.Error("the copy of an active training is active too")
 	}
 	if len(f.insertedUnits) != 1 || f.insertedUnits[0].TrainingID != got.ID || len(f.insertedUnits[0].Dates) != 1 || f.insertedUnits[0].Weekdays[0] != 2 {
 		t.Errorf("units = %+v", f.insertedUnits)
+	} else if d := f.insertedUnits[0].Dates[0].Time.Format(time.DateOnly); d != "2026-03-29" {
+		t.Errorf("unit date = %s, want it moved with the period to 2026-03-29", d)
 	}
 	if len(f.insertedBlocks) != 1 || f.insertedBlocks[0].Kind != "superset" || *f.insertedBlocks[0].Sets != 3 {
 		t.Errorf("blocks = %+v", f.insertedBlocks)

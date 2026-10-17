@@ -27,7 +27,7 @@ pnpm-debug.log*
 /.output/
 /.nuxt/
 /dist/
-frontend/dist/
+frontend/*/dist/
 
 # Environment variables
 .env

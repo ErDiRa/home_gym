@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -24,7 +25,7 @@ func TestUpdateKeepsUnitIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID != id || !got.Active {
+	if got.ID != id || !got.Active || got.StartDate.Time.Format(time.DateOnly) != "2026-03-02" || got.EndDate.Time.Format(time.DateOnly) != "2026-03-29" {
 		t.Errorf("updated = %+v", got)
 	}
 	if !slices.Equal(f.keptUnits, []uuid.UUID{kept}) {

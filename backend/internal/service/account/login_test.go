@@ -24,7 +24,7 @@ func TestLogin(t *testing.T) {
 	f, userID, adminID := newFake()
 	s := &Service{q: f}
 
-	user, err := s.Login(context.Background(), " Anna@Example.com ", "anna-pass")
+	user, err := s.LoginUser(context.Background(), " Anna@Example.com ", "anna-pass")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestLogin(t *testing.T) {
 		t.Errorf("user = %+v", user)
 	}
 
-	admin, err := s.Login(context.Background(), "admin@example.com", "admin-pass")
+	admin, err := s.LoginAdmin(context.Background(), "admin@example.com", "admin-pass")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,20 +44,31 @@ func TestLogin(t *testing.T) {
 func TestLoginRejects(t *testing.T) {
 	f, _, _ := newFake()
 	s := &Service{q: f}
-	for _, c := range []struct{ email, password string }{
-		{"anna@example.com", "wrong"},
-		{"admin@example.com", "anna-pass"},
-		{"nobody@example.com", "anna-pass"},
+	for _, c := range []struct {
+		name            string
+		login           func(ctx context.Context, email, password string) (Account, error)
+		email, password string
+	}{
+		{"user, wrong password", s.LoginUser, "anna@example.com", "wrong"},
+		{"user, unknown email", s.LoginUser, "nobody@example.com", "anna-pass"},
+		// Each app's login only knows its own accounts, so the other kind fails like a wrong password.
+		{"admin at user login", s.LoginUser, "admin@example.com", "admin-pass"},
+		{"admin, wrong password", s.LoginAdmin, "admin@example.com", "anna-pass"},
+		{"user at admin login", s.LoginAdmin, "anna@example.com", "anna-pass"},
 	} {
-		_, err := s.Login(context.Background(), c.email, c.password)
-		wantError(t, err, service.KindUnauthorized, "invalid email or password")
+		t.Run(c.name, func(t *testing.T) {
+			_, err := c.login(context.Background(), c.email, c.password)
+			wantError(t, err, service.KindUnauthorized, "invalid email or password")
+		})
 	}
 
 	// A failing database is not a wrong password.
 	f.err = errors.New("connection refused")
-	_, err := s.Login(context.Background(), "anna@example.com", "anna-pass")
-	var svcErr *service.Error
-	if err == nil || errors.As(err, &svcErr) {
-		t.Errorf("err = %v, want the database error", err)
+	for _, login := range []func(ctx context.Context, email, password string) (Account, error){s.LoginUser, s.LoginAdmin} {
+		_, err := login(context.Background(), "anna@example.com", "anna-pass")
+		var svcErr *service.Error
+		if err == nil || errors.As(err, &svcErr) {
+			t.Errorf("err = %v, want the database error", err)
+		}
 	}
 }

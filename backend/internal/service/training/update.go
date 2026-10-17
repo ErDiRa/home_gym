@@ -33,6 +33,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in Input) (repos.Upd
 		var err error
 		training, err = q.UpdateTraining(ctx, repos.UpdateTrainingParams{
 			ID: id, UserID: in.ClientID, Name: in.Name, Description: in.Description, Active: in.Active,
+			StartDate: in.start, EndDate: in.end,
 		})
 		if err != nil {
 			return err

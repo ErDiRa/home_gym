@@ -152,22 +152,26 @@ SELECT
     t.id,
     t.name,
     t.active,
+    t.start_date,
+    t.end_date,
     t.updated_at,
     (SELECT count(*) FROM training_units tu WHERE tu.training_id = t.id)::bigint AS unit_count
 FROM trainings t
 WHERE t.user_id = $1 AND t.deleted_at IS NULL
-ORDER BY t.active DESC, t.updated_at DESC
+ORDER BY t.active DESC, t.start_date DESC
 `
 
 type ListClientTrainingsRow struct {
 	ID        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`
 	Active    bool               `json:"active"`
+	StartDate pgtype.Date        `json:"start_date"`
+	EndDate   pgtype.Date        `json:"end_date"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	UnitCount int64              `json:"unit_count"`
 }
 
-// A client's trainings for their detail page, the active one first.
+// A client's trainings for their detail page, the active one first, then the latest.
 func (q *Queries) ListClientTrainings(ctx context.Context, userID uuid.UUID) ([]ListClientTrainingsRow, error) {
 	rows, err := q.db.Query(ctx, listClientTrainings, userID)
 	if err != nil {
@@ -181,6 +185,8 @@ func (q *Queries) ListClientTrainings(ctx context.Context, userID uuid.UUID) ([]
 			&i.ID,
 			&i.Name,
 			&i.Active,
+			&i.StartDate,
+			&i.EndDate,
 			&i.UpdatedAt,
 			&i.UnitCount,
 		); err != nil {

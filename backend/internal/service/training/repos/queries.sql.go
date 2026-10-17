@@ -13,16 +13,18 @@ import (
 )
 
 const createTraining = `-- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id AS client_id, name, description, active, created_at, updated_at
+INSERT INTO trainings (user_id, name, description, active, start_date, end_date)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at
 `
 
 type CreateTrainingParams struct {
-	UserID      uuid.UUID `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Active      bool      `json:"active"`
+	UserID      uuid.UUID   `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Active      bool        `json:"active"`
+	StartDate   pgtype.Date `json:"start_date"`
+	EndDate     pgtype.Date `json:"end_date"`
 }
 
 type CreateTrainingRow struct {
@@ -31,6 +33,8 @@ type CreateTrainingRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -41,6 +45,8 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 		arg.Name,
 		arg.Description,
 		arg.Active,
+		arg.StartDate,
+		arg.EndDate,
 	)
 	var i CreateTrainingRow
 	err := row.Scan(
@@ -49,6 +55,8 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 		&i.Name,
 		&i.Description,
 		&i.Active,
+		&i.StartDate,
+		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -108,7 +116,7 @@ func (q *Queries) DeleteTrainingUnitsExcept(ctx context.Context, arg DeleteTrain
 }
 
 const getTraining = `-- name: GetTraining :one
-SELECT t.id, t.user_id AS client_id, t.name, t.description, t.active, t.created_at, t.updated_at
+SELECT t.id, t.user_id AS client_id, t.name, t.description, t.active, t.start_date, t.end_date, t.created_at, t.updated_at
 FROM trainings t
 JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
 WHERE t.id = $1 AND t.deleted_at IS NULL
@@ -120,6 +128,8 @@ type GetTrainingRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -134,6 +144,8 @@ func (q *Queries) GetTraining(ctx context.Context, id uuid.UUID) (GetTrainingRow
 		&i.Name,
 		&i.Description,
 		&i.Active,
+		&i.StartDate,
+		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -263,6 +275,32 @@ func (q *Queries) InsertTrainingUnit(ctx context.Context, arg InsertTrainingUnit
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const listAssignedTrainingIDs = `-- name: ListAssignedTrainingIDs :many
+SELECT id FROM trainings
+WHERE user_id = $1 AND active AND deleted_at IS NULL
+`
+
+// What a client sees: their active training (at most one); inactive ones are drafts or done.
+func (q *Queries) ListAssignedTrainingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssignedTrainingIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBlockKinds = `-- name: ListBlockKinds :many
@@ -573,6 +611,8 @@ SELECT
     t.name,
     t.description,
     t.active,
+    t.start_date,
+    t.end_date,
     t.updated_at,
     u.id AS client_id,
     u.first_name AS client_first_name,
@@ -585,7 +625,7 @@ SELECT
 FROM trainings t
 JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
 WHERE t.deleted_at IS NULL
-ORDER BY u.last_name, u.first_name, t.active DESC, t.updated_at DESC
+ORDER BY u.last_name, u.first_name, t.active DESC, t.start_date DESC
 `
 
 type ListTrainingsRow struct {
@@ -593,6 +633,8 @@ type ListTrainingsRow struct {
 	Name            string             `json:"name"`
 	Description     string             `json:"description"`
 	Active          bool               `json:"active"`
+	StartDate       pgtype.Date        `json:"start_date"`
+	EndDate         pgtype.Date        `json:"end_date"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 	ClientID        uuid.UUID          `json:"client_id"`
 	ClientFirstName string             `json:"client_first_name"`
@@ -616,6 +658,8 @@ func (q *Queries) ListTrainings(ctx context.Context) ([]ListTrainingsRow, error)
 			&i.Name,
 			&i.Description,
 			&i.Active,
+			&i.StartDate,
+			&i.EndDate,
 			&i.UpdatedAt,
 			&i.ClientID,
 			&i.ClientFirstName,
@@ -635,17 +679,19 @@ func (q *Queries) ListTrainings(ctx context.Context) ([]ListTrainingsRow, error)
 
 const updateTraining = `-- name: UpdateTraining :one
 UPDATE trainings
-SET user_id = $2, name = $3, description = $4, active = $5, updated_at = now()
+SET user_id = $2, name = $3, description = $4, active = $5, start_date = $6, end_date = $7, updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, user_id AS client_id, name, description, active, created_at, updated_at
+RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at
 `
 
 type UpdateTrainingParams struct {
-	ID          uuid.UUID `json:"id"`
-	UserID      uuid.UUID `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Active      bool      `json:"active"`
+	ID          uuid.UUID   `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Active      bool        `json:"active"`
+	StartDate   pgtype.Date `json:"start_date"`
+	EndDate     pgtype.Date `json:"end_date"`
 }
 
 type UpdateTrainingRow struct {
@@ -654,6 +700,8 @@ type UpdateTrainingRow struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -665,6 +713,8 @@ func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) 
 		arg.Name,
 		arg.Description,
 		arg.Active,
+		arg.StartDate,
+		arg.EndDate,
 	)
 	var i UpdateTrainingRow
 	err := row.Scan(
@@ -673,6 +723,8 @@ func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) 
 		&i.Name,
 		&i.Description,
 		&i.Active,
+		&i.StartDate,
+		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

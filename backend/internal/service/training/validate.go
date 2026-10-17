@@ -24,6 +24,15 @@ func validate(in *Input, lk lookups) error {
 	if in.Name == "" || tooLong(in.Name, 100) {
 		return service.Invalid("name is required (max 100 characters)")
 	}
+	start, startErr := time.Parse(time.DateOnly, in.StartDate)
+	end, endErr := time.Parse(time.DateOnly, in.EndDate)
+	if startErr != nil || endErr != nil {
+		return service.Invalid("start_date and end_date are required (YYYY-MM-DD)")
+	}
+	if end.Before(start) {
+		return service.Invalid("end_date must not be before start_date")
+	}
+	in.start, in.end = pgtype.Date{Time: start, Valid: true}, pgtype.Date{Time: end, Valid: true}
 	// A unit id sent twice would update the same row twice and lose one of the units.
 	seenUnits := map[uuid.UUID]bool{}
 	for i := range in.Units {
@@ -45,6 +54,10 @@ func validate(in *Input, lk lookups) error {
 		u.Weekdays = weekdays
 		if u.dates, ok = parseDates(u.Dates); !ok {
 			return service.Invalid("dates must be formatted YYYY-MM-DD")
+		}
+		// Sorted by parseDates, so checking the first and last is enough.
+		if n := len(u.dates); n > 0 && (u.dates[0].Time.Before(start) || u.dates[n-1].Time.After(end)) {
+			return service.Invalid(fmt.Sprintf("%s: dates must lie within the training period", u.Name))
 		}
 		for j := range u.Blocks {
 			if msg := checkBlock(&u.Blocks[j], lk); msg != "" {

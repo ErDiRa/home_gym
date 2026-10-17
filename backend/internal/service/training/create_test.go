@@ -3,6 +3,7 @@ package training
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -14,7 +15,7 @@ import (
 // superset.
 func twoUnitInput(reps uuid.UUID) Input {
 	withReps := Amount{RepsValue: ptr(8.0), RepsUnit: &reps}
-	return Input{ClientID: uuid.New(), Name: "Strength", Units: []UnitInput{
+	return Input{ClientID: uuid.New(), Name: "Strength", StartDate: "2026-03-02", EndDate: "2026-03-29", Units: []UnitInput{
 		{Name: "Day A", Blocks: []BlockInput{{Kind: "single", Exercises: []ExerciseInput{
 			{ExerciseID: uuid.New(), Sets: ptr[int32](3), Amount: withReps},
 			{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps},
@@ -36,6 +37,9 @@ func TestCreate(t *testing.T) {
 	}
 	if got.ClientID != in.ClientID || got.Name != "Strength" || got.Active {
 		t.Errorf("created = %+v", got)
+	}
+	if start, end := got.StartDate.Time.Format(time.DateOnly), got.EndDate.Time.Format(time.DateOnly); start != "2026-03-02" || end != "2026-03-29" {
+		t.Errorf("period = %s to %s, want 2026-03-02 to 2026-03-29", start, end)
 	}
 	if f.called("DeactivateClientTrainings") {
 		t.Error("an inactive training deactivated the client's trainings")

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#6366f1"/>
+  <!-- The dumbbell of the HomeGym logo, enlarged and centred -->
+  <g transform="translate(16 16) scale(1.45) translate(-16 -20)">
+    <path d="M10.5 20h3.4l.85-1.6 1.1 3.6 1.2-5 .85 3H21.5" fill="none" stroke="#fff" stroke-width=".7" stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="#fff">
+      <rect x="8.75" y="16.75" width="1.75" height="6.5" rx=".6"/>
+      <rect x="21.5" y="16.75" width="1.75" height="6.5" rx=".6"/>
+      <rect x="7.65" y="19.65" width="1.25" height=".7" rx=".35"/>
+      <rect x="23.1" y="19.65" width="1.25" height=".7" rx=".35"/>
+    </g>
+  </g>
+</svg>

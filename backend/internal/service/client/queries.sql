@@ -35,16 +35,18 @@ UPDATE users SET deleted_at = now(), updated_at = now()
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: ListClientTrainings :many
--- A client's trainings for their detail page, the active one first.
+-- A client's trainings for their detail page, the active one first, then the latest.
 SELECT
     t.id,
     t.name,
     t.active,
+    t.start_date,
+    t.end_date,
     t.updated_at,
     (SELECT count(*) FROM training_units tu WHERE tu.training_id = t.id)::bigint AS unit_count
 FROM trainings t
 WHERE t.user_id = $1 AND t.deleted_at IS NULL
-ORDER BY t.active DESC, t.updated_at DESC;
+ORDER BY t.active DESC, t.start_date DESC;
 
 -- name: ListClientExerciseRatings :many
 -- How one client rated exercises, for admins picking exercises for their training.

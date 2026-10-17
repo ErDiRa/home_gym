@@ -35,11 +35,6 @@ func clientError(w http.ResponseWriter, r *http.Request, status int, msg string,
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// notImplemented answers 501 for routes that exist but have no implementation yet.
-func notImplemented(w http.ResponseWriter, r *http.Request) {
-	writeError(w, r, http.StatusNotImplemented, "not implemented")
-}
-
 // serverError answers 500 with a generic message; err is only logged.
 func serverError(w http.ResponseWriter, r *http.Request, err error) {
 	clientError(w, r, http.StatusInternalServerError, "internal server error", err)
