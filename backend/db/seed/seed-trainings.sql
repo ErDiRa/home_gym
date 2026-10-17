@@ -1,5 +1,5 @@
 -- Dev seed: sample clients with trainings (needs the schema's block kinds and units, and
--- seed-exercises.sql / seed-exercise-archive.sql). Clients log in with password "test".
+-- seed-exercises.sql). Clients log in with password "test".
 -- Skipped when anna@example.com already exists. Squat also gets a second video link.
 --   anna@example.com  gym training: an active and an older inactive training, all block kinds,
 --                     ranges, kg / % 1RM / RPE / RIR loads
@@ -146,19 +146,19 @@ BEGIN
     b := pg_temp.block(u, 1, 'single', NULL, name => 'Warm-up');
     PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing', sets => 2, reps => 20, load => 6, load_unit => 'RPE');
     b := pg_temp.block(u, 2, 'superset', 4, notes => '60s rest after each round');
-    PERFORM pg_temp.exercise(b, 1, 'Kettlebell Bulgarian Split Squat', reps => 8, per_side => true, load => 16, tempo => '3110');
+    PERFORM pg_temp.exercise(b, 1, 'Bulgarian Split Squat', reps => 8, per_side => true, load => 16, tempo => '3110');
     PERFORM pg_temp.exercise(b, 2, 'Ring Row', reps => 10, reps_max => 12);
     b := pg_temp.block(u, 3, 'superset', 3, name => 'Finisher');
-    PERFORM pg_temp.exercise(b, 1, 'Walking Lunges', reps => 30, reps_unit => 's');
+    PERFORM pg_temp.exercise(b, 1, 'Walking Lunge', reps => 30, reps_unit => 's');
     PERFORM pg_temp.exercise(b, 2, 'Single Leg Deadlift', reps => 8, per_side => true, load => 16);
 
     u := pg_temp.unit(t, 2, 'Session 2', weekdays => '{3}');
     b := pg_temp.block(u, 1, 'complex', 3, name => 'Kettlebell complex', reps => 5, load => 16);
     PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing');
-    PERFORM pg_temp.exercise(b, 2, 'Kickstand Romanian Deadlift');
-    PERFORM pg_temp.exercise(b, 3, 'Split Squats');
+    PERFORM pg_temp.exercise(b, 2, 'Romanian Deadlift');
+    PERFORM pg_temp.exercise(b, 3, 'Split Squat');
     b := pg_temp.block(u, 2, 'single', NULL);
-    PERFORM pg_temp.exercise(b, 1, 'Liegestütze (erhöht)', sets => 3, reps => 10, reps_max => 15);
+    PERFORM pg_temp.exercise(b, 1, 'Push-up', sets => 3, reps => 10, reps_max => 15);
     b := pg_temp.block(u, 3, 'single', NULL);
-    PERFORM pg_temp.exercise(b, 1, 'Single Leg Box Pistol', sets => 3, reps => 5, per_side => true, notes => 'Lower box if needed');
+    PERFORM pg_temp.exercise(b, 1, 'Box Pistol Squat', sets => 3, reps => 5, per_side => true, notes => 'Lower box if needed');
 END $$;

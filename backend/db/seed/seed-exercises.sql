@@ -13,7 +13,16 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     ('Pull-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Bodyweight pull-up with an overhand grip.', 'https://www.youtube.com/results?search_query=Pull-up+exercise+form', ARRAY['Functional fitness', 'Shoulder health'], 'strength'),
     ('Bicep Curl', ARRAY['Elbow'], ARRAY['Biceps'], 'Standing dumbbell curl.', 'https://www.youtube.com/results?search_query=Bicep+Curl+exercise+form', ARRAY['Weightlifting'], 'strength'),
     ('Triceps Pushdown', ARRAY['Elbow'], ARRAY['Triceps'], 'Cable pushdown with a rope or bar.', 'https://www.youtube.com/results?search_query=Triceps+Pushdown+exercise+form', ARRAY['Weightlifting', 'Elbow health'], 'strength'),
-    ('Calf Raise', ARRAY['Ankle'], ARRAY['Calves'], 'Standing calf raise on a step.', 'https://www.youtube.com/results?search_query=Calf+Raise+exercise+form', ARRAY['Functional fitness'], 'strength')
+    ('Calf Raise', ARRAY['Ankle'], ARRAY['Calves'], 'Standing calf raise on a step.', 'https://www.youtube.com/results?search_query=Calf+Raise+exercise+form', ARRAY['Functional fitness'], 'strength'),
+    ('Kettlebell Swing', ARRAY['Hip'], ARRAY['Glutes', 'Hamstrings', 'Core'], 'Two-handed hip hinge swing to chest height.', 'https://www.youtube.com/results?search_query=Kettlebell+Swing+exercise+form', ARRAY['Functional fitness'], 'strength'),
+    ('Romanian Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge with soft knees, weight close to the legs.', 'https://www.youtube.com/results?search_query=Romanian+Deadlift+exercise+form', ARRAY['Functional fitness', 'Hip health'], 'strength'),
+    ('Single Leg Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge on one leg, the free leg reaching back.', 'https://www.youtube.com/results?search_query=Single+Leg+Deadlift+exercise+form', ARRAY['Functional fitness', 'Hip health'], 'strength'),
+    ('Bulgarian Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Split squat with the rear foot on a bench.', 'https://www.youtube.com/results?search_query=Bulgarian+Split+Squat+exercise+form', ARRAY['Functional fitness', 'Knee health'], 'strength'),
+    ('Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Static lunge, lowering the back knee towards the floor.', 'https://www.youtube.com/results?search_query=Split+Squat+exercise+form', ARRAY['Functional fitness'], 'strength'),
+    ('Walking Lunge', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Alternating forward lunges while walking.', 'https://www.youtube.com/results?search_query=Walking+Lunge+exercise+form', ARRAY['Functional fitness'], 'strength'),
+    ('Box Pistol Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Single-leg squat down to a box.', 'https://www.youtube.com/results?search_query=Box+Pistol+Squat+exercise+form', ARRAY['Functional fitness', 'Knee health'], 'strength'),
+    ('Push-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps'], 'Bodyweight push-up, hands elevated to make it easier.', 'https://www.youtube.com/results?search_query=Push-up+exercise+form', ARRAY['Functional fitness'], 'strength'),
+    ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/results?search_query=Ring+Row+exercise+form', ARRAY['Functional fitness', 'Shoulder health'], 'strength')
 ), new_exercises AS (
     INSERT INTO exercises (name, description, type)
     SELECT v.name, v.description, v.type
