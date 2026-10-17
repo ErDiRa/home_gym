@@ -28,12 +28,12 @@ task frontend:dev
 
 Seed logins (password `test` for all):
 
-| Account             | Role                                       |
-| ------------------- | ------------------------------------------ |
-| `admin@example.com` | Admin                                      |
-| `anna@example.com`  | Client with sample trainings               |
-| `ben@example.com`   | Client with a home training                |
-| `clara@example.com` | Client without trainings                   |
+| Account             | Role                         |
+| ------------------- | ---------------------------- |
+| `admin@example.com` | Admin                        |
+| `anna@example.com`  | Client with sample trainings |
+| `ben@example.com`   | Client with a home training  |
+| `clara@example.com` | Client without trainings     |
 
 ### Without Task
 
@@ -46,17 +46,17 @@ cd frontend && npm install && npm run dev  # frontend
 
 The backend works out of the box with dev defaults. To override them, copy `backend/.env.example` to `backend/.env`:
 
-| Variable               | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `POSTGRES_*`           | Database user, password and name                 |
-| `JWT_SECRET`           | Secret for signing session tokens. Change it outside of dev. |
-| `COOKIE_SECURE`        | Set to `true` when served over HTTPS             |
-| `CORS_ALLOWED_ORIGINS` | Allowed frontend origins                         |
-| `LOG_LEVEL`, `LOG_FORMAT` | `debug`/`info`/`warn`/`error`, `text`/`json`  |
+| Variable                  | Purpose                                                      |
+| ------------------------- | ------------------------------------------------------------ |
+| `POSTGRES_*`              | Database user, password and name                             |
+| `JWT_SECRET`              | Secret for signing session tokens. Change it outside of dev. |
+| `COOKIE_SECURE`           | Set to `true` when served over HTTPS                         |
+| `CORS_ALLOWED_ORIGINS`    | Allowed frontend origins                                     |
+| `LOG_LEVEL`, `LOG_FORMAT` | `debug`/`info`/`warn`/`error`, `text`/`json`                 |
 
 ## Project layout
 
-```
+```text
 backend/
   cmd/api/            entrypoint
   internal/handlers/  HTTP handlers and routes
@@ -71,14 +71,16 @@ frontend/
 
 ## Development
 
-| Command                                              | What it does                              |
-| ---------------------------------------------------- | ----------------------------------------- |
-| `task --list`                                         | Show all tasks                            |
-| `task backend:fresh`                                  | Wipe the database and recreate it from schema and seeds |
-| `cd backend && go test ./...`                         | Run the Go tests                          |
-| `docker exec -it workout_backend sqlc generate`       | Regenerate database code after changing queries or the schema |
-| `cd frontend && npm run build`                        | Type-check and build the frontend         |
+| Command                                         | What it does                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| `task --list`                                   | Show all tasks                                                |
+| `task backend:fresh`                            | Wipe the database and recreate it from schema and seeds       |
+| `cd backend && go test ./...`                   | Run the Go tests                                              |
+| `docker exec -it workout_backend sqlc generate` | Regenerate database code after changing queries or the schema |
+| `cd frontend && npm run build`                  | Type-check and build the frontend                             |
 
 There are no migrations yet: during v1 development the schema in `backend/db/migrations/000001_init_schema.up.sql` is edited directly, so run `task backend:fresh` after pulling schema changes.
 
 Users and admins are created directly in the database; there is no sign-up.
+
+Private seed data goes into `backend/db/seed/local/` (git-ignored): every `*.sql` file there is loaded after the exercise seeds when the database is created.

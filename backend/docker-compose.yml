@@ -17,6 +17,9 @@ services:
       - ./db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
       - ./db/seed/seed-admin.sql:/docker-entrypoint-initdb.d/999_seed-admin.sql:ro
       - ./db/seed/seed-exercises.sql:/docker-entrypoint-initdb.d/999_seed-exercises.sql:ro
+      # Private, git-ignored seeds from db/seed/local (e.g. the exercise archive); skipped when empty
+      - ./db/seed/seed-local.sh:/docker-entrypoint-initdb.d/999_seed-local.sh:ro
+      - ./db/seed/local:/seed-local:ro
       # Sample clients and trainings; sorts after the exercise seeds it needs
       - ./db/seed/seed-trainings.sql:/docker-entrypoint-initdb.d/999_seed-trainings.sql:ro
     healthcheck:
