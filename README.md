@@ -4,6 +4,11 @@
 
 # HomeGym
 
+![Status: in development](https://img.shields.io/badge/status-in%20development-orange)
+
+> [!WARNING]
+> HomeGym is in early development. Features, the API and the database schema can change at any time, and it is not ready for production use.
+
 A workout planner for coaches. Admins manage an exercise library and build trainings for their clients: training days on fixed weekdays or dates, made of blocks (single, superset, complex). Each exercise in a block has its own sets, reps, load and tempo.
 
 ## Tech stack
