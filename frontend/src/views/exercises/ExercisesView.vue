@@ -31,26 +31,27 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { listExercises } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
 import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { state } from '../../session'
+import { useExercisesStore } from '../../stores/exercises'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()
-const exercises = ref<Exercise[]>([])
+const store = useExercisesStore()
+const { exercises, loading } = storeToRefs(store)
 const query = ref('')
-const loading = ref(true)
 const error = ref('')
 
 // Joints and muscle groups are arrays: show them comma-separated and make them searchable.
@@ -104,12 +105,10 @@ function openExercise(event: RowClickedEvent<Exercise>) {
 
 async function load() {
   try {
-    exercises.value = await listExercises()
+    await store.loadExercises()
   } catch {
     error.value = 'Could not load exercises.'
     toast.error(error.value)
-  } finally {
-    loading.value = false
   }
 }
 

@@ -94,12 +94,14 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import { ApiError, createClient, deleteClient, getClient, updateClient } from '../../api'
+import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import ActiveBadge from '../../components/training/ActiveBadge.vue'
+import { useClientsStore } from '../../stores/clients'
 import type { ClientInput, ClientTraining } from '../../types'
 
 const router = useRouter()
+const clientsStore = useClientsStore()
 // Set when editing an existing client (route /clients/:id), absent when creating one.
 const clientId = useRoute().params.id as string | undefined
 
@@ -114,7 +116,7 @@ const saving = ref(false)
 onMounted(async () => {
   if (!clientId) return
   try {
-    const client = await getClient(clientId)
+    const client = await clientsStore.getClient(clientId)
     // Copy just the editable fields; the response also has id, created_at and trainings.
     Object.assign(form, { first_name: client.first_name, last_name: client.last_name, email: client.email })
     trainings.value = client.trainings
@@ -127,11 +129,11 @@ async function submit() {
   saving.value = true
   try {
     if (clientId) {
-      await updateClient(clientId, form)
+      await clientsStore.updateClient(clientId, form)
       toast.success('Client saved.')
       await router.push({ name: 'clients' })
     } else {
-      const client = await createClient({ ...form, password: password.value })
+      const client = await clientsStore.createClient({ ...form, password: password.value })
       toast.success(`Client ${client.first_name} ${client.last_name} created.`)
       // Continue on the edit page, where the client's trainings are created.
       await router.push({ name: 'client-edit', params: { id: client.id } })
@@ -149,7 +151,7 @@ async function remove() {
   if (!confirm(`Delete ${name}? They will no longer be able to sign in, and their trainings are hidden.`)) return
   saving.value = true
   try {
-    await deleteClient(clientId)
+    await clientsStore.deleteClient(clientId)
     toast.success(`${name} deleted.`)
     await router.push({ name: 'clients' })
   } catch {

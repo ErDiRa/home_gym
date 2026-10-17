@@ -103,8 +103,6 @@
               v-model="unit.blocks[b]"
               :index="b"
               :count="unit.blocks.length"
-              :exercises="exercises"
-              :ratings="ratings"
               :rated-by="clientName"
               @move="move(unit.blocks, b, $event)"
               @remove="unit.blocks.splice(b, 1)"
@@ -134,27 +132,17 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ArrowLeftIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import {
-  ApiError,
-  createTraining,
-  deleteTraining,
-  duplicateTraining,
-  getTraining,
-  listClientExerciseRatings,
-  listClients,
-  listExercises,
-  updateTraining,
-} from '../../api'
+import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import MoveRemoveButtons from '../../components/training/MoveRemoveButtons.vue'
 import TrainingBlockEditor from '../../components/training/TrainingBlockEditor.vue'
 import UnitScheduleEditor from '../../components/training/UnitScheduleEditor.vue'
-import { loadTrainingLookups } from '../../components/training/lookups'
 import {
   blockLetter,
   blockProblem,
@@ -165,10 +153,17 @@ import {
   toRows,
   type UnitRow,
 } from '../../components/training/trainingForm'
-import type { Client, Exercise, ExerciseRating } from '../../types'
+import { useClientsStore } from '../../stores/clients'
+import { useExercisesStore } from '../../stores/exercises'
+import { useLookupsStore } from '../../stores/lookups'
+import { useTrainingsStore } from '../../stores/trainings'
 
 const router = useRouter()
 const route = useRoute()
+const trainingsStore = useTrainingsStore()
+const clientsStore = useClientsStore()
+const exercisesStore = useExercisesStore()
+const lookups = useLookupsStore()
 // Set when editing an existing training (route /trainings/:id), absent when creating one.
 const trainingId = route.params.id as string | undefined
 // Where to go after saving: back to the client when we came from there (?client=…).
@@ -182,16 +177,13 @@ const name = ref('')
 const description = ref('')
 // New trainings are usually the client's next phase, so they start active.
 const active = ref(!trainingId)
-const clients = ref<Client[]>([])
+const { clients } = storeToRefs(clientsStore)
 const clientOptions = computed(() =>
   clients.value.map((c) => ({ id: c.id, name: `${c.last_name}, ${c.first_name} (${c.email})` })),
 )
 const duplicateOpen = ref(false)
 const duplicateClientId = ref<string | null>(null)
 const units = ref<UnitRow[]>(trainingId ? [] : [newUnit('Day A')])
-const exercises = ref<Exercise[]>([])
-// How the selected client rated exercises, by exercise id; null while no client is selected.
-const ratings = ref<Map<string, ExerciseRating> | null>(null)
 // The client's first name, for labels like "Rated by Anna".
 const clientName = computed(() => {
   const client = clients.value.find((c) => c.id === clientId.value)
@@ -215,14 +207,12 @@ const problem = computed(() => {
 
 onMounted(async () => {
   try {
-    const [loadedExercises, loadedClients, training] = await Promise.all([
-      listExercises(),
-      listClients(),
-      trainingId ? getTraining(trainingId) : undefined,
-      loadTrainingLookups(), // fills the shared lookup refs, so its result isn't needed here
+    const [training] = await Promise.all([
+      trainingId ? trainingsStore.getTraining(trainingId) : undefined,
+      exercisesStore.loadExercises(),
+      clientsStore.loadClients(),
+      lookups.loadTrainingLookups(),
     ])
-    exercises.value = loadedExercises
-    clients.value = loadedClients
     if (training) {
       clientId.value = training.client_id
       active.value = training.active
@@ -239,17 +229,7 @@ onMounted(async () => {
 // training, or picked in the form.
 watch(
   clientId,
-  async (id) => {
-    ratings.value = null
-    if (!id) return
-    try {
-      const loaded = await listClientExerciseRatings(id)
-      // Ignore the answer if another client was picked meanwhile.
-      if (clientId.value === id) ratings.value = new Map(loaded.map((r) => [r.exercise_id, r]))
-    } catch {
-      toast.error("Could not load the client's exercise ratings.")
-    }
-  },
+  (id) => clientsStore.loadRatings(id).catch(() => toast.error("Could not load the client's exercise ratings.")),
   { immediate: true },
 )
 
@@ -268,7 +248,7 @@ async function submit() {
   )
   saving.value = true
   try {
-    await (trainingId ? updateTraining(trainingId, input) : createTraining(input))
+    await (trainingId ? trainingsStore.updateTraining(trainingId, input) : trainingsStore.createTraining(input))
     toast.success(trainingId ? 'Training saved.' : 'Training created.')
     await goBack()
   } catch (e) {
@@ -282,7 +262,7 @@ async function remove() {
   if (!trainingId || !confirm(`Delete the training "${name.value}"?`)) return
   saving.value = true
   try {
-    await deleteTraining(trainingId)
+    await trainingsStore.deleteTraining(trainingId)
     toast.success('Training deleted.')
     await goBack()
   } catch {
@@ -300,7 +280,7 @@ async function duplicate() {
   if (!trainingId || !duplicateClientId.value) return
   saving.value = true
   try {
-    const copy = await duplicateTraining(trainingId, duplicateClientId.value)
+    const copy = await trainingsStore.duplicateTraining(trainingId, duplicateClientId.value)
     toast.success('Training duplicated. You are now editing the copy.')
     duplicateOpen.value = false
     duplicateClientId.value = null

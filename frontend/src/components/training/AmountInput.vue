@@ -40,13 +40,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import UnitSelect from './UnitSelect.vue'
-import { defaultUnit, lastLoadUnit, type AmountPart } from './lookups'
+import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 import type { Amount } from '../../types'
 
 // Edits the reps or the load of an amount in place: a value, an optional upper end (a range
 // such as 8-10) and a unit; reps can also be per side.
 const props = defineProps<{ part: AmountPart; label: string; hint?: string }>()
 const amount = defineModel<Amount>({ required: true })
+const lookups = useLookupsStore()
 
 const numberClass =
   'h-8 w-16 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
@@ -62,7 +63,7 @@ const value = computed({
   get: () => (props.part === 'reps' ? amount.value.reps_value : amount.value.load_value),
   set: (v) => {
     // Typing a value picks the default unit, so the common case needs no unit click.
-    if (v !== null && unit.value === null) unit.value = defaultUnit(props.part)
+    if (v !== null && unit.value === null) unit.value = lookups.defaultUnit(props.part)
     if (props.part === 'reps') amount.value.reps_value = v
     else amount.value.load_value = v
   },
@@ -82,7 +83,7 @@ const unit = computed({
     if (props.part === 'reps') amount.value.reps_unit = id
     else {
       amount.value.load_unit = id
-      if (id) lastLoadUnit.value = id // becomes the default for the next load
+      if (id) lookups.lastLoadUnit = id // becomes the default for the next load
     }
   },
 })

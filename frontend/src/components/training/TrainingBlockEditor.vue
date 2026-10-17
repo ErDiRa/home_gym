@@ -9,7 +9,7 @@
       </span>
       <div role="radiogroup" :aria-label="`Block ${letter} kind`" class="flex rounded-md border border-slate-300 bg-white p-0.5">
         <label
-          v-for="k in blockKinds"
+          v-for="k in lookups.blockKinds"
           :key="k.code"
           :title="k.description"
           :class="[
@@ -123,10 +123,8 @@
     <ExercisePickerDialog
       :open="pickerOpen"
       :title="`Add exercises to block ${letter}`"
-      :exercises="exercises"
       :in-block="block.exercises.map((e) => e.exercise_id)"
       :limit="remaining"
-      :ratings="ratings"
       :rated-by="ratedBy"
       @close="pickerOpen = false"
       @add="addExercises"
@@ -135,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
@@ -143,26 +142,28 @@ import RatingBadge from '../exercise/RatingBadge.vue'
 import AmountInput from './AmountInput.vue'
 import ExercisePickerDialog from './ExercisePickerDialog.vue'
 import MoveRemoveButtons from './MoveRemoveButtons.vue'
-import { blockKinds, kindOf } from './lookups'
 import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
-import type { Exercise, ExerciseRating } from '../../types'
+import { useClientsStore } from '../../stores/clients'
+import { useLookupsStore } from '../../stores/lookups'
+import type { Exercise } from '../../types'
 
 const props = defineProps<{
   index: number
   count: number
-  exercises: Exercise[]
-  ratings: Map<string, ExerciseRating> | null // the client's ratings by exercise id; null = no client
   ratedBy: string // the client's name
 }>()
 const emit = defineEmits<{ move: [by: -1 | 1]; remove: [] }>()
 // Edited in place; the parent owns the training's rows.
 const block = defineModel<BlockRow>({ required: true })
+const lookups = useLookupsStore()
+// The selected client's ratings by exercise id; null while no client is selected.
+const { ratings } = storeToRefs(useClientsStore())
 
 const inputClass =
   'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
 const letter = computed(() => blockLetter(props.index))
-const kind = computed(() => kindOf(block.value.kind))
+const kind = computed(() => lookups.kindOf(block.value.kind))
 // Switching kinds never drops exercises; a mismatch shows up here instead.
 const problem = computed(() => blockProblem(block.value))
 const full = computed(() => kind.value?.max_exercises != null && block.value.exercises.length >= kind.value.max_exercises)

@@ -158,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { CheckIcon, MagnifyingGlassIcon, StarIcon, XMarkIcon } from '@heroicons/vue/16/solid'
@@ -165,20 +166,24 @@ import AppButton from '../button/AppButton.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
 import RatingBadge from '../exercise/RatingBadge.vue'
 import MultiSelect from '../form/MultiSelect.vue'
-import { exerciseTypeLabels, type Exercise, type ExerciseRating, type ExerciseType, type Option } from '../../types'
+import { useClientsStore } from '../../stores/clients'
+import { useExercisesStore } from '../../stores/exercises'
+import { exerciseTypeLabels, type Exercise, type ExerciseType, type Option } from '../../types'
 
 // Finds exercises by search and filters and adds one or several to a block at once. The
 // selection survives changing the search, so it can be built up over several searches.
 const props = defineProps<{
   open: boolean
   title: string
-  exercises: Exercise[]
   inBlock: string[] // exercise ids already in the block
   limit: number | null // how many more the block takes; null = no limit
-  ratings: Map<string, ExerciseRating> | null // the client's ratings by exercise id; null = no client
   ratedBy: string // the client's name
 }>()
 const emit = defineEmits<{ close: []; add: [exercises: Exercise[]] }>()
+
+const { exercises } = storeToRefs(useExercisesStore())
+// The selected client's ratings by exercise id; null while no client is selected.
+const { ratings } = storeToRefs(useClientsStore())
 
 const searchInput = ref<HTMLInputElement | null>(null)
 
@@ -206,25 +211,25 @@ watch(
 // Offer only the values exercises actually use.
 const byName = (a: Option, b: Option) => a.name.localeCompare(b.name)
 const namesOf = (pick: (e: Exercise) => string[]) =>
-  [...new Set(props.exercises.flatMap(pick))].map((name) => ({ id: name, name })).sort(byName)
+  [...new Set(exercises.value.flatMap(pick))].map((name) => ({ id: name, name })).sort(byName)
 const muscleOptions = computed(() => namesOf((e) => e.muscle_groups ?? []))
 const jointOptions = computed(() => namesOf((e) => e.joints ?? []))
 const focusOptions = computed(() => {
   const focuses = new Map<string, Option>()
-  for (const e of props.exercises)
+  for (const e of exercises.value)
     for (const f of e.focuses ?? []) focuses.set(f.id, { id: f.id, name: `${f.name} (${f.alias})` })
   return [...focuses.values()].sort(byName)
 })
 
 // Rating filter chips: 1-5, plus "Not rated" as 0 so unrated exercises can be filtered too.
 const ratingOptions = [1, 2, 3, 4, 5].map((r) => ({ value: r, label: String(r) })).concat({ value: 0, label: 'Not rated' })
-const ratingOf = (e: Exercise) => props.ratings?.get(e.id)?.rating ?? 0
+const ratingOf = (e: Exercise) => ratings.value?.get(e.id)?.rating ?? 0
 
 // What the search matches against, lower-cased once per exercise.
 const searchText = computed(
   () =>
     new Map(
-      props.exercises.map((e) => [
+      exercises.value.map((e) => [
         e.id,
         [e.name, ...(e.muscle_groups ?? []), ...(e.joints ?? []), ...(e.focuses ?? []).flatMap((f) => [f.name, f.alias])]
           .join(' ')
@@ -237,7 +242,7 @@ const searchText = computed(
 const filtered = computed(() => {
   const terms = query.value.toLowerCase().split(/\s+/).filter(Boolean)
   const anyOf = (picked: string[], values: string[]) => !picked.length || values.some((v) => picked.includes(v))
-  return props.exercises.filter(
+  return exercises.value.filter(
     (e) =>
       terms.every((t) => searchText.value.get(e.id)!.includes(t)) &&
       (!typeFilter.value.length || typeFilter.value.includes(e.type)) &&
@@ -247,7 +252,7 @@ const filtered = computed(() => {
         focusFilter.value,
         (e.focuses ?? []).map((f) => f.id),
       ) &&
-      (!props.ratings || !ratingFilter.value.length || ratingFilter.value.includes(ratingOf(e))),
+      (!ratings.value || !ratingFilter.value.length || ratingFilter.value.includes(ratingOf(e))),
   )
 })
 watch(filtered, () => (active.value = 0))
@@ -282,7 +287,7 @@ function toggleRating(rating: number) {
     : [...ratingFilter.value, rating]
 }
 
-const exerciseById = computed(() => new Map(props.exercises.map((e) => [e.id, e])))
+const exerciseById = computed(() => new Map(exercises.value.map((e) => [e.id, e])))
 const selectedExercises = computed(() => selected.value.map((id) => exerciseById.value.get(id)!).filter(Boolean))
 
 const isSelected = (id: string) => selected.value.includes(id)

@@ -31,23 +31,24 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { listTrainings } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import ActiveCell from '../../components/grid/ActiveCell.vue'
+import { useTrainingsStore } from '../../stores/trainings'
 import type { Training } from '../../types'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()
-const trainings = ref<Training[]>([])
+const store = useTrainingsStore()
+const { trainings, loading } = storeToRefs(store)
 const query = ref('')
-const loading = ref(true)
 const error = ref('')
 
 const columnDefs: ColDef<Training>[] = [
@@ -89,12 +90,10 @@ function openTraining(event: RowClickedEvent<Training>) {
 
 onMounted(async () => {
   try {
-    trainings.value = await listTrainings()
+    await store.loadTrainings()
   } catch {
     error.value = 'Could not load trainings.'
     toast.error(error.value)
-  } finally {
-    loading.value = false
   }
 })
 </script>

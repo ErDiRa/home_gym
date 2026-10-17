@@ -1,5 +1,5 @@
 import type { Amount, BlockKind, ExerciseType, TrainingDetail, TrainingInput, Unit } from '../../types'
-import { blockKinds, kindOf, unitsOf, type AmountPart } from './lookups'
+import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 
 // Editable rows of the training form. key keeps v-for stable while rows move, since the same
 // exercise may appear several times and new units and blocks have no id yet. Blocks and
@@ -63,7 +63,7 @@ export const DEFAULT_SETS = 3
 
 export const newBlock = (): BlockRow => ({
   key: nextKey(),
-  kind: blockKinds.value[0]?.code ?? 'single',
+  kind: useLookupsStore().blockKinds[0]?.code ?? 'single',
   name: '',
   sets: DEFAULT_SETS,
   notes: '',
@@ -131,7 +131,7 @@ export function toInput(fields: Omit<TrainingInput, 'units'>, units: UnitRow[]):
       weekdays,
       dates,
       blocks: blocks.map((b) => {
-        const sharedSets = kindOf(b.kind)?.shared_sets ?? true
+        const sharedSets = useLookupsStore().kindOf(b.kind)?.shared_sets ?? true
         return {
           kind: b.kind,
           name: b.name,
@@ -177,7 +177,7 @@ export function exerciseCountRule(kind: BlockKind) {
 
 // Why a block can't be saved yet, if anything; mirrors the server's checks.
 export function blockProblem(b: BlockRow): string {
-  const kind = kindOf(b.kind)
+  const kind = useLookupsStore().kindOf(b.kind)
   if (!kind) return 'Choose a block kind.'
   const n = b.exercises.length
   if (n < kind.min_exercises || (kind.max_exercises !== null && n > kind.max_exercises)) return exerciseCountRule(kind)
@@ -210,7 +210,7 @@ function amountProblem(a: Amount, part: AmountPart): string {
   const [value, max, unitId] =
     part === 'reps' ? [a.reps_value, a.reps_max, a.reps_unit] : [a.load_value, a.load_max, a.load_unit]
   if (value === null) return part === 'reps' ? 'Reps are required.' : ''
-  const unit = unitsOf(part).value.find((u) => u.id === unitId)
+  const unit = useLookupsStore().unitsOf(part).find((u) => u.id === unitId)
   if (!unit) return `Choose a ${part} unit.`
   if (max !== null && max <= value) return `The upper end of the ${part} range must be higher than ${value}.`
   for (const v of [value, max]) {

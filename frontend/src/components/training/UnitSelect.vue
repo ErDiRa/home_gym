@@ -54,17 +54,18 @@ import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOption
 import { CheckIcon, ChevronUpDownIcon, PlusIcon } from '@heroicons/vue/16/solid'
 import { toast } from 'vue-sonner'
 import { ApiError } from '../../api'
-import { addUnit, unitsOf, type AmountPart } from './lookups'
+import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 
 // A compact searchable select of rep or load units holding the unit's id. Typing a name that
 // doesn't exist offers to add it as a new unit.
 const props = defineProps<{ part: AmountPart; label: string }>()
 const model = defineModel<string | null>({ required: true })
+const lookups = useLookupsStore()
 
 // Value of the "add" option; never a unit id.
 const CREATE = '__create__'
 
-const units = computed(() => unitsOf(props.part).value)
+const units = computed(() => lookups.unitsOf(props.part))
 const query = ref('')
 const creating = ref(false)
 const filtered = computed(() => {
@@ -85,7 +86,7 @@ async function pick(value: string | null) {
   const name = query.value.trim()
   creating.value = true
   try {
-    const unit = await addUnit(props.part, name)
+    const unit = await lookups.addUnit(props.part, name)
     model.value = unit.id
     toast.success(`Unit "${unit.name}" added.`)
   } catch (e) {

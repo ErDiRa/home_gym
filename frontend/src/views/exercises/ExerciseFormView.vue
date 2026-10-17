@@ -201,31 +201,23 @@
 
 <script setup lang="ts">
 	import { ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+	import { storeToRefs } from 'pinia';
 	import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 	import { useRoute, useRouter } from 'vue-router';
 	import { toast } from 'vue-sonner';
-	import {
-		ApiError,
-		createExercise,
-		createFocus,
-		getExercise,
-		listFocuses,
-		listJoints,
-		listMuscleGroups,
-		updateExercise
-	} from '../../api';
+	import { ApiError } from '../../api';
 	import AppButton from '../../components/button/AppButton.vue';
 	import MultiSelect from '../../components/form/MultiSelect.vue';
 	import VideoPreview from '../../components/video/VideoPreview.vue';
 	import { state } from '../../session';
-	import {
-		exerciseTypeLabels,
-		type ExerciseType,
-		type Focus,
-		type Option
-	} from '../../types';
+	import { useExercisesStore } from '../../stores/exercises';
+	import { useLookupsStore } from '../../stores/lookups';
+	import { exerciseTypeLabels, type ExerciseType } from '../../types';
 
 	const router = useRouter();
+	const exercisesStore = useExercisesStore();
+	const lookups = useLookupsStore();
+	const { joints, muscleGroups, focuses } = storeToRefs(lookups);
 	// Set when editing an existing exercise (route /exercises/:id), absent when creating one.
 	const exerciseId = useRoute().params.id as string | undefined;
 	// Only admins can change exercises; everyone else gets the filled form read-only.
@@ -261,9 +253,6 @@
 		focus_ids: [] as string[]
 	});
 	const saving = ref(false);
-	const joints = ref<Option[]>([]);
-	const muscleGroups = ref<Option[]>([]);
-	const focuses = ref<Focus[]>([]);
 	const newFocus = ref('');
 	const newAlias = ref('');
 	const addingFocusOpen = ref(false);
@@ -301,16 +290,10 @@
 
 	onMounted(async () => {
 		try {
-			const [loadedJoints, loadedMuscleGroups, loadedFocuses, exercise] =
-				await Promise.all([
-					listJoints(),
-					listMuscleGroups(),
-					listFocuses(),
-					exerciseId ? getExercise(exerciseId) : undefined
-				]);
-			joints.value = loadedJoints;
-			muscleGroups.value = loadedMuscleGroups;
-			focuses.value = loadedFocuses;
+			const [exercise] = await Promise.all([
+				exerciseId ? exercisesStore.getExercise(exerciseId) : undefined,
+				lookups.loadExerciseLookups()
+			]);
 			if (exercise) {
 				// The form holds everything but the id, which comes from the route.
 				const { id: _id, ...fields } = exercise;
@@ -339,12 +322,9 @@
 			return;
 		addingFocus.value = true;
 		try {
-			const focus = await createFocus(
+			const focus = await lookups.createFocus(
 				newFocus.value.trim(),
 				newAlias.value.trim()
-			);
-			focuses.value = [...focuses.value, focus].sort((a, b) =>
-				a.name.localeCompare(b.name)
 			);
 			form.focus_ids.push(focus.id);
 			closeAddFocus();
@@ -370,8 +350,8 @@
 		saving.value = true;
 		try {
 			await (exerciseId
-				? updateExercise(exerciseId, input)
-				: createExercise(input));
+				? exercisesStore.updateExercise(exerciseId, input)
+				: exercisesStore.createExercise(input));
 			toast.success(exerciseId ? 'Exercise saved.' : 'Exercise created.');
 			await router.push({ name: 'exercises' });
 		} catch (e) {
