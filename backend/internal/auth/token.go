@@ -15,22 +15,14 @@ const (
 	MaxSessionAge = 7 * 24 * time.Hour
 )
 
-// Roles carried in the token. Users and admins are separate accounts, so the subject
-// is a user ID for RoleUser and an admin ID for RoleAdmin.
-const (
-	RoleUser  = "user"
-	RoleAdmin = "admin"
-)
-
-// Claims are the JWT claims: the subject is the account ID, Role says which table it is in.
+// Claims are the JWT claims: the subject is the user ID.
 type Claims struct {
 	jwt.RegisteredClaims
-	Role     string `json:"role"`
-	AuthTime int64  `json:"auth_time"` // unix time of the original login
-	Remember bool   `json:"remember"`
+	AuthTime int64 `json:"auth_time"` // unix time of the original login
+	Remember bool  `json:"remember"`
 }
 
-// UserID parses the subject: a user ID or an admin ID, depending on Role.
+// UserID parses the subject.
 func (c *Claims) UserID() (uuid.UUID, error) { return uuid.Parse(c.Subject) }
 
 // SessionExpiry returns when a token issued at now expires: SessionTTL from now,
@@ -56,16 +48,15 @@ func NewTokenManager(secret string) (*TokenManager, error) {
 	return &TokenManager{secret: []byte(secret)}, nil
 }
 
-// Issue signs a token for an account. authTime and remember are carried over unchanged when
+// Issue signs a token for a user. authTime and remember are carried over unchanged when
 // the session is extended, so the 7-day cap and cookie kind survive refreshes.
-func (m *TokenManager) Issue(role string, id uuid.UUID, authTime time.Time, remember bool, expiry time.Time) (string, error) {
+func (m *TokenManager) Issue(id uuid.UUID, authTime time.Time, remember bool, expiry time.Time) (string, error) {
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   id.String(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(expiry),
 		},
-		Role:     role,
 		AuthTime: authTime.Unix(),
 		Remember: remember,
 	}
@@ -82,7 +73,7 @@ func (m *TokenManager) Parse(token string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := claims.UserID(); err != nil || claims.AuthTime == 0 || (claims.Role != RoleUser && claims.Role != RoleAdmin) {
+	if _, err := claims.UserID(); err != nil || claims.AuthTime == 0 {
 		return nil, errors.New("invalid claims")
 	}
 	return claims, nil

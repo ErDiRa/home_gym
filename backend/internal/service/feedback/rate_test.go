@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/erdira/homegym/backend/internal/service"
 	"github.com/erdira/homegym/backend/internal/service/feedback/repos"
@@ -26,6 +26,10 @@ func (f *fakeQueries) UpsertExerciseFeedback(_ context.Context, arg repos.Upsert
 	return repos.ExerciseFeedback{ID: uuid.New(), UserID: arg.UserID, ExerciseID: arg.ExerciseID, Rating: arg.Rating, Notes: arg.Notes}, nil
 }
 
+func (f *fakeQueries) ListExerciseRatings(context.Context, uuid.UUID) ([]repos.ListExerciseRatingsRow, error) {
+	return []repos.ListExerciseRatingsRow{}, nil
+}
+
 func (f *fakeQueries) GetExerciseStats(context.Context, uuid.UUID) ([]repos.GetExerciseStatsRow, error) {
 	return []repos.GetExerciseStatsRow{}, nil
 }
@@ -33,7 +37,7 @@ func (f *fakeQueries) GetExerciseStats(context.Context, uuid.UUID) ([]repos.GetE
 func TestRate(t *testing.T) {
 	f := &fakeQueries{}
 	user, exercise := uuid.New(), uuid.New()
-	got, err := (&Service{q: f}).Rate(context.Background(), user, exercise, RatingInput{Rating: 4, Notes: "knees ok"})
+	got, err := (&Service{q: f}).Rate(context.Background(), user, exercise, RatingInput{Rating: 4, Notes: " knees ok "})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,9 +56,10 @@ func TestRateRejects(t *testing.T) {
 		}
 	}
 
-	f := &fakeQueries{err: &pgconn.PgError{Code: "23503"}}
+	// Another user's or an unknown exercise inserts no row.
+	f := &fakeQueries{err: pgx.ErrNoRows}
 	_, err := (&Service{q: f}).Rate(context.Background(), uuid.New(), uuid.New(), RatingInput{Rating: 3})
-	wantError(t, err, service.KindNotFound, "user or exercise not found")
+	wantError(t, err, service.KindNotFound, "exercise not found")
 }
 
 // wantError fails the test unless err is a *service.Error of kind with message msg.

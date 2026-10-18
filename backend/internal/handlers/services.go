@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/erdira/homegym/backend/internal/service/account"
-	"github.com/erdira/homegym/backend/internal/service/client"
-	clientrepos "github.com/erdira/homegym/backend/internal/service/client/repos"
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	exerciserepos "github.com/erdira/homegym/backend/internal/service/exercise/repos"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
@@ -16,36 +15,30 @@ import (
 	lookuprepos "github.com/erdira/homegym/backend/internal/service/lookup/repos"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	trainingrepos "github.com/erdira/homegym/backend/internal/service/training/repos"
+	"github.com/erdira/homegym/backend/internal/service/workout"
+	workoutrepos "github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
 
 // The handlers depend on these interfaces rather than on the services in internal/service,
 // so a service can be replaced by another implementation, e.g. a fake in handler tests.
-// Failures the caller caused come back as *service.Error (see serviceError).
+// Failures the caller caused come back as *service.Error (see serviceError). The userID
+// parameters are the signed-in user's: services act on that user's data only.
 
 type TrainingService interface {
-	List(ctx context.Context) ([]trainingrepos.ListTrainingsRow, error)
-	Get(ctx context.Context, id uuid.UUID) (training.Training, error)
-	Assigned(ctx context.Context, clientID uuid.UUID) ([]training.Training, error)
-	Create(ctx context.Context, in training.Input) (trainingrepos.CreateTrainingRow, error)
-	Update(ctx context.Context, id uuid.UUID, in training.Input) (trainingrepos.UpdateTrainingRow, error)
-	Duplicate(ctx context.Context, id, clientID uuid.UUID) (trainingrepos.CreateTrainingRow, error)
-	Delete(ctx context.Context, id uuid.UUID) error
-}
-
-type ClientService interface {
-	List(ctx context.Context) ([]clientrepos.ListUsersRow, error)
-	Get(ctx context.Context, id uuid.UUID) (client.Client, error)
-	Create(ctx context.Context, in client.Input) (clientrepos.CreateUserRow, error)
-	Update(ctx context.Context, id uuid.UUID, in client.Input) (clientrepos.UpdateUserRow, error)
-	Delete(ctx context.Context, id uuid.UUID) error
-	ExerciseRatings(ctx context.Context, id uuid.UUID) ([]clientrepos.ListClientExerciseRatingsRow, error)
+	List(ctx context.Context, userID uuid.UUID) ([]trainingrepos.ListTrainingsRow, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (training.Training, error)
+	Active(ctx context.Context, userID uuid.UUID) (*training.Training, error)
+	Create(ctx context.Context, userID uuid.UUID, in training.Input) (trainingrepos.CreateTrainingRow, error)
+	Update(ctx context.Context, userID, id uuid.UUID, in training.Input) (trainingrepos.UpdateTrainingRow, error)
+	Duplicate(ctx context.Context, userID, id uuid.UUID) (trainingrepos.CreateTrainingRow, error)
+	Delete(ctx context.Context, userID, id uuid.UUID) error
 }
 
 type ExerciseService interface {
-	List(ctx context.Context) ([]exerciserepos.ListExercisesRow, error)
-	Get(ctx context.Context, id uuid.UUID) (exerciserepos.GetExerciseRow, error)
-	Create(ctx context.Context, in exercise.Input) (exerciserepos.CreateExerciseRow, error)
-	Update(ctx context.Context, id uuid.UUID, in exercise.Input) (exerciserepos.UpdateExerciseRow, error)
+	List(ctx context.Context, userID uuid.UUID) ([]exerciserepos.ListExercisesRow, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (exerciserepos.GetExerciseRow, error)
+	Create(ctx context.Context, userID uuid.UUID, in exercise.Input) (exerciserepos.CreateExerciseRow, error)
+	Update(ctx context.Context, userID, id uuid.UUID, in exercise.Input) (exerciserepos.UpdateExerciseRow, error)
 }
 
 type LookupService interface {
@@ -62,33 +55,44 @@ type LookupService interface {
 
 type FeedbackService interface {
 	Rate(ctx context.Context, userID, exerciseID uuid.UUID, in feedback.RatingInput) (feedbackrepos.ExerciseFeedback, error)
+	Ratings(ctx context.Context, userID uuid.UUID) ([]feedbackrepos.ListExerciseRatingsRow, error)
 	Stats(ctx context.Context, userID uuid.UUID) ([]feedbackrepos.GetExerciseStatsRow, error)
 }
 
+type WorkoutService interface {
+	Week(ctx context.Context, userID uuid.UUID, from, to time.Time) (workout.Week, error)
+	List(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]workoutrepos.ListWorkoutsRow, error)
+	Start(ctx context.Context, userID, unitID uuid.UUID) (workout.Workout, error)
+	Current(ctx context.Context, userID uuid.UUID) (*workout.Workout, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (workout.Workout, error)
+	Finish(ctx context.Context, userID, id uuid.UUID, notes string) (workout.Workout, error)
+	Delete(ctx context.Context, userID, id uuid.UUID) error
+	LogSet(ctx context.Context, userID, workoutID uuid.UUID, in workout.SetInput) (workoutrepos.WorkoutSet, error)
+	DeleteSet(ctx context.Context, userID, workoutID, setID uuid.UUID) error
+}
+
 type AccountService interface {
-	LoginUser(ctx context.Context, email, password string) (account.Account, error)
-	LoginAdmin(ctx context.Context, email, password string) (account.Account, error)
-	Current(ctx context.Context, role string, id uuid.UUID) (account.Account, error)
-	IsAdmin(ctx context.Context, id uuid.UUID) (bool, error)
+	Login(ctx context.Context, email, password string) (account.Account, error)
+	Current(ctx context.Context, id uuid.UUID) (account.Account, error)
 	UserExists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
 // Services are the services the handlers use.
 type Services struct {
 	Trainings TrainingService
-	Clients   ClientService
 	Exercises ExerciseService
 	Lookups   LookupService
 	Feedback  FeedbackService
+	Workouts  WorkoutService
 	Accounts  AccountService
 }
 
 // The services in internal/service implement the interfaces.
 var (
 	_ TrainingService = (*training.Service)(nil)
-	_ ClientService   = (*client.Service)(nil)
 	_ ExerciseService = (*exercise.Service)(nil)
 	_ LookupService   = (*lookup.Service)(nil)
 	_ FeedbackService = (*feedback.Service)(nil)
+	_ WorkoutService  = (*workout.Service)(nil)
 	_ AccountService  = (*account.Service)(nil)
 )

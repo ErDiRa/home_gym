@@ -17,18 +17,6 @@ CREATE TABLE users (
 
 CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE deleted_at IS NULL;
 
--- Admins are separate accounts with their own credentials; they are not linked to users.
-CREATE TABLE admins (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email         TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at    TIMESTAMPTZ
-);
-
-CREATE UNIQUE INDEX idx_admins_email ON admins (email) WHERE deleted_at IS NULL;
-
 -- Reference lists an exercise picks from.
 CREATE TABLE joints (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,7 +39,7 @@ CREATE TABLE muscle_groups (
 CREATE UNIQUE INDEX idx_muscle_groups_name ON muscle_groups (name) WHERE deleted_at IS NULL;
 
 -- Training focus an exercise belongs to, e.g. weightlifting, functional fitness, shoulder health.
--- Admins can add new ones.
+-- Users can add new ones; like joints and muscle groups they are shared by all users.
 CREATE TABLE focuses (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name       TEXT NOT NULL,
@@ -63,9 +51,10 @@ CREATE TABLE focuses (
 
 CREATE UNIQUE INDEX idx_focuses_name ON focuses (lower(name)) WHERE deleted_at IS NULL;
 
--- The exercise library trainings pick from.
+-- A user's exercise library, which their trainings pick from.
 CREATE TABLE exercises (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     name         TEXT NOT NULL,
     description  TEXT NOT NULL DEFAULT '',
     type         TEXT NOT NULL CHECK (type IN ('mobility', 'strength')), -- mainly improves mobility or strength
@@ -73,6 +62,8 @@ CREATE TABLE exercises (
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at   TIMESTAMPTZ
 );
+
+CREATE INDEX idx_exercises_user ON exercises (user_id) WHERE deleted_at IS NULL;
 
 -- An exercise involves several joints and trains several muscle groups. These pure link
 -- tables are hard-deleted (no deleted_at); the soft-deleted rows are the exercises, joints
@@ -105,20 +96,22 @@ CREATE TABLE exercise_focuses (
     PRIMARY KEY (exercise_id, focus_id)
 );
 
--- A training is written for one client. A client can have several (e.g. one per phase), of
--- which at most one is active. It runs over a period (e.g. a 4-week block), both days included;
--- the period is independent of the active flag.
+-- A user's training plan. A user can have several (e.g. one per phase), of which at most one
+-- is active: the one the tracker shows. It runs over a period (e.g. a 4-week block), both days
+-- included; the period is independent of the active flag. Instead of fixed days, it asks for a
+-- number of sessions per week, done whenever there is time.
 CREATE TABLE trainings (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    active      BOOLEAN NOT NULL DEFAULT false,
-    start_date  DATE NOT NULL,
-    end_date    DATE NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    deleted_at  TIMESTAMPTZ,
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name              TEXT NOT NULL,
+    description       TEXT NOT NULL DEFAULT '',
+    active            BOOLEAN NOT NULL DEFAULT false,
+    start_date        DATE NOT NULL,
+    end_date          DATE NOT NULL,
+    sessions_per_week INT NOT NULL DEFAULT 3 CHECK (sessions_per_week BETWEEN 1 AND 14),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at        TIMESTAMPTZ,
     CONSTRAINT trainings_period_check CHECK (end_date >= start_date)
 );
 
@@ -126,17 +119,15 @@ CREATE INDEX idx_trainings_user ON trainings (user_id) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX idx_trainings_user_active ON trainings (user_id) WHERE active AND deleted_at IS NULL;
 
 -- A training is made of units (e.g. "Day A"), a unit of blocks (e.g. "Warm-up", "Superset"),
--- and a block of one or more exercises. A unit is done on recurring weekdays (ISO, 1 = Monday)
--- and/or specific dates. Units keep their id when a training is edited; blocks and their
--- exercises are rewritten on every save.
+-- and a block of one or more exercises. Units are done in turn, one per session. Units keep
+-- their id when a training is edited (workouts point at them); blocks and their exercises are
+-- rewritten on every save.
 CREATE TABLE training_units (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     training_id UUID NOT NULL REFERENCES trainings (id) ON DELETE CASCADE,
     position    INT NOT NULL,
     name        TEXT NOT NULL,
-    notes       TEXT NOT NULL DEFAULT '',
-    weekdays    SMALLINT[] NOT NULL DEFAULT '{}' CHECK (weekdays <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]),
-    dates       DATE[] NOT NULL DEFAULT '{}'
+    notes       TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX idx_training_units_training ON training_units (training_id, position);
@@ -162,7 +153,7 @@ INSERT INTO block_kinds (code, name, description, position, min_exercises, max_e
     ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true, true);
 
 -- Units a planned amount is measured in: rep_units for reps (reps, seconds, metres...),
--- load_units for load (kg, % 1RM, RPE...). Admins can add new ones. min/max_value bound the
+-- load_units for load (kg, % 1RM, RPE...). Users can add new ones. min/max_value bound the
 -- values planned in the unit (NULL = unbounded).
 CREATE TABLE rep_units (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,8 +235,8 @@ CREATE TABLE training_exercises (
 
 CREATE INDEX idx_training_exercises_block ON training_exercises (block_id, position);
 
--- A client's rating (1-5) and notes for an exercise, at most one live row per client and
--- exercise. Admins filter the exercise picker by the training's client's ratings.
+-- A user's rating (1-5) and notes for an exercise, at most one live row per user and
+-- exercise. The exercise picker shows and filters by them.
 CREATE TABLE exercise_feedbacks (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -260,16 +251,45 @@ CREATE UNIQUE INDEX idx_exercise_feedbacks_user_exercise
     ON exercise_feedbacks (user_id, exercise_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_exercise_feedbacks_exercise ON exercise_feedbacks (exercise_id);
 
--- What a client actually did: one row per performed exercise. Not used by the UI yet.
-CREATE TABLE workout_logs (
+-- A performed session: one unit of a training, done on any day. completed_at is NULL while
+-- it is in progress (it can be resumed); a user has at most one in progress. The training and
+-- unit may be edited or deleted later, so the unit's name is kept as it was.
+CREATE TABLE workouts (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    exercise_id  UUID NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
-    completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    sets_done    INT NOT NULL CHECK (sets_done > 0),
-    reps_done    INT NOT NULL CHECK (reps_done > 0),
-    weight_kg    NUMERIC(6, 2) NOT NULL DEFAULT 0 CHECK (weight_kg >= 0),
-    deleted_at   TIMESTAMPTZ
+    training_id  UUID REFERENCES trainings (id) ON DELETE SET NULL,
+    unit_id      UUID REFERENCES training_units (id) ON DELETE SET NULL,
+    unit_name    TEXT NOT NULL,
+    started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at TIMESTAMPTZ,
+    notes        TEXT NOT NULL DEFAULT '',
+    deleted_at   TIMESTAMPTZ,
+    CHECK (completed_at IS NULL OR completed_at >= started_at)
 );
 
-CREATE INDEX idx_workout_logs_user_exercise ON workout_logs (user_id, exercise_id);
+CREATE INDEX idx_workouts_user_completed ON workouts (user_id, completed_at) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX idx_workouts_user_in_progress ON workouts (user_id)
+    WHERE completed_at IS NULL AND deleted_at IS NULL;
+
+-- One performed set of a workout. It points at the exercise rather than at training_exercises
+-- (rewritten on every save) and keeps the exercise's place in the unit (block and position
+-- within the block, both from 1) for grouping. Reps and load are what was actually done, in
+-- the same units as planned.
+CREATE TABLE workout_sets (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workout_id        UUID NOT NULL REFERENCES workouts (id) ON DELETE CASCADE,
+    exercise_id       UUID NOT NULL REFERENCES exercises (id) ON DELETE RESTRICT,
+    block_position    INT NOT NULL CHECK (block_position >= 1),
+    exercise_position INT NOT NULL CHECK (exercise_position >= 1),
+    set_number        INT NOT NULL CHECK (set_number BETWEEN 1 AND 100),
+    reps_value        NUMERIC(7, 2) NOT NULL,
+    reps_unit         UUID NOT NULL REFERENCES rep_units (id) ON DELETE RESTRICT,
+    per_side          BOOLEAN NOT NULL DEFAULT false,
+    load_value        NUMERIC(7, 2),
+    load_unit         UUID REFERENCES load_units (id) ON DELETE RESTRICT,
+    completed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK ((load_value IS NULL) = (load_unit IS NULL)),
+    UNIQUE (workout_id, block_position, exercise_position, set_number)
+);
+
+CREATE INDEX idx_workout_sets_exercise ON workout_sets (exercise_id);

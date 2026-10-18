@@ -13,11 +13,10 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/account/repos"
 )
 
-// fakeQueries holds users and admins by email; the lookups return pgx.ErrNoRows for others.
+// fakeQueries holds users by email; the lookups return pgx.ErrNoRows for others.
 type fakeQueries struct {
-	users  map[string]repos.GetUserByEmailRow
-	admins map[string]repos.GetAdminByEmailRow
-	err    error // returned by every lookup when set
+	users map[string]repos.GetUserByEmailRow
+	err   error // returned by every lookup when set
 }
 
 // hash is a cheap bcrypt hash of password for fixtures.
@@ -44,31 +43,6 @@ func (f *fakeQueries) GetUserByID(_ context.Context, id uuid.UUID) (repos.GetUse
 		}
 	}
 	return repos.GetUserByIDRow{}, pgx.ErrNoRows
-}
-
-func (f *fakeQueries) GetAdminByEmail(_ context.Context, email string) (repos.GetAdminByEmailRow, error) {
-	if f.err != nil {
-		return repos.GetAdminByEmailRow{}, f.err
-	}
-	a, ok := f.admins[email]
-	if !ok {
-		return a, pgx.ErrNoRows
-	}
-	return a, nil
-}
-
-func (f *fakeQueries) GetAdminByID(_ context.Context, id uuid.UUID) (repos.GetAdminByIDRow, error) {
-	for _, a := range f.admins {
-		if a.ID == id {
-			return repos.GetAdminByIDRow{ID: a.ID, Email: a.Email}, nil
-		}
-	}
-	return repos.GetAdminByIDRow{}, pgx.ErrNoRows
-}
-
-func (f *fakeQueries) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
-	_, err := f.GetAdminByID(ctx, id)
-	return err == nil, nil
 }
 
 func (f *fakeQueries) UserExists(ctx context.Context, id uuid.UUID) (bool, error) {

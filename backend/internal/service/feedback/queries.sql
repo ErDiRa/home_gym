@@ -1,16 +1,27 @@
 -- name: UpsertExerciseFeedback :one
--- A client's rating of an exercise; rating again replaces it. The ON CONFLICT target repeats
--- the partial unique index's WHERE so Postgres can match that index.
+-- A user's rating of one of their exercises; rating again replaces it. Another user's (or a
+-- deleted) exercise inserts nothing, so no row comes back. The ON CONFLICT target repeats the
+-- partial unique index's WHERE so Postgres can match that index.
 INSERT INTO exercise_feedbacks (user_id, exercise_id, rating, notes)
-VALUES ($1, $2, $3, $4)
+SELECT e.user_id, e.id, sqlc.arg(rating), sqlc.arg(notes)
+FROM exercises e
+WHERE e.id = sqlc.arg(exercise_id) AND e.user_id = sqlc.arg(user_id) AND e.deleted_at IS NULL
 ON CONFLICT (user_id, exercise_id) WHERE deleted_at IS NULL
 DO UPDATE SET rating = EXCLUDED.rating,
               notes = EXCLUDED.notes,
               updated_at = now()
 RETURNING *;
 
+-- name: ListExerciseRatings :many
+-- How a user rated their exercises, for the exercise picker.
+SELECT f.exercise_id, f.rating, f.notes, f.updated_at
+FROM exercise_feedbacks f
+JOIN exercises e ON e.id = f.exercise_id AND e.deleted_at IS NULL
+WHERE f.user_id = $1 AND f.deleted_at IS NULL;
+
 -- name: GetExerciseStats :many
--- The exercises a user has logged, with how often and their own rating (NULL if unrated).
+-- The exercises a user has done in finished workouts, with in how many workouts and their
+-- rating (NULL if unrated).
 SELECT
     e.id AS exercise_id,
     e.name,
@@ -24,16 +35,12 @@ SELECT
         JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
         WHERE em.exercise_id = e.id ORDER BY m.name
     )::text[] AS muscle_groups,
-    COUNT(wl.id)::bigint AS times_performed,
+    COUNT(DISTINCT w.id)::bigint AS times_performed,
     f.rating AS rating
 FROM exercises e
-JOIN workout_logs wl ON wl.exercise_id = e.id AND wl.user_id = $1 AND wl.deleted_at IS NULL
+JOIN workout_sets ws ON ws.exercise_id = e.id
+JOIN workouts w ON w.id = ws.workout_id AND w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL
 LEFT JOIN exercise_feedbacks f ON f.exercise_id = e.id AND f.user_id = $1 AND f.deleted_at IS NULL
-WHERE e.deleted_at IS NULL
+WHERE e.user_id = $1 AND e.deleted_at IS NULL
 GROUP BY e.id, f.rating
 ORDER BY times_performed DESC, e.name;
-
--- name: LogWorkout :one
-INSERT INTO workout_logs (user_id, exercise_id, sets_done, reps_done, weight_kg)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;

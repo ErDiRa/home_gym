@@ -19,14 +19,17 @@ func TestUpdateKeepsUnitIDs(t *testing.T) {
 	in := twoUnitInput(reps)
 	in.Units[1].ID = &kept // Day B exists, Day A is new
 	in.Active = true
-	id := uuid.New()
+	id, userID := uuid.New(), uuid.New()
 
-	got, err := newTestService(f).Update(context.Background(), id, in)
+	got, err := newTestService(f).Update(context.Background(), userID, id, in)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.ID != id || !got.Active || got.StartDate.Time.Format(time.DateOnly) != "2026-03-02" || got.EndDate.Time.Format(time.DateOnly) != "2026-03-29" {
 		t.Errorf("updated = %+v", got)
+	}
+	if f.updated[0].UserID != userID || f.deactivated[0] != userID {
+		t.Errorf("updated %v, deactivated %v, want both for %v", f.updated[0].UserID, f.deactivated[0], userID)
 	}
 	if !slices.Equal(f.keptUnits, []uuid.UUID{kept}) {
 		t.Errorf("kept units = %v, want [%v]", f.keptUnits, kept)
@@ -41,8 +44,8 @@ func TestUpdateKeepsUnitIDs(t *testing.T) {
 	if f.indexOf("DeleteTrainingBlocks") > f.indexOf("InsertTrainingBlock") {
 		t.Errorf("calls = %v, want DeleteTrainingBlocks first", f.calls)
 	}
-	if f.indexOf("DeactivateClientTrainings") > f.indexOf("UpdateTraining") {
-		t.Errorf("calls = %v, want DeactivateClientTrainings before UpdateTraining", f.calls)
+	if f.indexOf("DeactivateUserTrainings") > f.indexOf("UpdateTraining") {
+		t.Errorf("calls = %v, want DeactivateUserTrainings before UpdateTraining", f.calls)
 	}
 }
 
@@ -52,7 +55,7 @@ func TestUpdateUnknownUnit(t *testing.T) {
 	in := twoUnitInput(reps)
 	in.Units[0].ID = &foreign
 
-	_, err := newTestService(f).Update(context.Background(), uuid.New(), in)
+	_, err := newTestService(f).Update(context.Background(), uuid.New(), uuid.New(), in)
 	wantError(t, err, service.KindInvalid, "unknown unit")
 	if f.calls[len(f.calls)-1] != "rollback" {
 		t.Errorf("calls end with %q, want rollback", f.calls[len(f.calls)-1])
@@ -63,6 +66,6 @@ func TestUpdateMissingTraining(t *testing.T) {
 	f, reps, _ := newFake()
 	f.updateErr = pgx.ErrNoRows
 
-	_, err := newTestService(f).Update(context.Background(), uuid.New(), twoUnitInput(reps))
+	_, err := newTestService(f).Update(context.Background(), uuid.New(), uuid.New(), twoUnitInput(reps))
 	wantError(t, err, service.KindNotFound, "training not found")
 }

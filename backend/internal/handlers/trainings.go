@@ -3,28 +3,35 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/erdira/homegym/backend/internal/service/training"
 )
 
-// ListTrainings returns all trainings with their client, for the admin overview.
+// ListTrainings returns the user's trainings with their size, for the overview.
 func (h *Handler) ListTrainings(w http.ResponseWriter, r *http.Request) {
-	trainings, err := h.trainings.List(r.Context())
+	listOwn(w, r, h.trainings.List)
+}
+
+// GetTraining returns one of the user's trainings with its units, blocks and exercises.
+func (h *Handler) GetTraining(w http.ResponseWriter, r *http.Request) {
+	userID, id, ok := userAndID(w, r, "training")
+	if !ok {
+		return
+	}
+	t, err := h.trainings.Get(r.Context(), userID, id)
 	if err != nil {
 		serviceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, trainings)
+	writeJSON(w, http.StatusOK, t)
 }
 
-// GetTraining returns a training with its units, blocks and exercises.
-func (h *Handler) GetTraining(w http.ResponseWriter, r *http.Request) {
-	id, ok := idParam(w, r, "training")
+// GetActiveTraining returns the user's active training with its whole tree, or null.
+func (h *Handler) GetActiveTraining(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(w, r)
 	if !ok {
 		return
 	}
-	t, err := h.trainings.Get(r.Context(), id)
+	t, err := h.trainings.Active(r.Context(), userID)
 	if err != nil {
 		serviceError(w, r, err)
 		return
@@ -34,11 +41,15 @@ func (h *Handler) GetTraining(w http.ResponseWriter, r *http.Request) {
 
 // CreateTraining saves a new training with its whole tree.
 func (h *Handler) CreateTraining(w http.ResponseWriter, r *http.Request) {
+	userID, ok := userIDFromRequest(w, r)
+	if !ok {
+		return
+	}
 	var in training.Input
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	t, err := h.trainings.Create(r.Context(), in)
+	t, err := h.trainings.Create(r.Context(), userID, in)
 	if err != nil {
 		serviceError(w, r, err)
 		return
@@ -46,10 +57,9 @@ func (h *Handler) CreateTraining(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, t)
 }
 
-// UpdateTraining replaces a training's fields and tree; it can also move the training to
-// another client.
+// UpdateTraining replaces a training's fields and tree.
 func (h *Handler) UpdateTraining(w http.ResponseWriter, r *http.Request) {
-	id, ok := idParam(w, r, "training")
+	userID, id, ok := userAndID(w, r, "training")
 	if !ok {
 		return
 	}
@@ -57,7 +67,7 @@ func (h *Handler) UpdateTraining(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	t, err := h.trainings.Update(r.Context(), id, in)
+	t, err := h.trainings.Update(r.Context(), userID, id, in)
 	if err != nil {
 		serviceError(w, r, err)
 		return
@@ -65,21 +75,13 @@ func (h *Handler) UpdateTraining(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, t)
 }
 
-type duplicateTrainingRequest struct {
-	ClientID uuid.UUID `json:"client_id"`
-}
-
-// DuplicateTraining copies a training for a client (the same or another one), inactive.
+// DuplicateTraining copies a training as the next phase, inactive.
 func (h *Handler) DuplicateTraining(w http.ResponseWriter, r *http.Request) {
-	id, ok := idParam(w, r, "training")
+	userID, id, ok := userAndID(w, r, "training")
 	if !ok {
 		return
 	}
-	var req duplicateTrainingRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-	t, err := h.trainings.Duplicate(r.Context(), id, req.ClientID)
+	t, err := h.trainings.Duplicate(r.Context(), userID, id)
 	if err != nil {
 		serviceError(w, r, err)
 		return
@@ -89,11 +91,11 @@ func (h *Handler) DuplicateTraining(w http.ResponseWriter, r *http.Request) {
 
 // DeleteTraining soft-deletes a training.
 func (h *Handler) DeleteTraining(w http.ResponseWriter, r *http.Request) {
-	id, ok := idParam(w, r, "training")
+	userID, id, ok := userAndID(w, r, "training")
 	if !ok {
 		return
 	}
-	if err := h.trainings.Delete(r.Context(), id); err != nil {
+	if err := h.trainings.Delete(r.Context(), userID, id); err != nil {
 		serviceError(w, r, err)
 		return
 	}

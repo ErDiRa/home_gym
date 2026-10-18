@@ -1,4 +1,5 @@
-// Package exercise manages the exercise library trainings are built from.
+// Package exercise manages a user's exercise library, which their trainings are built from.
+// Every usecase acts on the given user's exercises only; another user's look missing.
 package exercise
 
 import (
@@ -19,8 +20,8 @@ import (
 
 // Queries is the part of repos.Queries this service uses; *repos.Queries satisfies it.
 type Queries interface {
-	ListExercises(ctx context.Context) ([]repos.ListExercisesRow, error)
-	GetExercise(ctx context.Context, id uuid.UUID) (repos.GetExerciseRow, error)
+	ListExercises(ctx context.Context, userID uuid.UUID) ([]repos.ListExercisesRow, error)
+	GetExercise(ctx context.Context, arg repos.GetExerciseParams) (repos.GetExerciseRow, error)
 	CreateExercise(ctx context.Context, arg repos.CreateExerciseParams) (repos.CreateExerciseRow, error)
 	UpdateExercise(ctx context.Context, arg repos.UpdateExerciseParams) (repos.UpdateExerciseRow, error)
 }

@@ -1,5 +1,5 @@
 -- name: ListTrainings :many
--- Admin overview: every live training with its client and size, grouped by client.
+-- A user's trainings with their size, the active one first, then the newest.
 SELECT
     t.id,
     t.name,
@@ -7,29 +7,25 @@ SELECT
     t.active,
     t.start_date,
     t.end_date,
+    t.sessions_per_week,
     t.updated_at,
-    u.id AS client_id,
-    u.first_name AS client_first_name,
-    u.last_name AS client_last_name,
     (SELECT count(*) FROM training_units tu WHERE tu.training_id = t.id)::bigint AS unit_count,
     (SELECT count(*) FROM training_exercises te
      JOIN training_blocks tb ON tb.id = te.block_id
      JOIN training_units tu ON tu.id = tb.unit_id
      WHERE tu.training_id = t.id)::bigint AS exercise_count
 FROM trainings t
-JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
-WHERE t.deleted_at IS NULL
-ORDER BY u.last_name, u.first_name, t.active DESC, t.start_date DESC;
+WHERE t.user_id = $1 AND t.deleted_at IS NULL
+ORDER BY t.active DESC, t.start_date DESC, t.name;
 
 -- name: GetTraining :one
--- Only trainings of live clients.
-SELECT t.id, t.user_id AS client_id, t.name, t.description, t.active, t.start_date, t.end_date, t.created_at, t.updated_at
-FROM trainings t
-JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
-WHERE t.id = $1 AND t.deleted_at IS NULL;
+-- Only the user's own trainings: another user's is not found.
+SELECT id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at
+FROM trainings
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
 -- name: ListTrainingUnits :many
-SELECT id, name, notes, weekdays, dates FROM training_units
+SELECT id, name, notes FROM training_units
 WHERE training_id = $1
 ORDER BY position;
 
@@ -60,34 +56,35 @@ WHERE tu.training_id = $1
 ORDER BY te.block_id, te.position;
 
 -- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active, start_date, end_date)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at;
+INSERT INTO trainings (user_id, name, description, active, start_date, end_date, sessions_per_week)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at;
 
 -- name: UpdateTraining :one
+-- Another user's training updates nothing (no row).
 UPDATE trainings
-SET user_id = $2, name = $3, description = $4, active = $5, start_date = $6, end_date = $7, updated_at = now()
-WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, user_id AS client_id, name, description, active, start_date, end_date, created_at, updated_at;
+SET name = $3, description = $4, active = $5, start_date = $6, end_date = $7, sessions_per_week = $8, updated_at = now()
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+RETURNING id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at;
 
--- name: DeactivateClientTrainings :exec
--- Run before saving a training as active, so the client keeps at most one active one.
+-- name: DeactivateUserTrainings :exec
+-- Run before saving a training as active, so the user keeps at most one active one.
 UPDATE trainings SET active = false, updated_at = now()
 WHERE user_id = $1 AND active AND deleted_at IS NULL;
 
 -- name: DeleteTraining :execrows
 UPDATE trainings SET deleted_at = now(), updated_at = now()
-WHERE id = $1 AND deleted_at IS NULL;
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
 -- name: InsertTrainingUnit :one
-INSERT INTO training_units (training_id, position, name, notes, weekdays, dates)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO training_units (training_id, position, name, notes)
+VALUES ($1, $2, $3, $4)
 RETURNING id;
 
 -- name: UpdateTrainingUnit :execrows
 -- Matching training_id too means a unit id from another training updates nothing (0 rows).
 UPDATE training_units
-SET position = $3, name = $4, notes = $5, weekdays = $6, dates = $7
+SET position = $3, name = $4, notes = $5
 WHERE id = $1 AND training_id = $2;
 
 -- name: DeleteTrainingUnitsExcept :exec
@@ -113,15 +110,18 @@ INSERT INTO training_blocks (
 )
 RETURNING id;
 
--- name: InsertTrainingExercise :exec
+-- name: InsertTrainingExercise :execrows
+-- Only one of the user's own live exercises is inserted; any other inserts nothing (0 rows).
 INSERT INTO training_exercises (
     block_id, exercise_id, position, sets,
     reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
-) VALUES (
-    sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position), sqlc.narg(sets),
+)
+SELECT
+    sqlc.arg(block_id), e.id, sqlc.arg(position), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
     sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(tempo), sqlc.arg(notes)
-);
+FROM exercises e
+WHERE e.id = sqlc.arg(exercise_id) AND e.user_id = sqlc.arg(user_id) AND e.deleted_at IS NULL;
 
 -- name: ListBlockKinds :many
 SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
@@ -140,13 +140,7 @@ SELECT id, name, min_value, max_value FROM load_units
 WHERE deleted_at IS NULL
 ORDER BY created_at, name;
 
--- name: UserExists :one
--- The client a training is saved for must exist and not be deleted.
-SELECT EXISTS (
-    SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL
-);
-
--- name: ListAssignedTrainingIDs :many
--- What a client sees: their active training (at most one); inactive ones are drafts or done.
+-- name: GetActiveTrainingID :one
+-- The training the tracker shows: the user's active one (at most one).
 SELECT id FROM trainings
 WHERE user_id = $1 AND active AND deleted_at IS NULL;

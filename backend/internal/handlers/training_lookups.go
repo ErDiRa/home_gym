@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/erdira/homegym/backend/internal/service/lookup"
 )
 
@@ -50,6 +52,20 @@ func (h *Handler) CreateLoadUnit(w http.ResponseWriter, r *http.Request) {
 // list answers a GET with the rows fetch returns.
 func list[T any](w http.ResponseWriter, r *http.Request, fetch func(context.Context) ([]T, error)) {
 	rows, err := fetch(r.Context())
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+// listOwn answers a GET with the rows fetch returns for the signed-in user.
+func listOwn[T any](w http.ResponseWriter, r *http.Request, fetch func(context.Context, uuid.UUID) ([]T, error)) {
+	userID, ok := userIDFromRequest(w, r)
+	if !ok {
+		return
+	}
+	rows, err := fetch(r.Context(), userID)
 	if err != nil {
 		serviceError(w, r, err)
 		return

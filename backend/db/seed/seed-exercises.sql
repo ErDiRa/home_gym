@@ -1,4 +1,5 @@
--- Dev seed: sample exercises (needs seed-lookups.sql). Skips names that already exist.
+-- Dev seed: sample exercises (needs seed-lookups.sql and seed-user.sql), owned by me@example.com.
+-- Skips names the user already has.
 -- video_url points to a YouTube search for the exercise; replace with a specific video as needed.
 WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (VALUES
     ('Bench Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps', 'Deltoids'], 'Barbell press lying on a flat bench.', 'https://www.youtube.com/results?search_query=Bench+Press+exercise+form', ARRAY['Weightlifting'], 'strength'),
@@ -24,11 +25,12 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     ('Push-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps'], 'Bodyweight push-up, hands elevated to make it easier.', 'https://www.youtube.com/results?search_query=Push-up+exercise+form', ARRAY['Functional fitness'], 'strength'),
     ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/results?search_query=Ring+Row+exercise+form', ARRAY['Functional fitness', 'Shoulder health'], 'strength')
 ), new_exercises AS (
-    INSERT INTO exercises (name, description, type)
-    SELECT v.name, v.description, v.type
+    INSERT INTO exercises (user_id, name, description, type)
+    SELECT u.id, v.name, v.description, v.type
     FROM v
+    JOIN users u ON u.email = 'me@example.com' AND u.deleted_at IS NULL
     WHERE NOT EXISTS (
-        SELECT 1 FROM exercises e WHERE e.name = v.name AND e.deleted_at IS NULL
+        SELECT 1 FROM exercises e WHERE e.user_id = u.id AND e.name = v.name AND e.deleted_at IS NULL
     )
     RETURNING id, name -- the link CTEs join back to v by name for the rest of the row
 ), linked_videos AS (

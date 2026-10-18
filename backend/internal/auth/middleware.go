@@ -18,7 +18,7 @@ const CookieName = "token"
 type ctxKey struct{}
 
 // Middleware rejects requests without a valid JWT cookie and stores the verified claims
-// (account ID and role) in the request context. Roles are checked by RequireUser/RequireAdmin.
+// (the user ID) in the request context. Whether the user still exists is checked by RequireUser.
 func Middleware(tokens *TokenManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +32,14 @@ func Middleware(tokens *TokenManager) func(http.Handler) http.Handler {
 				unauthorized(w, r, "invalid or expired token", err)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, claims)))
+			next.ServeHTTP(w, r.WithContext(WithClaims(r.Context(), claims)))
 		})
 	}
+}
+
+// WithClaims returns ctx carrying claims, as Middleware stores them (also for handler tests).
+func WithClaims(ctx context.Context, claims *Claims) context.Context {
+	return context.WithValue(ctx, ctxKey{}, claims)
 }
 
 // ClaimsFromContext returns the verified token claims stored by Middleware.

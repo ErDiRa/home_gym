@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/erdira/homegym/backend/internal/auth"
 	"github.com/erdira/homegym/backend/internal/service"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	trainingrepos "github.com/erdira/homegym/backend/internal/service/training/repos"
@@ -21,23 +22,40 @@ import (
 // embedded interface.
 type fakeTrainings struct {
 	TrainingService
-	err   error
-	input training.Input // what Create received
+	err    error
+	userID uuid.UUID      // whose training was asked for
+	input  training.Input // what Create received
 }
 
-func (f *fakeTrainings) Get(_ context.Context, id uuid.UUID) (training.Training, error) {
+func (f *fakeTrainings) Get(_ context.Context, userID, id uuid.UUID) (training.Training, error) {
+	f.userID = userID
 	return training.Training{GetTrainingRow: trainingrepos.GetTrainingRow{ID: id, Name: "Strength"}, Units: []training.Unit{}}, f.err
 }
 
-func (f *fakeTrainings) Create(_ context.Context, in training.Input) (trainingrepos.CreateTrainingRow, error) {
-	f.input = in
+func (f *fakeTrainings) Create(_ context.Context, userID uuid.UUID, in training.Input) (trainingrepos.CreateTrainingRow, error) {
+	f.userID, f.input = userID, in
 	return trainingrepos.CreateTrainingRow{ID: uuid.New(), Name: in.Name}, f.err
 }
+
+// signedIn puts userID into every request's context the way auth.Middleware does.
+func signedIn(userID uuid.UUID) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims := &auth.Claims{}
+			claims.Subject = userID.String()
+			next.ServeHTTP(w, r.WithContext(auth.WithClaims(r.Context(), claims)))
+		})
+	}
+}
+
+// testUser is the signed-in user of the handler tests.
+var testUser = uuid.New()
 
 func serve(t *testing.T, fake *fakeTrainings, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	h := New(Services{Trainings: fake}, nil, false)
 	r := chi.NewRouter()
+	r.Use(signedIn(testUser))
 	r.Get("/trainings/{id}", h.GetTraining)
 	r.Post("/trainings", h.CreateTraining)
 	rec := httptest.NewRecorder()
@@ -56,15 +74,16 @@ func errorBody(t *testing.T, rec *httptest.ResponseRecorder) string {
 
 func TestTrainingHandlers(t *testing.T) {
 	id := uuid.New()
-	rec := serve(t, &fakeTrainings{}, http.MethodGet, "/trainings/"+id.String(), "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"Strength"`) {
-		t.Errorf("GET = %d %s", rec.Code, rec.Body)
+	fake := &fakeTrainings{}
+	rec := serve(t, fake, http.MethodGet, "/trainings/"+id.String(), "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"Strength"`) || fake.userID != testUser {
+		t.Errorf("GET = %d %s for %v", rec.Code, rec.Body, fake.userID)
 	}
 
-	fake := &fakeTrainings{}
-	rec = serve(t, fake, http.MethodPost, "/trainings", `{"name":"Strength","units":[{"name":"Day A"}]}`)
-	if rec.Code != http.StatusCreated || fake.input.Name != "Strength" || fake.input.Units[0].Name != "Day A" {
-		t.Errorf("POST = %d %s, service got %+v", rec.Code, rec.Body, fake.input)
+	fake = &fakeTrainings{}
+	rec = serve(t, fake, http.MethodPost, "/trainings", `{"name":"Strength","sessions_per_week":3,"units":[{"name":"Day A"}]}`)
+	if rec.Code != http.StatusCreated || fake.input.Name != "Strength" || fake.input.SessionsPerWeek != 3 || fake.input.Units[0].Name != "Day A" || fake.userID != testUser {
+		t.Errorf("POST = %d %s, service got %+v for %v", rec.Code, rec.Body, fake.input, fake.userID)
 	}
 }
 

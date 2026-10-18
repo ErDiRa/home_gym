@@ -12,48 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getAdminByEmail = `-- name: GetAdminByEmail :one
-SELECT id, email, password_hash, created_at FROM admins
-WHERE email = $1 AND deleted_at IS NULL
-`
-
-type GetAdminByEmailRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        string             `json:"email"`
-	PasswordHash string             `json:"password_hash"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-}
-
-func (q *Queries) GetAdminByEmail(ctx context.Context, email string) (GetAdminByEmailRow, error) {
-	row := q.db.QueryRow(ctx, getAdminByEmail, email)
-	var i GetAdminByEmailRow
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.PasswordHash,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getAdminByID = `-- name: GetAdminByID :one
-SELECT id, email, created_at FROM admins
-WHERE id = $1 AND deleted_at IS NULL
-`
-
-type GetAdminByIDRow struct {
-	ID        uuid.UUID          `json:"id"`
-	Email     string             `json:"email"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-func (q *Queries) GetAdminByID(ctx context.Context, id uuid.UUID) (GetAdminByIDRow, error) {
-	row := q.db.QueryRow(ctx, getAdminByID, id)
-	var i GetAdminByIDRow
-	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
-	return i, err
-}
-
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, created_at FROM users
 WHERE email = $1 AND deleted_at IS NULL
@@ -105,27 +63,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 	return i, err
 }
 
-const isAdmin = `-- name: IsAdmin :one
-SELECT EXISTS (
-    SELECT 1 FROM admins WHERE id = $1 AND deleted_at IS NULL
-)
-`
-
-// Checked on every /api/admin request by auth.RequireAdmin.
-func (q *Queries) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, isAdmin, id)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const userExists = `-- name: UserExists :one
 SELECT EXISTS (
     SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL
 )
 `
 
-// Checked on every /api/client request by auth.RequireUser.
+// Checked on every /api request by auth.RequireUser.
 func (q *Queries) UserExists(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, userExists, id)
 	var exists bool

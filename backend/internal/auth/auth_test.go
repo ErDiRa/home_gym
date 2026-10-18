@@ -20,9 +20,9 @@ func TestMiddleware(t *testing.T) {
 	other, _ := NewTokenManager("another-secret-another")
 
 	userID := uuid.New()
-	valid, _ := tm.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(time.Hour))
-	expiredTok, _ := expired.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(-time.Hour))
-	foreign, _ := other.Issue(RoleUser, userID, time.Now(), false, time.Now().Add(time.Hour))
+	valid, _ := tm.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
+	expiredTok, _ := expired.Issue(userID, time.Now(), false, time.Now().Add(-time.Hour))
+	foreign, _ := other.Issue(userID, time.Now(), false, time.Now().Add(time.Hour))
 
 	tests := []struct {
 		name   string
@@ -71,43 +71,9 @@ func TestSessionExpiry(t *testing.T) {
 	}
 }
 
-func TestRequireAdmin(t *testing.T) {
-	tm, _ := NewTokenManager("test-secret-test-secret")
-	adminToken, _ := tm.Issue(RoleAdmin, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
-	userToken, _ := tm.Issue(RoleUser, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
-
-	tests := []struct {
-		name   string
-		token  string
-		lookup AdminLookup
-		want   int
-	}{
-		{"admin", adminToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
-		{"admin removed", adminToken, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusForbidden},
-		{"lookup failure", adminToken, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
-		{"user token", userToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusForbidden},
-		{"no cookie", "", func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := Middleware(tm)(RequireAdmin(tt.lookup)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			if tt.token != "" {
-				req.AddCookie(&http.Cookie{Name: CookieName, Value: tt.token})
-			}
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, req)
-			if rec.Code != tt.want {
-				t.Errorf("status = %d, want %d", rec.Code, tt.want)
-			}
-		})
-	}
-}
-
 func TestRequireUser(t *testing.T) {
 	tm, _ := NewTokenManager("test-secret-test-secret")
-	userToken, _ := tm.Issue(RoleUser, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
-	adminToken, _ := tm.Issue(RoleAdmin, uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
+	userToken, _ := tm.Issue(uuid.New(), time.Now(), false, time.Now().Add(time.Hour))
 
 	tests := []struct {
 		name   string
@@ -118,7 +84,6 @@ func TestRequireUser(t *testing.T) {
 		{"user", userToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusOK},
 		{"user deleted", userToken, func(context.Context, uuid.UUID) (bool, error) { return false, nil }, http.StatusUnauthorized},
 		{"lookup failure", userToken, func(context.Context, uuid.UUID) (bool, error) { return false, errors.New("db down") }, http.StatusInternalServerError},
-		{"admin token", adminToken, func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusForbidden},
 		{"no cookie", "", func(context.Context, uuid.UUID) (bool, error) { return true, nil }, http.StatusUnauthorized},
 	}
 	for _, tt := range tests {

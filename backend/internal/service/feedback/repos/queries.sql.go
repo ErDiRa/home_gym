@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getExerciseStats = `-- name: GetExerciseStats :many
@@ -25,12 +26,13 @@ SELECT
         JOIN muscle_groups m ON m.id = em.muscle_group_id AND m.deleted_at IS NULL
         WHERE em.exercise_id = e.id ORDER BY m.name
     )::text[] AS muscle_groups,
-    COUNT(wl.id)::bigint AS times_performed,
+    COUNT(DISTINCT w.id)::bigint AS times_performed,
     f.rating AS rating
 FROM exercises e
-JOIN workout_logs wl ON wl.exercise_id = e.id AND wl.user_id = $1 AND wl.deleted_at IS NULL
+JOIN workout_sets ws ON ws.exercise_id = e.id
+JOIN workouts w ON w.id = ws.workout_id AND w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL
 LEFT JOIN exercise_feedbacks f ON f.exercise_id = e.id AND f.user_id = $1 AND f.deleted_at IS NULL
-WHERE e.deleted_at IS NULL
+WHERE e.user_id = $1 AND e.deleted_at IS NULL
 GROUP BY e.id, f.rating
 ORDER BY times_performed DESC, e.name
 `
@@ -44,7 +46,8 @@ type GetExerciseStatsRow struct {
 	Rating         *int32    `json:"rating"`
 }
 
-// The exercises a user has logged, with how often and their own rating (NULL if unrated).
+// The exercises a user has done in finished workouts, with in how many workouts and their
+// rating (NULL if unrated).
 func (q *Queries) GetExerciseStats(ctx context.Context, userID uuid.UUID) ([]GetExerciseStatsRow, error) {
 	rows, err := q.db.Query(ctx, getExerciseStats, userID)
 	if err != nil {
@@ -72,45 +75,51 @@ func (q *Queries) GetExerciseStats(ctx context.Context, userID uuid.UUID) ([]Get
 	return items, nil
 }
 
-const logWorkout = `-- name: LogWorkout :one
-INSERT INTO workout_logs (user_id, exercise_id, sets_done, reps_done, weight_kg)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, user_id, exercise_id, completed_at, sets_done, reps_done, weight_kg, deleted_at
+const listExerciseRatings = `-- name: ListExerciseRatings :many
+SELECT f.exercise_id, f.rating, f.notes, f.updated_at
+FROM exercise_feedbacks f
+JOIN exercises e ON e.id = f.exercise_id AND e.deleted_at IS NULL
+WHERE f.user_id = $1 AND f.deleted_at IS NULL
 `
 
-type LogWorkoutParams struct {
-	UserID     uuid.UUID `json:"user_id"`
-	ExerciseID uuid.UUID `json:"exercise_id"`
-	SetsDone   int32     `json:"sets_done"`
-	RepsDone   int32     `json:"reps_done"`
-	WeightKg   float64   `json:"weight_kg"`
+type ListExerciseRatingsRow struct {
+	ExerciseID uuid.UUID          `json:"exercise_id"`
+	Rating     int32              `json:"rating"`
+	Notes      string             `json:"notes"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
-func (q *Queries) LogWorkout(ctx context.Context, arg LogWorkoutParams) (WorkoutLog, error) {
-	row := q.db.QueryRow(ctx, logWorkout,
-		arg.UserID,
-		arg.ExerciseID,
-		arg.SetsDone,
-		arg.RepsDone,
-		arg.WeightKg,
-	)
-	var i WorkoutLog
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ExerciseID,
-		&i.CompletedAt,
-		&i.SetsDone,
-		&i.RepsDone,
-		&i.WeightKg,
-		&i.DeletedAt,
-	)
-	return i, err
+// How a user rated their exercises, for the exercise picker.
+func (q *Queries) ListExerciseRatings(ctx context.Context, userID uuid.UUID) ([]ListExerciseRatingsRow, error) {
+	rows, err := q.db.Query(ctx, listExerciseRatings, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExerciseRatingsRow{}
+	for rows.Next() {
+		var i ListExerciseRatingsRow
+		if err := rows.Scan(
+			&i.ExerciseID,
+			&i.Rating,
+			&i.Notes,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertExerciseFeedback = `-- name: UpsertExerciseFeedback :one
 INSERT INTO exercise_feedbacks (user_id, exercise_id, rating, notes)
-VALUES ($1, $2, $3, $4)
+SELECT e.user_id, e.id, $1, $2
+FROM exercises e
+WHERE e.id = $3 AND e.user_id = $4 AND e.deleted_at IS NULL
 ON CONFLICT (user_id, exercise_id) WHERE deleted_at IS NULL
 DO UPDATE SET rating = EXCLUDED.rating,
               notes = EXCLUDED.notes,
@@ -119,20 +128,21 @@ RETURNING id, user_id, exercise_id, rating, notes, updated_at, deleted_at
 `
 
 type UpsertExerciseFeedbackParams struct {
-	UserID     uuid.UUID `json:"user_id"`
-	ExerciseID uuid.UUID `json:"exercise_id"`
 	Rating     int32     `json:"rating"`
 	Notes      string    `json:"notes"`
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	UserID     uuid.UUID `json:"user_id"`
 }
 
-// A client's rating of an exercise; rating again replaces it. The ON CONFLICT target repeats
-// the partial unique index's WHERE so Postgres can match that index.
+// A user's rating of one of their exercises; rating again replaces it. Another user's (or a
+// deleted) exercise inserts nothing, so no row comes back. The ON CONFLICT target repeats the
+// partial unique index's WHERE so Postgres can match that index.
 func (q *Queries) UpsertExerciseFeedback(ctx context.Context, arg UpsertExerciseFeedbackParams) (ExerciseFeedback, error) {
 	row := q.db.QueryRow(ctx, upsertExerciseFeedback,
-		arg.UserID,
-		arg.ExerciseID,
 		arg.Rating,
 		arg.Notes,
+		arg.ExerciseID,
+		arg.UserID,
 	)
 	var i ExerciseFeedback
 	err := row.Scan(

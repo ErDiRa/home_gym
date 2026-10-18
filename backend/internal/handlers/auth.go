@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -17,24 +16,14 @@ type loginRequest struct {
 	Remember bool   `json:"remember"`
 }
 
-// LoginAdmin signs an admin in to the admin app; user accounts fail like wrong credentials.
-func (h *Handler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
-	h.login(w, r, h.accounts.LoginAdmin)
-}
-
-// LoginUser signs a user in to the client app; admin accounts fail like wrong credentials.
-func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
-	h.login(w, r, h.accounts.LoginUser)
-}
-
-// login checks the credentials with check and starts a new session; the login time becomes the
-// token's auth_time, from which the 7-day cap is measured.
-func (h *Handler) login(w http.ResponseWriter, r *http.Request, check func(ctx context.Context, email, password string) (account.Account, error)) {
+// Login checks the credentials and starts a new session; the login time becomes the token's
+// auth_time, from which the 7-day cap is measured.
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	acc, err := check(r.Context(), req.Email, req.Password)
+	acc, err := h.accounts.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		serviceError(w, r, err)
 		return
@@ -48,7 +37,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request, check func(ctx c
 func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, acc account.Account, authTime time.Time, remember bool) {
 	now := time.Now()
 	expiry := auth.SessionExpiry(now, authTime)
-	token, err := h.tokens.Issue(acc.Role(), acc.ID, authTime, remember, expiry)
+	token, err := h.tokens.Issue(acc.ID, authTime, remember, expiry)
 	if err != nil {
 		serverError(w, r, err)
 		return
@@ -82,7 +71,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
-	acc, err := h.accounts.Current(r.Context(), claims.Role, id)
+	acc, err := h.accounts.Current(r.Context(), id)
 	// The account was deleted since login: end the session instead of extending it.
 	var svcErr *service.Error
 	if errors.As(err, &svcErr) && svcErr.Kind == service.KindNotFound {

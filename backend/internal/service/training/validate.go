@@ -2,7 +2,6 @@ package training
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,9 +17,6 @@ import (
 // service.Invalid error for the first problem.
 func validate(in *Input, lk lookups) error {
 	in.Name, in.Description = strings.TrimSpace(in.Name), strings.TrimSpace(in.Description)
-	if in.ClientID == uuid.Nil {
-		return service.Invalid("client_id is required")
-	}
 	if in.Name == "" || tooLong(in.Name, 100) {
 		return service.Invalid("name is required (max 100 characters)")
 	}
@@ -33,6 +29,9 @@ func validate(in *Input, lk lookups) error {
 		return service.Invalid("end_date must not be before start_date")
 	}
 	in.start, in.end = pgtype.Date{Time: start, Valid: true}, pgtype.Date{Time: end, Valid: true}
+	if in.SessionsPerWeek < 1 || in.SessionsPerWeek > 14 {
+		return service.Invalid("sessions_per_week must be 1-14")
+	}
 	// A unit id sent twice would update the same row twice and lose one of the units.
 	seenUnits := map[uuid.UUID]bool{}
 	for i := range in.Units {
@@ -46,18 +45,6 @@ func validate(in *Input, lk lookups) error {
 				return service.Invalid("a unit appears twice")
 			}
 			seenUnits[*u.ID] = true
-		}
-		weekdays, ok := normalizeWeekdays(u.Weekdays)
-		if !ok {
-			return service.Invalid("weekdays must be 1 (Monday) to 7 (Sunday)")
-		}
-		u.Weekdays = weekdays
-		if u.dates, ok = parseDates(u.Dates); !ok {
-			return service.Invalid("dates must be formatted YYYY-MM-DD")
-		}
-		// Sorted by parseDates, so checking the first and last is enough.
-		if n := len(u.dates); n > 0 && (u.dates[0].Time.Before(start) || u.dates[n-1].Time.After(end)) {
-			return service.Invalid(fmt.Sprintf("%s: dates must lie within the training period", u.Name))
 		}
 		for j := range u.Blocks {
 			if msg := checkBlock(&u.Blocks[j], lk); msg != "" {
@@ -217,41 +204,4 @@ func blockLetter(i int) string {
 		return string(rune('A' + i))
 	}
 	return strconv.Itoa(i + 1)
-}
-
-// normalizeWeekdays sorts and deduplicates ISO weekdays, reporting false for invalid ones.
-func normalizeWeekdays(days []int16) ([]int16, bool) {
-	var seen [8]bool // indexed by weekday; 0 unused
-	for _, d := range days {
-		if d < 1 || d > 7 {
-			return nil, false
-		}
-		seen[d] = true
-	}
-	out := []int16{}
-	for d := int16(1); d <= 7; d++ {
-		if seen[d] {
-			out = append(out, d)
-		}
-	}
-	return out, true
-}
-
-// parseDates parses YYYY-MM-DD dates, sorted and deduplicated, reporting false for invalid ones.
-func parseDates(raw []string) ([]pgtype.Date, bool) {
-	parsed := make([]time.Time, 0, len(raw))
-	for _, r := range raw {
-		d, err := time.Parse(time.DateOnly, r)
-		if err != nil {
-			return nil, false
-		}
-		parsed = append(parsed, d)
-	}
-	slices.SortFunc(parsed, func(a, b time.Time) int { return a.Compare(b) })
-	parsed = slices.Compact(parsed) // drops adjacent duplicates, so sort first
-	out := make([]pgtype.Date, 0, len(parsed))
-	for _, d := range parsed {
-		out = append(out, pgtype.Date{Time: d, Valid: true})
-	}
-	return out, true
 }

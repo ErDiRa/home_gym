@@ -11,6 +11,6 @@ import (
 )
 
 func TestGetMissing(t *testing.T) {
-	_, err := (&Service{q: &fakeQueries{err: pgx.ErrNoRows}}).Get(context.Background(), uuid.New())
+	_, err := (&Service{q: &fakeQueries{err: pgx.ErrNoRows}}).Get(context.Background(), uuid.New(), uuid.New())
 	wantError(t, err, service.KindNotFound, "exercise not found")
 }

@@ -24,11 +24,15 @@ func TestCreate(t *testing.T) {
 	in.FocusIDs = []uuid.UUID{focus, focus}
 	in.VideoURLs = []string{" https://example.com/a ", "", "  ", "http://example.com/b"}
 
-	got, err := (&Service{q: f}).Create(context.Background(), in)
+	userID := uuid.New()
+	got, err := (&Service{q: f}).Create(context.Background(), userID, in)
 	if err != nil {
 		t.Fatal(err)
 	}
 	params := f.created[0]
+	if params.UserID != userID {
+		t.Errorf("created for %v, want %v", params.UserID, userID)
+	}
 	if !slices.Equal(params.JointIds, []uuid.UUID{knee}) || !slices.Equal(params.FocusIds, []uuid.UUID{focus}) {
 		t.Errorf("ids not deduplicated: %v, %v", params.JointIds, params.FocusIds)
 	}
@@ -61,7 +65,7 @@ func TestCreateRejects(t *testing.T) {
 			f := &fakeQueries{}
 			in := validInput()
 			tt.edit(&in)
-			_, err := (&Service{q: f}).Create(context.Background(), in)
+			_, err := (&Service{q: f}).Create(context.Background(), uuid.New(), in)
 			wantError(t, err, service.KindInvalid, tt.wantMsg)
 			if len(f.created) != 0 {
 				t.Error("created an exercise anyway")
@@ -72,6 +76,6 @@ func TestCreateRejects(t *testing.T) {
 
 func TestCreateUnknownLink(t *testing.T) {
 	f := &fakeQueries{err: &pgconn.PgError{Code: "23503"}}
-	_, err := (&Service{q: f}).Create(context.Background(), validInput())
+	_, err := (&Service{q: f}).Create(context.Background(), uuid.New(), validInput())
 	wantError(t, err, service.KindInvalid, "unknown joint, muscle group or focus")
 }

@@ -19,12 +19,12 @@ type fakeQueries struct {
 	updated []repos.UpdateExerciseParams
 }
 
-func (f *fakeQueries) ListExercises(context.Context) ([]repos.ListExercisesRow, error) {
+func (f *fakeQueries) ListExercises(context.Context, uuid.UUID) ([]repos.ListExercisesRow, error) {
 	return []repos.ListExercisesRow{}, f.err
 }
 
-func (f *fakeQueries) GetExercise(_ context.Context, id uuid.UUID) (repos.GetExerciseRow, error) {
-	return repos.GetExerciseRow{ID: id}, f.err
+func (f *fakeQueries) GetExercise(_ context.Context, arg repos.GetExerciseParams) (repos.GetExerciseRow, error) {
+	return repos.GetExerciseRow{ID: arg.ID}, f.err
 }
 
 func (f *fakeQueries) CreateExercise(_ context.Context, arg repos.CreateExerciseParams) (repos.CreateExerciseRow, error) {

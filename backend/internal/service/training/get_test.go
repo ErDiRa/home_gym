@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/erdira/homegym/backend/internal/service"
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
@@ -19,11 +17,10 @@ func TestGetAssemblesTree(t *testing.T) {
 	f, _, _ := newFake()
 	id, dayA, dayB, block1, block2 := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	squat, row := uuid.New(), uuid.New()
-	date := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 	f.training = repos.GetTrainingRow{ID: id, Name: "Strength"}
 	f.units = []repos.ListTrainingUnitsRow{
-		{ID: dayA, Name: "Day A", Weekdays: []int16{1}, Dates: []pgtype.Date{{Time: date, Valid: true}}},
-		{ID: dayB, Name: "Day B"}, // no weekdays, dates or blocks
+		{ID: dayA, Name: "Day A"},
+		{ID: dayB, Name: "Day B"}, // no blocks
 	}
 	f.blocks = []repos.ListTrainingBlocksRow{
 		{ID: block1, UnitID: dayA, Kind: "single"},
@@ -34,7 +31,7 @@ func TestGetAssemblesTree(t *testing.T) {
 		{BlockID: block1, ExerciseID: row, Name: "Row"},
 	}
 
-	got, err := newTestService(f).Get(context.Background(), id)
+	got, err := newTestService(f).Get(context.Background(), uuid.New(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,9 +39,6 @@ func TestGetAssemblesTree(t *testing.T) {
 		t.Fatalf("units = %+v", got.Units)
 	}
 	a := got.Units[0]
-	if len(a.Dates) != 1 || a.Dates[0] != "2026-03-01" {
-		t.Errorf("dates = %v", a.Dates)
-	}
 	if len(a.Blocks) != 2 || a.Blocks[0].ID != block1 || a.Blocks[1].ID != block2 {
 		t.Fatalf("blocks = %+v", a.Blocks)
 	}
@@ -58,7 +52,7 @@ func TestGetAssemblesTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"name":"Strength"`, `"weekdays":[],"dates":[],"blocks":[]`, `"exercises":[]`} {
+	for _, want := range []string{`"name":"Strength"`, `"name":"Day B","notes":"","blocks":[]`, `"exercises":[]`} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("JSON %s lacks %s", body, want)
 		}
@@ -69,6 +63,6 @@ func TestGetMissing(t *testing.T) {
 	f, _, _ := newFake()
 	f.getErr = pgx.ErrNoRows
 
-	_, err := newTestService(f).Get(context.Background(), uuid.New())
+	_, err := newTestService(f).Get(context.Background(), uuid.New(), uuid.New())
 	wantError(t, err, service.KindNotFound, "training not found")
 }

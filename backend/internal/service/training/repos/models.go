@@ -9,15 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Admin struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        string             `json:"email"`
-	PasswordHash string             `json:"password_hash"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
-}
-
 type BlockKind struct {
 	Code         string `json:"code"`
 	Name         string `json:"name"`
@@ -32,6 +23,7 @@ type BlockKind struct {
 
 type Exercise struct {
 	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Type        string             `json:"type"`
@@ -118,16 +110,17 @@ type RepUnit struct {
 }
 
 type Training struct {
-	ID          uuid.UUID          `json:"id"`
-	UserID      uuid.UUID          `json:"user_id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Active      bool               `json:"active"`
-	StartDate   pgtype.Date        `json:"start_date"`
-	EndDate     pgtype.Date        `json:"end_date"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	ID              uuid.UUID          `json:"id"`
+	UserID          uuid.UUID          `json:"user_id"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	Active          bool               `json:"active"`
+	StartDate       pgtype.Date        `json:"start_date"`
+	EndDate         pgtype.Date        `json:"end_date"`
+	SessionsPerWeek int32              `json:"sessions_per_week"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type TrainingBlock struct {
@@ -165,13 +158,11 @@ type TrainingExercise struct {
 }
 
 type TrainingUnit struct {
-	ID         uuid.UUID     `json:"id"`
-	TrainingID uuid.UUID     `json:"training_id"`
-	Position   int32         `json:"position"`
-	Name       string        `json:"name"`
-	Notes      string        `json:"notes"`
-	Weekdays   []int16       `json:"weekdays"`
-	Dates      []pgtype.Date `json:"dates"`
+	ID         uuid.UUID `json:"id"`
+	TrainingID uuid.UUID `json:"training_id"`
+	Position   int32     `json:"position"`
+	Name       string    `json:"name"`
+	Notes      string    `json:"notes"`
 }
 
 type User struct {
@@ -185,13 +176,29 @@ type User struct {
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type WorkoutLog struct {
+type Workout struct {
 	ID          uuid.UUID          `json:"id"`
 	UserID      uuid.UUID          `json:"user_id"`
-	ExerciseID  uuid.UUID          `json:"exercise_id"`
+	TrainingID  *uuid.UUID         `json:"training_id"`
+	UnitID      *uuid.UUID         `json:"unit_id"`
+	UnitName    string             `json:"unit_name"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	SetsDone    int32              `json:"sets_done"`
-	RepsDone    int32              `json:"reps_done"`
-	WeightKg    float64            `json:"weight_kg"`
+	Notes       string             `json:"notes"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type WorkoutSet struct {
+	ID               uuid.UUID          `json:"id"`
+	WorkoutID        uuid.UUID          `json:"workout_id"`
+	ExerciseID       uuid.UUID          `json:"exercise_id"`
+	BlockPosition    int32              `json:"block_position"`
+	ExercisePosition int32              `json:"exercise_position"`
+	SetNumber        int32              `json:"set_number"`
+	RepsValue        float64            `json:"reps_value"`
+	RepsUnit         uuid.UUID          `json:"reps_unit"`
+	PerSide          bool               `json:"per_side"`
+	LoadValue        *float64           `json:"load_value"`
+	LoadUnit         *uuid.UUID         `json:"load_unit"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
 }

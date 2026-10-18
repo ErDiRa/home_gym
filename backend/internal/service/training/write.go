@@ -9,18 +9,17 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// insertUnits writes the units, blocks and exercises of a new training, in input order.
-// Unit ids in the input are ignored: a new training has no units yet.
-func insertUnits(ctx context.Context, q Queries, trainingID uuid.UUID, units []UnitInput) error {
+// insertUnits writes the units, blocks and exercises of a new training of the user, in input
+// order. Unit ids in the input are ignored: a new training has no units yet.
+func insertUnits(ctx context.Context, q Queries, userID, trainingID uuid.UUID, units []UnitInput) error {
 	for i, u := range units {
 		unitID, err := q.InsertTrainingUnit(ctx, repos.InsertTrainingUnitParams{
 			TrainingID: trainingID, Position: int32(i + 1), Name: u.Name, Notes: u.Notes,
-			Weekdays: u.Weekdays, Dates: u.dates,
 		})
 		if err != nil {
 			return err
 		}
-		if err := insertBlocks(ctx, q, unitID, u.Blocks); err != nil {
+		if err := insertBlocks(ctx, q, userID, unitID, u.Blocks); err != nil {
 			return err
 		}
 	}
@@ -30,7 +29,7 @@ func insertUnits(ctx context.Context, q Queries, trainingID uuid.UUID, units []U
 // updateUnits replaces the units of an existing training: units missing from the input are
 // deleted, units with an id are updated in place (keeping their id), units without one are
 // inserted. All blocks and exercises are deleted and re-inserted.
-func updateUnits(ctx context.Context, q Queries, trainingID uuid.UUID, units []UnitInput) error {
+func updateUnits(ctx context.Context, q Queries, userID, trainingID uuid.UUID, units []UnitInput) error {
 	keep := []uuid.UUID{}
 	for _, u := range units {
 		if u.ID != nil {
@@ -51,7 +50,6 @@ func updateUnits(ctx context.Context, q Queries, trainingID uuid.UUID, units []U
 		if u.ID != nil {
 			n, err := q.UpdateTrainingUnit(ctx, repos.UpdateTrainingUnitParams{
 				ID: *u.ID, TrainingID: trainingID, Position: position, Name: u.Name, Notes: u.Notes,
-				Weekdays: u.Weekdays, Dates: u.dates,
 			})
 			if err != nil {
 				return err
@@ -64,22 +62,22 @@ func updateUnits(ctx context.Context, q Queries, trainingID uuid.UUID, units []U
 		} else {
 			id, err := q.InsertTrainingUnit(ctx, repos.InsertTrainingUnitParams{
 				TrainingID: trainingID, Position: position, Name: u.Name, Notes: u.Notes,
-				Weekdays: u.Weekdays, Dates: u.dates,
 			})
 			if err != nil {
 				return err
 			}
 			unitID = id
 		}
-		if err := insertBlocks(ctx, q, unitID, u.Blocks); err != nil {
+		if err := insertBlocks(ctx, q, userID, unitID, u.Blocks); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// insertBlocks inserts a unit's blocks and their exercises, in input order.
-func insertBlocks(ctx context.Context, q Queries, unitID uuid.UUID, blocks []BlockInput) error {
+// insertBlocks inserts a unit's blocks and their exercises, in input order. The exercises must
+// be the user's own.
+func insertBlocks(ctx context.Context, q Queries, userID, unitID uuid.UUID, blocks []BlockInput) error {
 	for j, b := range blocks {
 		blockID, err := q.InsertTrainingBlock(ctx, repos.InsertTrainingBlockParams{
 			UnitID: unitID, Position: int32(j + 1), Kind: b.Kind, Name: b.Name, Sets: b.Sets,
@@ -90,13 +88,17 @@ func insertBlocks(ctx context.Context, q Queries, unitID uuid.UUID, blocks []Blo
 			return err
 		}
 		for k, e := range b.Exercises {
-			err := q.InsertTrainingExercise(ctx, repos.InsertTrainingExerciseParams{
-				BlockID: blockID, ExerciseID: e.ExerciseID, Position: int32(k + 1), Sets: e.Sets,
+			n, err := q.InsertTrainingExercise(ctx, repos.InsertTrainingExerciseParams{
+				BlockID: blockID, ExerciseID: e.ExerciseID, UserID: userID, Position: int32(k + 1), Sets: e.Sets,
 				RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
 				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, Tempo: e.Tempo, Notes: e.Notes,
 			})
 			if err != nil {
 				return err
+			}
+			// Another user's, a deleted or an unknown exercise.
+			if n == 0 {
+				return service.Invalid("unknown exercise")
 			}
 		}
 	}
@@ -107,8 +109,7 @@ func insertBlocks(ctx context.Context, q Queries, unitID uuid.UUID, blocks []Blo
 func copyUnits(units []Unit) []UnitInput {
 	out := make([]UnitInput, 0, len(units))
 	for _, u := range units {
-		unit := UnitInput{Name: u.Name, Notes: u.Notes, Weekdays: u.Weekdays}
-		unit.dates, _ = parseDates(u.Dates) // formatted by load, so always valid
+		unit := UnitInput{Name: u.Name, Notes: u.Notes}
 		for _, b := range u.Blocks {
 			block := BlockInput{Kind: b.Kind, Name: b.Name, Sets: b.Sets, Amount: b.Amount, Notes: b.Notes}
 			for _, e := range b.Exercises {

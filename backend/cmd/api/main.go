@@ -20,11 +20,11 @@ import (
 	"github.com/erdira/homegym/backend/internal/handlers"
 	"github.com/erdira/homegym/backend/internal/logging"
 	"github.com/erdira/homegym/backend/internal/service/account"
-	"github.com/erdira/homegym/backend/internal/service/client"
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
 	"github.com/erdira/homegym/backend/internal/service/training"
+	"github.com/erdira/homegym/backend/internal/service/workout"
 )
 
 func main() {
@@ -84,10 +84,10 @@ func run() error {
 	})
 	services := handlers.Services{
 		Trainings: training.New(dbpool),
-		Clients:   client.New(dbpool),
 		Exercises: exercise.New(dbpool),
 		Lookups:   lookup.New(dbpool),
 		Feedback:  feedback.New(dbpool),
+		Workouts:  workout.New(dbpool),
 		Accounts:  account.New(dbpool),
 	}
 	handlers.New(services, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)

@@ -10,8 +10,8 @@ import (
 
 // Get returns one exercise with the ids of its joints, muscle groups and focuses, for filling
 // the exercise form.
-func (s *Service) Get(ctx context.Context, id uuid.UUID) (repos.GetExerciseRow, error) {
-	exercise, err := s.q.GetExercise(ctx, id)
+func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (repos.GetExerciseRow, error) {
+	exercise, err := s.q.GetExercise(ctx, repos.GetExerciseParams{ID: id, UserID: userID})
 	if err != nil {
 		return repos.GetExerciseRow{}, mapError(err)
 	}

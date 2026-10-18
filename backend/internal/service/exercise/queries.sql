@@ -2,8 +2,8 @@
 -- Inserts the exercise and its links in one statement: Postgres runs every data-modifying CTE,
 -- even the ones nothing selects from. Video positions come from the array order.
 WITH new_exercise AS (
-    INSERT INTO exercises (name, description, type)
-    VALUES ($1, $2, $3)
+    INSERT INTO exercises (user_id, name, description, type)
+    VALUES ($1, $2, $3, $4)
     RETURNING *
 ), linked_videos AS (
     INSERT INTO exercise_videos (exercise_id, position, url)
@@ -22,7 +22,7 @@ WITH new_exercise AS (
 SELECT id, name, description, type, sqlc.arg(video_urls)::text[] AS video_urls, created_at, updated_at FROM new_exercise;
 
 -- name: ListExercises :many
--- With the names of joints and muscle groups and the focuses as JSON, for lists and the picker.
+-- A user's exercises with the names of joints and muscle groups and the focuses as JSON, for lists and the picker.
 SELECT
     e.id,
     e.name,
@@ -48,7 +48,7 @@ SELECT
         WHERE ef.exercise_id = e.id
     ), '[]'::jsonb) AS focuses
 FROM exercises e
-WHERE e.deleted_at IS NULL
+WHERE e.user_id = $1 AND e.deleted_at IS NULL
 ORDER BY e.name;
 
 -- name: GetExercise :one
@@ -63,16 +63,16 @@ SELECT
     ARRAY(SELECT muscle_group_id FROM exercise_muscle_groups WHERE exercise_id = e.id)::uuid[] AS muscle_group_ids,
     ARRAY(SELECT focus_id FROM exercise_focuses WHERE exercise_id = e.id)::uuid[] AS focus_ids
 FROM exercises e
-WHERE e.id = $1 AND e.deleted_at IS NULL;
+WHERE e.id = $1 AND e.user_id = $2 AND e.deleted_at IS NULL;
 
 -- name: UpdateExercise :one
 -- The links are synced by deleting the ones no longer wanted and inserting the new ones;
 -- the two never touch the same row, so they are safe in one statement. Videos are ordered,
--- so they are all replaced.
+-- so they are all replaced. Another user's exercise updates nothing (no row).
 WITH updated AS (
     UPDATE exercises
-    SET name = $2, description = $3, type = $4, updated_at = now()
-    WHERE exercises.id = $1 AND exercises.deleted_at IS NULL
+    SET name = $3, description = $4, type = $5, updated_at = now()
+    WHERE exercises.id = $1 AND exercises.user_id = $2 AND exercises.deleted_at IS NULL
     RETURNING *
 ), removed_videos AS (
     DELETE FROM exercise_videos ev USING updated u WHERE ev.exercise_id = u.id

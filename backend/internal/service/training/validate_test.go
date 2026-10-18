@@ -111,8 +111,8 @@ func TestValidate(t *testing.T) {
 	lk := lookups{kinds: map[string]repos.ListBlockKindsRow{"single": {Code: "single", Name: "Single", MinExercises: 1}}}
 	unitID := uuid.New()
 	valid := func() Input {
-		return Input{ClientID: uuid.New(), Name: "  Strength  ", StartDate: "2026-03-01", EndDate: "2026-03-28", Units: []UnitInput{
-			{Name: " Day A ", Weekdays: []int16{5, 1, 1}, Dates: []string{"2026-03-02", "2026-03-01", "2026-03-02"}},
+		return Input{Name: "  Strength  ", StartDate: "2026-03-01", EndDate: "2026-03-28", SessionsPerWeek: 3, Units: []UnitInput{
+			{Name: " Day A "},
 		}}
 	}
 
@@ -122,21 +122,19 @@ func TestValidate(t *testing.T) {
 		wantMsg string // empty means valid
 	}{
 		{"valid", func(*Input) {}, ""},
-		{"missing client", func(in *Input) { in.ClientID = uuid.Nil }, "client_id is required"},
 		{"blank name", func(in *Input) { in.Name = "   " }, "name is required (max 100 characters)"},
 		{"long name", func(in *Input) { in.Name = strings.Repeat("ä", 101) }, "name is required (max 100 characters)"},
 		{"unit without name", func(in *Input) { in.Units[0].Name = "" }, "every unit needs a name (max 100 characters)"},
 		{"unit twice", func(in *Input) {
 			in.Units = []UnitInput{{ID: &unitID, Name: "A"}, {ID: &unitID, Name: "B"}}
 		}, "a unit appears twice"},
-		{"bad weekday", func(in *Input) { in.Units[0].Weekdays = []int16{8} }, "weekdays must be 1 (Monday) to 7 (Sunday)"},
-		{"bad date", func(in *Input) { in.Units[0].Dates = []string{"01.03.2026"} }, "dates must be formatted YYYY-MM-DD"},
 		{"missing start", func(in *Input) { in.StartDate = "" }, "start_date and end_date are required (YYYY-MM-DD)"},
 		{"bad end", func(in *Input) { in.EndDate = "28.03.2026" }, "start_date and end_date are required (YYYY-MM-DD)"},
 		{"end before start", func(in *Input) { in.EndDate = "2026-02-28" }, "end_date must not be before start_date"},
-		{"one-day period", func(in *Input) { in.EndDate = "2026-03-02" }, ""},
-		{"unit date before period", func(in *Input) { in.StartDate = "2026-03-02" }, "Day A: dates must lie within the training period"},
-		{"unit date after period", func(in *Input) { in.Units[0].Dates = []string{"2026-03-29"} }, "Day A: dates must lie within the training period"},
+		{"one-day period", func(in *Input) { in.EndDate = "2026-03-01" }, ""},
+		{"no sessions per week", func(in *Input) { in.SessionsPerWeek = 0 }, "sessions_per_week must be 1-14"},
+		{"too many sessions per week", func(in *Input) { in.SessionsPerWeek = 15 }, "sessions_per_week must be 1-14"},
+		{"no units", func(in *Input) { in.Units = nil }, ""},
 		{"bad block names unit and letter", func(in *Input) {
 			in.Units[0].Blocks = []BlockInput{{Kind: "single"}}
 		}, "Day A, block A: a Single block needs at least 1 exercise"},
@@ -161,15 +159,8 @@ func TestValidate(t *testing.T) {
 		if err := validate(&in, lk); err != nil {
 			t.Fatal(err)
 		}
-		u := in.Units[0]
-		if in.Name != "Strength" || u.Name != "Day A" {
+		if u := in.Units[0]; in.Name != "Strength" || u.Name != "Day A" {
 			t.Errorf("names not trimmed: %q, %q", in.Name, u.Name)
-		}
-		if len(u.Weekdays) != 2 || u.Weekdays[0] != 1 || u.Weekdays[1] != 5 {
-			t.Errorf("weekdays = %v, want [1 5]", u.Weekdays)
-		}
-		if len(u.dates) != 2 || u.dates[0].Time.Day() != 1 || u.dates[1].Time.Day() != 2 {
-			t.Errorf("dates = %v, want 2026-03-01, 2026-03-02", u.dates)
 		}
 	})
 }

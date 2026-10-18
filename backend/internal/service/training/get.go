@@ -2,20 +2,21 @@ package training
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// Get returns a training with its units, blocks and exercises in order.
-func (s *Service) Get(ctx context.Context, id uuid.UUID) (Training, error) {
-	t, err := load(ctx, s.q, id)
+// Get returns one of the user's trainings with its units, blocks and exercises in order.
+func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (Training, error) {
+	t, err := load(ctx, s.q, userID, id)
 	return t, mapError(err)
 }
 
-// load reads a training with its units, blocks and exercises in order.
-func load(ctx context.Context, q Queries, id uuid.UUID) (Training, error) {
-	training, err := q.GetTraining(ctx, id)
+// load reads one of the user's trainings with its units, blocks and exercises in order.
+func load(ctx context.Context, q Queries, userID, id uuid.UUID) (Training, error) {
+	training, err := q.GetTraining(ctx, repos.GetTrainingParams{ID: id, UserID: userID})
 	if err != nil {
 		return Training{}, err
 	}
@@ -62,14 +63,7 @@ func load(ctx context.Context, q Queries, id uuid.UUID) (Training, error) {
 	}
 	resp := Training{GetTrainingRow: training, Units: make([]Unit, 0, len(units))}
 	for _, u := range units {
-		dates := make([]string, 0, len(u.Dates))
-		for _, d := range u.Dates {
-			dates = append(dates, d.Time.Format(time.DateOnly))
-		}
-		resp.Units = append(resp.Units, Unit{
-			ID: u.ID, Name: u.Name, Notes: u.Notes, Weekdays: orEmpty(u.Weekdays), Dates: dates,
-			Blocks: orEmpty(blocksByUnit[u.ID]),
-		})
+		resp.Units = append(resp.Units, Unit{ID: u.ID, Name: u.Name, Notes: u.Notes, Blocks: orEmpty(blocksByUnit[u.ID])})
 	}
 	return resp, nil
 }

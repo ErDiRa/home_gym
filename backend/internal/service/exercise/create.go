@@ -3,15 +3,18 @@ package exercise
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/erdira/homegym/backend/internal/service/exercise/repos"
 )
 
 // Create adds an exercise with its links and videos.
-func (s *Service) Create(ctx context.Context, in Input) (repos.CreateExerciseRow, error) {
+func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (repos.CreateExerciseRow, error) {
 	if err := validate(&in); err != nil {
 		return repos.CreateExerciseRow{}, err
 	}
 	exercise, err := s.q.CreateExercise(ctx, repos.CreateExerciseParams{
+		UserID:         userID,
 		Name:           in.Name,
 		Description:    in.Description,
 		Type:           in.Type,

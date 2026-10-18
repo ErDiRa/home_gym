@@ -1,10 +1,11 @@
-// Package training manages the trainings admins write for their clients.
+// Package training manages the trainings users plan for themselves.
 //
-// A training belongs to one client and is a tree: units (e.g. "Day A", done on weekdays
-// and/or dates) hold blocks, and blocks hold one or more exercises. A block has a kind
-// (single, superset, complex, see block_kinds) that decides how many exercises it takes and
-// whether sets, reps and load are set once on the block or per exercise. The same shape is
-// sent to and returned from the API.
+// A training belongs to one user and is a tree: units (e.g. "Day A", done in turn, as many
+// sessions per week as the training asks for) hold blocks, and blocks hold one or more
+// exercises. A block has a kind (single, superset, complex, see block_kinds) that decides how
+// many exercises it takes and whether sets, reps and load are set once on the block or per
+// exercise. The same shape is sent to and returned from the API. Every usecase acts on the
+// given user's trainings only; another user's look missing.
 package training
 
 import (
@@ -24,26 +25,25 @@ import (
 
 // Queries is the part of repos.Queries this service uses; *repos.Queries satisfies it.
 type Queries interface {
-	ListTrainings(ctx context.Context) ([]repos.ListTrainingsRow, error)
-	GetTraining(ctx context.Context, id uuid.UUID) (repos.GetTrainingRow, error)
-	ListAssignedTrainingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	ListTrainings(ctx context.Context, userID uuid.UUID) ([]repos.ListTrainingsRow, error)
+	GetTraining(ctx context.Context, arg repos.GetTrainingParams) (repos.GetTrainingRow, error)
+	GetActiveTrainingID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 	ListTrainingUnits(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingUnitsRow, error)
 	ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingBlocksRow, error)
 	ListTrainingExercises(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingExercisesRow, error)
 	CreateTraining(ctx context.Context, arg repos.CreateTrainingParams) (repos.CreateTrainingRow, error)
 	UpdateTraining(ctx context.Context, arg repos.UpdateTrainingParams) (repos.UpdateTrainingRow, error)
-	DeactivateClientTrainings(ctx context.Context, userID uuid.UUID) error
-	DeleteTraining(ctx context.Context, id uuid.UUID) (int64, error)
+	DeactivateUserTrainings(ctx context.Context, userID uuid.UUID) error
+	DeleteTraining(ctx context.Context, arg repos.DeleteTrainingParams) (int64, error)
 	InsertTrainingUnit(ctx context.Context, arg repos.InsertTrainingUnitParams) (uuid.UUID, error)
 	UpdateTrainingUnit(ctx context.Context, arg repos.UpdateTrainingUnitParams) (int64, error)
 	DeleteTrainingUnitsExcept(ctx context.Context, arg repos.DeleteTrainingUnitsExceptParams) error
 	DeleteTrainingBlocks(ctx context.Context, trainingID uuid.UUID) error
 	InsertTrainingBlock(ctx context.Context, arg repos.InsertTrainingBlockParams) (uuid.UUID, error)
-	InsertTrainingExercise(ctx context.Context, arg repos.InsertTrainingExerciseParams) error
+	InsertTrainingExercise(ctx context.Context, arg repos.InsertTrainingExerciseParams) (int64, error)
 	ListBlockKinds(ctx context.Context) ([]repos.ListBlockKindsRow, error)
 	ListRepUnits(ctx context.Context) ([]repos.ListRepUnitsRow, error)
 	ListLoadUnits(ctx context.Context) ([]repos.ListLoadUnitsRow, error)
-	UserExists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
 // TxFunc runs fn in a transaction, committing if it returns nil and rolling back otherwise.
@@ -104,25 +104,21 @@ type BlockInput struct {
 
 type UnitInput struct {
 	// ID is set for units that already exist, so they keep their id; new units have none.
-	ID       *uuid.UUID   `json:"id"`
-	Name     string       `json:"name"`
-	Notes    string       `json:"notes"`
-	Weekdays []int16      `json:"weekdays"` // ISO, 1 = Monday
-	Dates    []string     `json:"dates"`    // YYYY-MM-DD
-	Blocks   []BlockInput `json:"blocks"`
-
-	dates []pgtype.Date // Dates, parsed by validate
+	ID     *uuid.UUID   `json:"id"`
+	Name   string       `json:"name"`
+	Notes  string       `json:"notes"`
+	Blocks []BlockInput `json:"blocks"`
 }
 
 // Input is a whole training for Create and Update, the tree at once.
 type Input struct {
-	ClientID    uuid.UUID   `json:"client_id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Active      bool        `json:"active"`
-	StartDate   string      `json:"start_date"` // YYYY-MM-DD, first day of the period
-	EndDate     string      `json:"end_date"`   // YYYY-MM-DD, last day of the period
-	Units       []UnitInput `json:"units"`
+	Name            string      `json:"name"`
+	Description     string      `json:"description"`
+	Active          bool        `json:"active"`
+	StartDate       string      `json:"start_date"` // YYYY-MM-DD, first day of the period
+	EndDate         string      `json:"end_date"`   // YYYY-MM-DD, last day of the period
+	SessionsPerWeek int32       `json:"sessions_per_week"`
+	Units           []UnitInput `json:"units"`
 
 	start, end pgtype.Date // StartDate and EndDate, parsed by validate
 }
@@ -155,12 +151,10 @@ type Block struct {
 }
 
 type Unit struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	Notes    string    `json:"notes"`
-	Weekdays []int16   `json:"weekdays"`
-	Dates    []string  `json:"dates"`
-	Blocks   []Block   `json:"blocks"`
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Notes  string    `json:"notes"`
+	Blocks []Block   `json:"blocks"`
 }
 
 // Training is the whole training tree; the embedded row's fields sit at the top level.
@@ -184,18 +178,6 @@ func mapError(err error) error {
 	default:
 		return err
 	}
-}
-
-// checkClientExists fails unless the client exists and isn't deleted.
-func checkClientExists(ctx context.Context, q Queries, clientID uuid.UUID) error {
-	exists, err := q.UserExists(ctx, clientID)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return service.Invalid("unknown client")
-	}
-	return nil
 }
 
 // orEmpty turns a nil slice into an empty one, so it encodes as [] rather than null.

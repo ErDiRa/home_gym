@@ -1,4 +1,4 @@
-// Package lookup manages the lookup tables admins pick from: joints, muscle groups and
+// Package lookup manages the lookup tables users pick from: joints, muscle groups and
 // focuses for exercises, and block kinds and the units of reps and load for trainings.
 // Trainings are validated against the rows of the latter, so a new kind or unit needs no
 // code change.

@@ -75,11 +75,26 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 // idParam parses the {id} URL parameter, writing a 400 ("invalid <what> id") when it isn't a
 // UUID (callers just return when ok is false).
 func idParam(w http.ResponseWriter, r *http.Request, what string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	return uuidParam(w, r, "id", what)
+}
+
+// uuidParam parses the URL parameter name like idParam.
+func uuidParam(w http.ResponseWriter, r *http.Request, name, what string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(chi.URLParam(r, name))
 	if err != nil {
 		clientError(w, r, http.StatusBadRequest, "invalid "+what+" id", err)
 	}
 	return id, err == nil
+}
+
+// userAndID returns the signed-in user's ID and the {id} URL parameter, writing the error
+// response when either is missing (callers just return when ok is false).
+func userAndID(w http.ResponseWriter, r *http.Request, what string) (userID, id uuid.UUID, ok bool) {
+	if userID, ok = userIDFromRequest(w, r); !ok {
+		return
+	}
+	id, ok = idParam(w, r, what)
+	return
 }
 
 // userIDFromRequest returns the signed-in account's ID set by auth.Middleware, writing a 401
