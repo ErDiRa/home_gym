@@ -26,7 +26,7 @@
             class="flex min-h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 active:bg-slate-50"
           >
             <span class="min-w-0 flex-1">
-              <span class="block truncate font-medium text-slate-900">{{ w.unit_name }}</span>
+              <span class="block truncate font-medium text-slate-900">{{ w.session_name }}</span>
               <span class="block text-sm text-slate-500">
                 {{ formatDay(w.completed_at) }} · {{ w.set_count }} {{ w.set_count === 1 ? 'set' : 'sets' }}
               </span>

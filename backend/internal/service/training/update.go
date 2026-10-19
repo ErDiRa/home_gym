@@ -8,8 +8,8 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// Update validates a training and replaces its fields and tree in one transaction. Units sent
-// with an id keep it, so the workouts done of them stay linked.
+// Update validates a training and replaces its fields, tree and schedule in one transaction.
+// Sessions and slots sent with an id keep it, so the workouts done of them stay linked.
 func (s *Service) Update(ctx context.Context, userID, id uuid.UUID, in Input) (repos.UpdateTrainingRow, error) {
 	lk, err := loadLookups(ctx, s.q)
 	if err != nil {
@@ -20,22 +20,19 @@ func (s *Service) Update(ctx context.Context, userID, id uuid.UUID, in Input) (r
 	}
 	var training repos.UpdateTrainingRow
 	err = s.inTx(ctx, func(q Queries) error {
-		// Deactivate all the user's trainings, this one included; the update below sets this
-		// one active again.
-		if in.Active {
-			if err := q.DeactivateUserTrainings(ctx, userID); err != nil {
-				return err
-			}
-		}
 		var err error
 		training, err = q.UpdateTraining(ctx, repos.UpdateTrainingParams{
 			ID: id, UserID: userID, Name: in.Name, Description: in.Description, Active: in.Active,
-			StartDate: in.start, EndDate: in.end, SessionsPerWeek: in.SessionsPerWeek,
+			StartDate: in.start, Weeks: in.Weeks,
 		})
 		if err != nil {
 			return err
 		}
-		return updateUnits(ctx, q, userID, id, in.Units)
+		ids, err := updateSessions(ctx, q, userID, id, in.Sessions)
+		if err != nil {
+			return err
+		}
+		return writeSchedule(ctx, q, id, in.Schedule, ids)
 	})
 	if err != nil {
 		return repos.UpdateTrainingRow{}, mapError(err)

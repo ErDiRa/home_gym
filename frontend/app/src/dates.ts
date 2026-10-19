@@ -6,7 +6,7 @@ function parse(date: string): Date {
   return new Date(y, m - 1, d)
 }
 
-function toIso(d: Date): string {
+export function toIso(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
@@ -24,6 +24,11 @@ export function addDays(date: string, days: number): string {
 // Whole days from one date to another; rounded, as a DST change makes a day 23 or 25 hours.
 export function daysBetween(from: string, to: string): number {
   return Math.round((parse(to).getTime() - parse(from).getTime()) / 86_400_000)
+}
+
+// Whether a YYYY-MM-DD date is a Monday, the day trainings start on.
+export function isMonday(date: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && parse(date).getDay() === 1
 }
 
 // The coming Monday, or today when it is one: when a new training block usually starts.

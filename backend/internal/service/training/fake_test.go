@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/erdira/homegym/backend/internal/service"
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
@@ -21,16 +22,20 @@ type fakeQueries struct {
 
 	// Canned results.
 	training      repos.GetTrainingRow
-	activeID      *uuid.UUID // nil: no active training
 	getErr        error
-	units         []repos.ListTrainingUnitsRow
+	sessions      []repos.ListTrainingSessionsRow
 	blocks        []repos.ListTrainingBlocksRow
 	exercises     []repos.ListTrainingExercisesRow
+	slots         []repos.ListWeekSessionsRow
+	template      *repos.GetLibrarySessionRow // nil: no template found
+	tmplBlocks    []repos.ListSessionBlocksRow
+	tmplExercises []repos.ListSessionExercisesRow
 	kinds         []repos.ListBlockKindsRow
 	repUnits      []repos.ListRepUnitsRow
 	loadUnits     []repos.ListLoadUnitsRow
-	knownUnits    map[uuid.UUID]bool // unit ids UpdateTrainingUnit finds
-	foreignExer   map[uuid.UUID]bool // exercise ids InsertTrainingExercise doesn't find
+	knownSessions map[uuid.UUID]bool // session ids UpdateTrainingSession finds
+	knownSlots    map[uuid.UUID]bool // slot ids UpdateWeekSession finds
+	foreignExer   map[uuid.UUID]bool // exercise ids InsertSessionExercise doesn't find
 	updateErr     error
 	deleteRows    int64
 	insertExerErr error
@@ -39,12 +44,17 @@ type fakeQueries struct {
 	gotTraining       []repos.GetTrainingParams
 	created           []repos.CreateTrainingParams
 	updated           []repos.UpdateTrainingParams
-	deactivated       []uuid.UUID
-	keptUnits         []uuid.UUID
-	insertedUnits     []repos.InsertTrainingUnitParams
-	updatedUnits      []repos.UpdateTrainingUnitParams
-	insertedBlocks    []repos.InsertTrainingBlockParams
-	insertedExercises []repos.InsertTrainingExerciseParams
+	keptSessions      []uuid.UUID
+	insertedSessions  []repos.InsertSessionParams
+	sessionIDs        []uuid.UUID // the ids InsertSession returned, in order
+	updatedSessions   []repos.UpdateTrainingSessionParams
+	keptSlots         []uuid.UUID
+	insertedSlots     []repos.InsertWeekSessionParams
+	updatedSlots      []repos.UpdateWeekSessionParams
+	insertedBlocks    []repos.InsertSessionBlockParams
+	insertedExercises []repos.InsertSessionExerciseParams
+	updatedTemplates  []repos.UpdateLibrarySessionParams
+	clearedBlocksOf   []uuid.UUID
 }
 
 // newFake returns a fake whose lookups hold a single and a superset kind, a "reps" unit and
@@ -56,10 +66,11 @@ func newFake() (*fakeQueries, uuid.UUID, uuid.UUID) {
 			{Code: "single", Name: "Single", MinExercises: 1},
 			{Code: "superset", Name: "Superset", MinExercises: 2, SharedSets: true},
 		},
-		repUnits:    []repos.ListRepUnitsRow{{ID: reps, Name: "reps"}},
-		loadUnits:   []repos.ListLoadUnitsRow{{ID: kg, Name: "kg"}},
-		knownUnits:  map[uuid.UUID]bool{},
-		foreignExer: map[uuid.UUID]bool{},
+		repUnits:      []repos.ListRepUnitsRow{{ID: reps, Name: "reps"}},
+		loadUnits:     []repos.ListLoadUnitsRow{{ID: kg, Name: "kg"}},
+		knownSessions: map[uuid.UUID]bool{},
+		knownSlots:    map[uuid.UUID]bool{},
+		foreignExer:   map[uuid.UUID]bool{},
 	}, reps, kg
 }
 
@@ -107,17 +118,9 @@ func (f *fakeQueries) GetTraining(_ context.Context, arg repos.GetTrainingParams
 	return f.training, f.getErr
 }
 
-func (f *fakeQueries) GetActiveTrainingID(context.Context, uuid.UUID) (uuid.UUID, error) {
-	f.calls = append(f.calls, "GetActiveTrainingID")
-	if f.activeID == nil {
-		return uuid.Nil, pgx.ErrNoRows
-	}
-	return *f.activeID, nil
-}
-
-func (f *fakeQueries) ListTrainingUnits(context.Context, uuid.UUID) ([]repos.ListTrainingUnitsRow, error) {
-	f.calls = append(f.calls, "ListTrainingUnits")
-	return f.units, nil
+func (f *fakeQueries) ListTrainingSessions(context.Context, uuid.UUID) ([]repos.ListTrainingSessionsRow, error) {
+	f.calls = append(f.calls, "ListTrainingSessions")
+	return f.sessions, nil
 }
 
 func (f *fakeQueries) ListTrainingBlocks(context.Context, uuid.UUID) ([]repos.ListTrainingBlocksRow, error) {
@@ -130,11 +133,21 @@ func (f *fakeQueries) ListTrainingExercises(context.Context, uuid.UUID) ([]repos
 	return f.exercises, nil
 }
 
+func (f *fakeQueries) ListWeekSessions(context.Context, uuid.UUID) ([]repos.ListWeekSessionsRow, error) {
+	f.calls = append(f.calls, "ListWeekSessions")
+	return f.slots, nil
+}
+
+// endDate is what the generated column computes: the last Sunday of the weeks.
+func endDate(start pgtype.Date, weeks int32) pgtype.Date {
+	return addDays(start, int(weeks)*7-1)
+}
+
 func (f *fakeQueries) CreateTraining(_ context.Context, arg repos.CreateTrainingParams) (repos.CreateTrainingRow, error) {
 	f.calls = append(f.calls, "CreateTraining")
 	f.created = append(f.created, arg)
 	return repos.CreateTrainingRow{ID: uuid.New(), Name: arg.Name, Description: arg.Description, Active: arg.Active,
-		StartDate: arg.StartDate, EndDate: arg.EndDate, SessionsPerWeek: arg.SessionsPerWeek}, nil
+		StartDate: arg.StartDate, EndDate: endDate(arg.StartDate, arg.Weeks), Weeks: arg.Weeks}, nil
 }
 
 func (f *fakeQueries) UpdateTraining(_ context.Context, arg repos.UpdateTrainingParams) (repos.UpdateTrainingRow, error) {
@@ -144,13 +157,7 @@ func (f *fakeQueries) UpdateTraining(_ context.Context, arg repos.UpdateTraining
 	}
 	f.updated = append(f.updated, arg)
 	return repos.UpdateTrainingRow{ID: arg.ID, Name: arg.Name, Description: arg.Description, Active: arg.Active,
-		StartDate: arg.StartDate, EndDate: arg.EndDate, SessionsPerWeek: arg.SessionsPerWeek}, nil
-}
-
-func (f *fakeQueries) DeactivateUserTrainings(_ context.Context, userID uuid.UUID) error {
-	f.calls = append(f.calls, "DeactivateUserTrainings")
-	f.deactivated = append(f.deactivated, userID)
-	return nil
+		StartDate: arg.StartDate, EndDate: endDate(arg.StartDate, arg.Weeks), Weeks: arg.Weeks}, nil
 }
 
 func (f *fakeQueries) DeleteTraining(context.Context, repos.DeleteTrainingParams) (int64, error) {
@@ -158,24 +165,26 @@ func (f *fakeQueries) DeleteTraining(context.Context, repos.DeleteTrainingParams
 	return f.deleteRows, nil
 }
 
-func (f *fakeQueries) InsertTrainingUnit(_ context.Context, arg repos.InsertTrainingUnitParams) (uuid.UUID, error) {
-	f.calls = append(f.calls, "InsertTrainingUnit")
-	f.insertedUnits = append(f.insertedUnits, arg)
-	return uuid.New(), nil
+func (f *fakeQueries) InsertSession(_ context.Context, arg repos.InsertSessionParams) (uuid.UUID, error) {
+	f.calls = append(f.calls, "InsertSession")
+	f.insertedSessions = append(f.insertedSessions, arg)
+	id := uuid.New()
+	f.sessionIDs = append(f.sessionIDs, id)
+	return id, nil
 }
 
-func (f *fakeQueries) UpdateTrainingUnit(_ context.Context, arg repos.UpdateTrainingUnitParams) (int64, error) {
-	f.calls = append(f.calls, "UpdateTrainingUnit")
-	if !f.knownUnits[arg.ID] {
+func (f *fakeQueries) UpdateTrainingSession(_ context.Context, arg repos.UpdateTrainingSessionParams) (int64, error) {
+	f.calls = append(f.calls, "UpdateTrainingSession")
+	if !f.knownSessions[arg.ID] {
 		return 0, nil
 	}
-	f.updatedUnits = append(f.updatedUnits, arg)
+	f.updatedSessions = append(f.updatedSessions, arg)
 	return 1, nil
 }
 
-func (f *fakeQueries) DeleteTrainingUnitsExcept(_ context.Context, arg repos.DeleteTrainingUnitsExceptParams) error {
-	f.calls = append(f.calls, "DeleteTrainingUnitsExcept")
-	f.keptUnits = arg.KeepIds
+func (f *fakeQueries) DeleteTrainingSessionsExcept(_ context.Context, arg repos.DeleteTrainingSessionsExceptParams) error {
+	f.calls = append(f.calls, "DeleteTrainingSessionsExcept")
+	f.keptSessions = arg.KeepIds
 	return nil
 }
 
@@ -184,14 +193,80 @@ func (f *fakeQueries) DeleteTrainingBlocks(context.Context, uuid.UUID) error {
 	return nil
 }
 
-func (f *fakeQueries) InsertTrainingBlock(_ context.Context, arg repos.InsertTrainingBlockParams) (uuid.UUID, error) {
-	f.calls = append(f.calls, "InsertTrainingBlock")
+func (f *fakeQueries) InsertWeekSession(_ context.Context, arg repos.InsertWeekSessionParams) error {
+	f.calls = append(f.calls, "InsertWeekSession")
+	f.insertedSlots = append(f.insertedSlots, arg)
+	return nil
+}
+
+func (f *fakeQueries) UpdateWeekSession(_ context.Context, arg repos.UpdateWeekSessionParams) (int64, error) {
+	f.calls = append(f.calls, "UpdateWeekSession")
+	if !f.knownSlots[arg.ID] {
+		return 0, nil
+	}
+	f.updatedSlots = append(f.updatedSlots, arg)
+	return 1, nil
+}
+
+func (f *fakeQueries) DeleteWeekSessionsExcept(_ context.Context, arg repos.DeleteWeekSessionsExceptParams) error {
+	f.calls = append(f.calls, "DeleteWeekSessionsExcept")
+	f.keptSlots = arg.KeepIds
+	return nil
+}
+
+func (f *fakeQueries) ListLibrarySessions(context.Context, uuid.UUID) ([]repos.ListLibrarySessionsRow, error) {
+	f.calls = append(f.calls, "ListLibrarySessions")
+	return []repos.ListLibrarySessionsRow{}, nil
+}
+
+func (f *fakeQueries) GetLibrarySession(_ context.Context, arg repos.GetLibrarySessionParams) (repos.GetLibrarySessionRow, error) {
+	f.calls = append(f.calls, "GetLibrarySession")
+	if f.template == nil {
+		return repos.GetLibrarySessionRow{}, pgx.ErrNoRows
+	}
+	row := *f.template
+	row.ID = arg.ID
+	return row, nil
+}
+
+func (f *fakeQueries) ListSessionBlocks(context.Context, uuid.UUID) ([]repos.ListSessionBlocksRow, error) {
+	f.calls = append(f.calls, "ListSessionBlocks")
+	return f.tmplBlocks, nil
+}
+
+func (f *fakeQueries) ListSessionExercises(context.Context, uuid.UUID) ([]repos.ListSessionExercisesRow, error) {
+	f.calls = append(f.calls, "ListSessionExercises")
+	return f.tmplExercises, nil
+}
+
+func (f *fakeQueries) UpdateLibrarySession(_ context.Context, arg repos.UpdateLibrarySessionParams) (int64, error) {
+	f.calls = append(f.calls, "UpdateLibrarySession")
+	if f.template == nil {
+		return 0, nil
+	}
+	f.updatedTemplates = append(f.updatedTemplates, arg)
+	return 1, nil
+}
+
+func (f *fakeQueries) DeleteSessionBlocks(_ context.Context, sessionID uuid.UUID) error {
+	f.calls = append(f.calls, "DeleteSessionBlocks")
+	f.clearedBlocksOf = append(f.clearedBlocksOf, sessionID)
+	return nil
+}
+
+func (f *fakeQueries) DeleteLibrarySession(context.Context, repos.DeleteLibrarySessionParams) (int64, error) {
+	f.calls = append(f.calls, "DeleteLibrarySession")
+	return f.deleteRows, nil
+}
+
+func (f *fakeQueries) InsertSessionBlock(_ context.Context, arg repos.InsertSessionBlockParams) (uuid.UUID, error) {
+	f.calls = append(f.calls, "InsertSessionBlock")
 	f.insertedBlocks = append(f.insertedBlocks, arg)
 	return uuid.New(), nil
 }
 
-func (f *fakeQueries) InsertTrainingExercise(_ context.Context, arg repos.InsertTrainingExerciseParams) (int64, error) {
-	f.calls = append(f.calls, "InsertTrainingExercise")
+func (f *fakeQueries) InsertSessionExercise(_ context.Context, arg repos.InsertSessionExerciseParams) (int64, error) {
+	f.calls = append(f.calls, "InsertSessionExercise")
 	if f.insertExerErr != nil {
 		return 0, f.insertExerErr
 	}

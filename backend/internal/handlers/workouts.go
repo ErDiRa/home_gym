@@ -10,12 +10,17 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/workout"
 )
 
-// GetWeek returns the week [from, to) for the tracker: the active training's target, the
-// workouts finished, the next unit and the workout in progress. The client sends the bounds
-// (RFC 3339) of its local week.
+// GetWeek returns the week for the tracker: the active trainings, the sessions the chosen one
+// (training, optional: else the first) plans for it, the workouts finished and the workout in
+// progress. The client sends its local week: the Monday as date (YYYY-MM-DD) and the bounds
+// from and to (RFC 3339).
 func (h *Handler) GetWeek(w http.ResponseWriter, r *http.Request) {
+	// An unparseable date is left zero, which the service rejects; an unparseable training is
+	// none, which picks the first.
+	monday, _ := time.Parse(time.DateOnly, r.URL.Query().Get("date"))
+	trainingID, _ := uuid.Parse(r.URL.Query().Get("training"))
 	h.withPeriod(w, r, func(ctx context.Context, userID uuid.UUID, from, to time.Time) (any, error) {
-		return h.workouts.Week(ctx, userID, from, to)
+		return h.workouts.Week(ctx, userID, trainingID, monday, from, to)
 	})
 }
 
@@ -44,10 +49,11 @@ func (h *Handler) withPeriod(w http.ResponseWriter, r *http.Request, fetch func(
 }
 
 type startWorkoutRequest struct {
-	UnitID uuid.UUID `json:"unit_id"`
+	WeekSessionID uuid.UUID `json:"week_session_id"`
 }
 
-// StartWorkout begins a workout of a unit; 409 while another one is in progress.
+// StartWorkout begins a workout of a planned session (a slot of the week plan); 409 while
+// another one is in progress.
 func (h *Handler) StartWorkout(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(w, r)
 	if !ok {
@@ -57,7 +63,7 @@ func (h *Handler) StartWorkout(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	wo, err := h.workouts.Start(r.Context(), userID, req.UnitID)
+	wo, err := h.workouts.Start(r.Context(), userID, req.WeekSessionID)
 	if err != nil {
 		serviceError(w, r, err)
 		return

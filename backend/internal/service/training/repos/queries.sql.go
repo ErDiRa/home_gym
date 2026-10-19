@@ -13,31 +13,30 @@ import (
 )
 
 const createTraining = `-- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active, start_date, end_date, sessions_per_week)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at
+INSERT INTO trainings (user_id, name, description, active, start_date, weeks)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 `
 
 type CreateTrainingParams struct {
-	UserID          uuid.UUID   `json:"user_id"`
-	Name            string      `json:"name"`
-	Description     string      `json:"description"`
-	Active          bool        `json:"active"`
-	StartDate       pgtype.Date `json:"start_date"`
-	EndDate         pgtype.Date `json:"end_date"`
-	SessionsPerWeek int32       `json:"sessions_per_week"`
+	UserID      uuid.UUID   `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Active      bool        `json:"active"`
+	StartDate   pgtype.Date `json:"start_date"`
+	Weeks       int32       `json:"weeks"`
 }
 
 type CreateTrainingRow struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Active          bool               `json:"active"`
-	StartDate       pgtype.Date        `json:"start_date"`
-	EndDate         pgtype.Date        `json:"end_date"`
-	SessionsPerWeek int32              `json:"sessions_per_week"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	Weeks       int32              `json:"weeks"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) (CreateTrainingRow, error) {
@@ -47,8 +46,7 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 		arg.Description,
 		arg.Active,
 		arg.StartDate,
-		arg.EndDate,
-		arg.SessionsPerWeek,
+		arg.Weeks,
 	)
 	var i CreateTrainingRow
 	err := row.Scan(
@@ -58,21 +56,38 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 		&i.Active,
 		&i.StartDate,
 		&i.EndDate,
-		&i.SessionsPerWeek,
+		&i.Weeks,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const deactivateUserTrainings = `-- name: DeactivateUserTrainings :exec
-UPDATE trainings SET active = false, updated_at = now()
-WHERE user_id = $1 AND active AND deleted_at IS NULL
+const deleteLibrarySession = `-- name: DeleteLibrarySession :execrows
+UPDATE sessions SET deleted_at = now(), updated_at = now()
+WHERE id = $1 AND user_id = $2 AND training_id IS NULL AND deleted_at IS NULL
 `
 
-// Run before saving a training as active, so the user keeps at most one active one.
-func (q *Queries) DeactivateUserTrainings(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deactivateUserTrainings, userID)
+type DeleteLibrarySessionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteLibrarySession(ctx context.Context, arg DeleteLibrarySessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteLibrarySession, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSessionBlocks = `-- name: DeleteSessionBlocks :exec
+DELETE FROM session_blocks WHERE session_id = $1
+`
+
+// Clears the blocks of one session before they are re-inserted.
+func (q *Queries) DeleteSessionBlocks(ctx context.Context, sessionID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSessionBlocks, sessionID)
 	return err
 }
 
@@ -95,9 +110,9 @@ func (q *Queries) DeleteTraining(ctx context.Context, arg DeleteTrainingParams) 
 }
 
 const deleteTrainingBlocks = `-- name: DeleteTrainingBlocks :exec
-DELETE FROM training_blocks tb
-USING training_units tu
-WHERE tu.id = tb.unit_id AND tu.training_id = $1
+DELETE FROM session_blocks sb
+USING sessions s
+WHERE s.id = sb.session_id AND s.training_id = $1::uuid
 `
 
 // Clears all blocks of a training before they are re-inserted; exercises go with them (cascade).
@@ -106,37 +121,72 @@ func (q *Queries) DeleteTrainingBlocks(ctx context.Context, trainingID uuid.UUID
 	return err
 }
 
-const deleteTrainingUnitsExcept = `-- name: DeleteTrainingUnitsExcept :exec
-DELETE FROM training_units
-WHERE training_id = $1 AND id <> ALL($2::uuid[])
+const deleteTrainingSessionsExcept = `-- name: DeleteTrainingSessionsExcept :exec
+DELETE FROM sessions
+WHERE training_id = $1::uuid AND id <> ALL($2::uuid[])
 `
 
-type DeleteTrainingUnitsExceptParams struct {
+type DeleteTrainingSessionsExceptParams struct {
 	TrainingID uuid.UUID   `json:"training_id"`
 	KeepIds    []uuid.UUID `json:"keep_ids"`
 }
 
-// Removes the units dropped from the training.
-func (q *Queries) DeleteTrainingUnitsExcept(ctx context.Context, arg DeleteTrainingUnitsExceptParams) error {
-	_, err := q.db.Exec(ctx, deleteTrainingUnitsExcept, arg.TrainingID, arg.KeepIds)
+// Removes the sessions dropped from the training (their slots go with them).
+func (q *Queries) DeleteTrainingSessionsExcept(ctx context.Context, arg DeleteTrainingSessionsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteTrainingSessionsExcept, arg.TrainingID, arg.KeepIds)
 	return err
 }
 
-const getActiveTrainingID = `-- name: GetActiveTrainingID :one
-SELECT id FROM trainings
-WHERE user_id = $1 AND active AND deleted_at IS NULL
+const deleteWeekSessionsExcept = `-- name: DeleteWeekSessionsExcept :exec
+DELETE FROM training_week_sessions
+WHERE training_id = $1 AND id <> ALL($2::uuid[])
 `
 
-// The training the tracker shows: the user's active one (at most one).
-func (q *Queries) GetActiveTrainingID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, getActiveTrainingID, userID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+type DeleteWeekSessionsExceptParams struct {
+	TrainingID uuid.UUID   `json:"training_id"`
+	KeepIds    []uuid.UUID `json:"keep_ids"`
+}
+
+// Removes the slots dropped from the week plan.
+func (q *Queries) DeleteWeekSessionsExcept(ctx context.Context, arg DeleteWeekSessionsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteWeekSessionsExcept, arg.TrainingID, arg.KeepIds)
+	return err
+}
+
+const getLibrarySession = `-- name: GetLibrarySession :one
+SELECT id, name, notes, created_at, updated_at FROM sessions
+WHERE id = $1 AND user_id = $2 AND training_id IS NULL AND deleted_at IS NULL
+`
+
+type GetLibrarySessionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+type GetLibrarySessionRow struct {
+	ID        uuid.UUID          `json:"id"`
+	Name      string             `json:"name"`
+	Notes     string             `json:"notes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Only the user's own live templates: another user's is not found.
+func (q *Queries) GetLibrarySession(ctx context.Context, arg GetLibrarySessionParams) (GetLibrarySessionRow, error) {
+	row := q.db.QueryRow(ctx, getLibrarySession, arg.ID, arg.UserID)
+	var i GetLibrarySessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getTraining = `-- name: GetTraining :one
-SELECT id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at
+SELECT id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 FROM trainings
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
@@ -147,15 +197,15 @@ type GetTrainingParams struct {
 }
 
 type GetTrainingRow struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Active          bool               `json:"active"`
-	StartDate       pgtype.Date        `json:"start_date"`
-	EndDate         pgtype.Date        `json:"end_date"`
-	SessionsPerWeek int32              `json:"sessions_per_week"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	Weeks       int32              `json:"weeks"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Only the user's own trainings: another user's is not found.
@@ -169,16 +219,44 @@ func (q *Queries) GetTraining(ctx context.Context, arg GetTrainingParams) (GetTr
 		&i.Active,
 		&i.StartDate,
 		&i.EndDate,
-		&i.SessionsPerWeek,
+		&i.Weeks,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const insertTrainingBlock = `-- name: InsertTrainingBlock :one
-INSERT INTO training_blocks (
-    unit_id, position, kind, name, sets,
+const insertSession = `-- name: InsertSession :one
+INSERT INTO sessions (user_id, training_id, position, name, notes)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id
+`
+
+type InsertSessionParams struct {
+	UserID     uuid.UUID  `json:"user_id"`
+	TrainingID *uuid.UUID `json:"training_id"`
+	Position   int32      `json:"position"`
+	Name       string     `json:"name"`
+	Notes      string     `json:"notes"`
+}
+
+// A training's session (training_id set) or a library template (training_id NULL).
+func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertSession,
+		arg.UserID,
+		arg.TrainingID,
+		arg.Position,
+		arg.Name,
+		arg.Notes,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertSessionBlock = `-- name: InsertSessionBlock :one
+INSERT INTO session_blocks (
+    session_id, position, kind, name, sets,
     reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
 ) VALUES (
     $1, $2, $3, $4, $5,
@@ -188,8 +266,8 @@ INSERT INTO training_blocks (
 RETURNING id
 `
 
-type InsertTrainingBlockParams struct {
-	UnitID    uuid.UUID  `json:"unit_id"`
+type InsertSessionBlockParams struct {
+	SessionID uuid.UUID  `json:"session_id"`
 	Position  int32      `json:"position"`
 	Kind      string     `json:"kind"`
 	Name      string     `json:"name"`
@@ -205,9 +283,9 @@ type InsertTrainingBlockParams struct {
 }
 
 // sqlc.narg marks the parameters that may be NULL (what the block's kind doesn't share).
-func (q *Queries) InsertTrainingBlock(ctx context.Context, arg InsertTrainingBlockParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, insertTrainingBlock,
-		arg.UnitID,
+func (q *Queries) InsertSessionBlock(ctx context.Context, arg InsertSessionBlockParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertSessionBlock,
+		arg.SessionID,
 		arg.Position,
 		arg.Kind,
 		arg.Name,
@@ -226,8 +304,8 @@ func (q *Queries) InsertTrainingBlock(ctx context.Context, arg InsertTrainingBlo
 	return id, err
 }
 
-const insertTrainingExercise = `-- name: InsertTrainingExercise :execrows
-INSERT INTO training_exercises (
+const insertSessionExercise = `-- name: InsertSessionExercise :execrows
+INSERT INTO session_exercises (
     block_id, exercise_id, position, sets,
     reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
 )
@@ -239,7 +317,7 @@ FROM exercises e
 WHERE e.id = $13 AND e.user_id = $14 AND e.deleted_at IS NULL
 `
 
-type InsertTrainingExerciseParams struct {
+type InsertSessionExerciseParams struct {
 	BlockID    uuid.UUID  `json:"block_id"`
 	Position   int32      `json:"position"`
 	Sets       *int32     `json:"sets"`
@@ -257,8 +335,8 @@ type InsertTrainingExerciseParams struct {
 }
 
 // Only one of the user's own live exercises is inserted; any other inserts nothing (0 rows).
-func (q *Queries) InsertTrainingExercise(ctx context.Context, arg InsertTrainingExerciseParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertTrainingExercise,
+func (q *Queries) InsertSessionExercise(ctx context.Context, arg InsertSessionExerciseParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertSessionExercise,
 		arg.BlockID,
 		arg.Position,
 		arg.Sets,
@@ -280,29 +358,26 @@ func (q *Queries) InsertTrainingExercise(ctx context.Context, arg InsertTraining
 	return result.RowsAffected(), nil
 }
 
-const insertTrainingUnit = `-- name: InsertTrainingUnit :one
-INSERT INTO training_units (training_id, position, name, notes)
+const insertWeekSession = `-- name: InsertWeekSession :exec
+INSERT INTO training_week_sessions (training_id, week, position, session_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id
 `
 
-type InsertTrainingUnitParams struct {
+type InsertWeekSessionParams struct {
 	TrainingID uuid.UUID `json:"training_id"`
+	Week       int32     `json:"week"`
 	Position   int32     `json:"position"`
-	Name       string    `json:"name"`
-	Notes      string    `json:"notes"`
+	SessionID  uuid.UUID `json:"session_id"`
 }
 
-func (q *Queries) InsertTrainingUnit(ctx context.Context, arg InsertTrainingUnitParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, insertTrainingUnit,
+func (q *Queries) InsertWeekSession(ctx context.Context, arg InsertWeekSessionParams) error {
+	_, err := q.db.Exec(ctx, insertWeekSession,
 		arg.TrainingID,
+		arg.Week,
 		arg.Position,
-		arg.Name,
-		arg.Notes,
+		arg.SessionID,
 	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	return err
 }
 
 const listBlockKinds = `-- name: ListBlockKinds :many
@@ -340,6 +415,58 @@ func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, erro
 			&i.SharedSets,
 			&i.SharedReps,
 			&i.SharedLoad,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLibrarySessions = `-- name: ListLibrarySessions :many
+SELECT
+    s.id,
+    s.name,
+    s.notes,
+    s.updated_at,
+    (SELECT count(*) FROM session_blocks sb WHERE sb.session_id = s.id)::bigint AS block_count,
+    (SELECT count(*) FROM session_exercises se
+     JOIN session_blocks sb ON sb.id = se.block_id
+     WHERE sb.session_id = s.id)::bigint AS exercise_count
+FROM sessions s
+WHERE s.user_id = $1 AND s.training_id IS NULL AND s.deleted_at IS NULL
+ORDER BY lower(s.name), s.created_at
+`
+
+type ListLibrarySessionsRow struct {
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	Notes         string             `json:"notes"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	BlockCount    int64              `json:"block_count"`
+	ExerciseCount int64              `json:"exercise_count"`
+}
+
+// The user's session templates with their size, by name.
+func (q *Queries) ListLibrarySessions(ctx context.Context, userID uuid.UUID) ([]ListLibrarySessionsRow, error) {
+	rows, err := q.db.Query(ctx, listLibrarySessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLibrarySessionsRow{}
+	for rows.Next() {
+		var i ListLibrarySessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Notes,
+			&i.UpdatedAt,
+			&i.BlockCount,
+			&i.ExerciseCount,
 		); err != nil {
 			return nil, err
 		}
@@ -429,22 +556,158 @@ func (q *Queries) ListRepUnits(ctx context.Context) ([]ListRepUnitsRow, error) {
 	return items, nil
 }
 
+const listSessionBlocks = `-- name: ListSessionBlocks :many
+SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
+       sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
+       sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       sb.notes
+FROM session_blocks sb
+LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
+LEFT JOIN load_units lu ON lu.id = sb.load_unit
+WHERE sb.session_id = $1
+ORDER BY sb.position
+`
+
+type ListSessionBlocksRow struct {
+	ID           uuid.UUID  `json:"id"`
+	SessionID    uuid.UUID  `json:"session_id"`
+	Kind         string     `json:"kind"`
+	Name         string     `json:"name"`
+	Sets         *int32     `json:"sets"`
+	RepsValue    *float64   `json:"reps_value"`
+	RepsMax      *float64   `json:"reps_max"`
+	RepsUnit     *uuid.UUID `json:"reps_unit"`
+	RepsUnitName string     `json:"reps_unit_name"`
+	PerSide      bool       `json:"per_side"`
+	LoadValue    *float64   `json:"load_value"`
+	LoadMax      *float64   `json:"load_max"`
+	LoadUnit     *uuid.UUID `json:"load_unit"`
+	LoadUnitName string     `json:"load_unit_name"`
+	Notes        string     `json:"notes"`
+}
+
+func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([]ListSessionBlocksRow, error) {
+	rows, err := q.db.Query(ctx, listSessionBlocks, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSessionBlocksRow{}
+	for rows.Next() {
+		var i ListSessionBlocksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionID,
+			&i.Kind,
+			&i.Name,
+			&i.Sets,
+			&i.RepsValue,
+			&i.RepsMax,
+			&i.RepsUnit,
+			&i.RepsUnitName,
+			&i.PerSide,
+			&i.LoadValue,
+			&i.LoadMax,
+			&i.LoadUnit,
+			&i.LoadUnitName,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessionExercises = `-- name: ListSessionExercises :many
+SELECT se.block_id, se.exercise_id, e.name, e.type, se.sets,
+       se.reps_value, se.reps_max, se.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, se.per_side,
+       se.load_value, se.load_max, se.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       se.tempo, se.notes
+FROM session_exercises se
+JOIN exercises e ON e.id = se.exercise_id
+JOIN session_blocks sb ON sb.id = se.block_id
+LEFT JOIN rep_units ru ON ru.id = se.reps_unit
+LEFT JOIN load_units lu ON lu.id = se.load_unit
+WHERE sb.session_id = $1
+ORDER BY se.block_id, se.position
+`
+
+type ListSessionExercisesRow struct {
+	BlockID      uuid.UUID  `json:"block_id"`
+	ExerciseID   uuid.UUID  `json:"exercise_id"`
+	Name         string     `json:"name"`
+	Type         string     `json:"type"`
+	Sets         *int32     `json:"sets"`
+	RepsValue    *float64   `json:"reps_value"`
+	RepsMax      *float64   `json:"reps_max"`
+	RepsUnit     *uuid.UUID `json:"reps_unit"`
+	RepsUnitName string     `json:"reps_unit_name"`
+	PerSide      bool       `json:"per_side"`
+	LoadValue    *float64   `json:"load_value"`
+	LoadMax      *float64   `json:"load_max"`
+	LoadUnit     *uuid.UUID `json:"load_unit"`
+	LoadUnitName string     `json:"load_unit_name"`
+	Tempo        string     `json:"tempo"`
+	Notes        string     `json:"notes"`
+}
+
+func (q *Queries) ListSessionExercises(ctx context.Context, sessionID uuid.UUID) ([]ListSessionExercisesRow, error) {
+	rows, err := q.db.Query(ctx, listSessionExercises, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSessionExercisesRow{}
+	for rows.Next() {
+		var i ListSessionExercisesRow
+		if err := rows.Scan(
+			&i.BlockID,
+			&i.ExerciseID,
+			&i.Name,
+			&i.Type,
+			&i.Sets,
+			&i.RepsValue,
+			&i.RepsMax,
+			&i.RepsUnit,
+			&i.RepsUnitName,
+			&i.PerSide,
+			&i.LoadValue,
+			&i.LoadMax,
+			&i.LoadUnit,
+			&i.LoadUnitName,
+			&i.Tempo,
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTrainingBlocks = `-- name: ListTrainingBlocks :many
-SELECT tb.id, tb.unit_id, tb.kind, tb.name, tb.sets,
-       tb.reps_value, tb.reps_max, tb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, tb.per_side,
-       tb.load_value, tb.load_max, tb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       tb.notes
-FROM training_blocks tb
-JOIN training_units tu ON tu.id = tb.unit_id
-LEFT JOIN rep_units ru ON ru.id = tb.reps_unit
-LEFT JOIN load_units lu ON lu.id = tb.load_unit
-WHERE tu.training_id = $1
-ORDER BY tb.unit_id, tb.position
+SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
+       sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
+       sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       sb.notes
+FROM session_blocks sb
+JOIN sessions s ON s.id = sb.session_id
+LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
+LEFT JOIN load_units lu ON lu.id = sb.load_unit
+WHERE s.training_id = $1::uuid
+ORDER BY sb.session_id, sb.position
 `
 
 type ListTrainingBlocksRow struct {
 	ID           uuid.UUID  `json:"id"`
-	UnitID       uuid.UUID  `json:"unit_id"`
+	SessionID    uuid.UUID  `json:"session_id"`
 	Kind         string     `json:"kind"`
 	Name         string     `json:"name"`
 	Sets         *int32     `json:"sets"`
@@ -471,7 +734,7 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 		var i ListTrainingBlocksRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.UnitID,
+			&i.SessionID,
 			&i.Kind,
 			&i.Name,
 			&i.Sets,
@@ -497,18 +760,18 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 }
 
 const listTrainingExercises = `-- name: ListTrainingExercises :many
-SELECT te.block_id, te.exercise_id, e.name, e.type, te.sets,
-       te.reps_value, te.reps_max, te.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, te.per_side,
-       te.load_value, te.load_max, te.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       te.tempo, te.notes
-FROM training_exercises te
-JOIN exercises e ON e.id = te.exercise_id
-JOIN training_blocks tb ON tb.id = te.block_id
-JOIN training_units tu ON tu.id = tb.unit_id
-LEFT JOIN rep_units ru ON ru.id = te.reps_unit
-LEFT JOIN load_units lu ON lu.id = te.load_unit
-WHERE tu.training_id = $1
-ORDER BY te.block_id, te.position
+SELECT se.block_id, se.exercise_id, e.name, e.type, se.sets,
+       se.reps_value, se.reps_max, se.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, se.per_side,
+       se.load_value, se.load_max, se.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
+       se.tempo, se.notes
+FROM session_exercises se
+JOIN exercises e ON e.id = se.exercise_id
+JOIN session_blocks sb ON sb.id = se.block_id
+JOIN sessions s ON s.id = sb.session_id
+LEFT JOIN rep_units ru ON ru.id = se.reps_unit
+LEFT JOIN load_units lu ON lu.id = se.load_unit
+WHERE s.training_id = $1::uuid
+ORDER BY se.block_id, se.position
 `
 
 type ListTrainingExercisesRow struct {
@@ -567,27 +830,27 @@ func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUI
 	return items, nil
 }
 
-const listTrainingUnits = `-- name: ListTrainingUnits :many
-SELECT id, name, notes FROM training_units
-WHERE training_id = $1
+const listTrainingSessions = `-- name: ListTrainingSessions :many
+SELECT id, name, notes FROM sessions
+WHERE training_id = $1::uuid
 ORDER BY position
 `
 
-type ListTrainingUnitsRow struct {
+type ListTrainingSessionsRow struct {
 	ID    uuid.UUID `json:"id"`
 	Name  string    `json:"name"`
 	Notes string    `json:"notes"`
 }
 
-func (q *Queries) ListTrainingUnits(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingUnitsRow, error) {
-	rows, err := q.db.Query(ctx, listTrainingUnits, trainingID)
+func (q *Queries) ListTrainingSessions(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listTrainingSessions, trainingID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListTrainingUnitsRow{}
+	items := []ListTrainingSessionsRow{}
 	for rows.Next() {
-		var i ListTrainingUnitsRow
+		var i ListTrainingSessionsRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.Notes); err != nil {
 			return nil, err
 		}
@@ -607,29 +870,26 @@ SELECT
     t.active,
     t.start_date,
     t.end_date,
-    t.sessions_per_week,
+    t.weeks,
     t.updated_at,
-    (SELECT count(*) FROM training_units tu WHERE tu.training_id = t.id)::bigint AS unit_count,
-    (SELECT count(*) FROM training_exercises te
-     JOIN training_blocks tb ON tb.id = te.block_id
-     JOIN training_units tu ON tu.id = tb.unit_id
-     WHERE tu.training_id = t.id)::bigint AS exercise_count
+    (SELECT count(*) FROM sessions s WHERE s.training_id = t.id)::bigint AS session_count,
+    (SELECT count(*) FROM training_week_sessions ws WHERE ws.training_id = t.id)::bigint AS planned_count
 FROM trainings t
 WHERE t.user_id = $1 AND t.deleted_at IS NULL
 ORDER BY t.active DESC, t.start_date DESC, t.name
 `
 
 type ListTrainingsRow struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Active          bool               `json:"active"`
-	StartDate       pgtype.Date        `json:"start_date"`
-	EndDate         pgtype.Date        `json:"end_date"`
-	SessionsPerWeek int32              `json:"sessions_per_week"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	UnitCount       int64              `json:"unit_count"`
-	ExerciseCount   int64              `json:"exercise_count"`
+	ID           uuid.UUID          `json:"id"`
+	Name         string             `json:"name"`
+	Description  string             `json:"description"`
+	Active       bool               `json:"active"`
+	StartDate    pgtype.Date        `json:"start_date"`
+	EndDate      pgtype.Date        `json:"end_date"`
+	Weeks        int32              `json:"weeks"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	SessionCount int64              `json:"session_count"`
+	PlannedCount int64              `json:"planned_count"`
 }
 
 // A user's trainings with their size, the active one first, then the newest.
@@ -649,10 +909,10 @@ func (q *Queries) ListTrainings(ctx context.Context, userID uuid.UUID) ([]ListTr
 			&i.Active,
 			&i.StartDate,
 			&i.EndDate,
-			&i.SessionsPerWeek,
+			&i.Weeks,
 			&i.UpdatedAt,
-			&i.UnitCount,
-			&i.ExerciseCount,
+			&i.SessionCount,
+			&i.PlannedCount,
 		); err != nil {
 			return nil, err
 		}
@@ -664,34 +924,98 @@ func (q *Queries) ListTrainings(ctx context.Context, userID uuid.UUID) ([]ListTr
 	return items, nil
 }
 
+const listWeekSessions = `-- name: ListWeekSessions :many
+SELECT id, week, position, session_id FROM training_week_sessions
+WHERE training_id = $1
+ORDER BY week, position
+`
+
+type ListWeekSessionsRow struct {
+	ID        uuid.UUID `json:"id"`
+	Week      int32     `json:"week"`
+	Position  int32     `json:"position"`
+	SessionID uuid.UUID `json:"session_id"`
+}
+
+// The week plan of a training: its slots by week, in order.
+func (q *Queries) ListWeekSessions(ctx context.Context, trainingID uuid.UUID) ([]ListWeekSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listWeekSessions, trainingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWeekSessionsRow{}
+	for rows.Next() {
+		var i ListWeekSessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Week,
+			&i.Position,
+			&i.SessionID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateLibrarySession = `-- name: UpdateLibrarySession :execrows
+UPDATE sessions SET name = $3, notes = $4, updated_at = now()
+WHERE id = $1 AND user_id = $2 AND training_id IS NULL AND deleted_at IS NULL
+`
+
+type UpdateLibrarySessionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+	Name   string    `json:"name"`
+	Notes  string    `json:"notes"`
+}
+
+// Another user's, a deleted template or a training's session updates nothing (0 rows).
+func (q *Queries) UpdateLibrarySession(ctx context.Context, arg UpdateLibrarySessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateLibrarySession,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Notes,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateTraining = `-- name: UpdateTraining :one
 UPDATE trainings
-SET name = $3, description = $4, active = $5, start_date = $6, end_date = $7, sessions_per_week = $8, updated_at = now()
+SET name = $3, description = $4, active = $5, start_date = $6, weeks = $7, updated_at = now()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, name, description, active, start_date, end_date, sessions_per_week, created_at, updated_at
+RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 `
 
 type UpdateTrainingParams struct {
-	ID              uuid.UUID   `json:"id"`
-	UserID          uuid.UUID   `json:"user_id"`
-	Name            string      `json:"name"`
-	Description     string      `json:"description"`
-	Active          bool        `json:"active"`
-	StartDate       pgtype.Date `json:"start_date"`
-	EndDate         pgtype.Date `json:"end_date"`
-	SessionsPerWeek int32       `json:"sessions_per_week"`
+	ID          uuid.UUID   `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Active      bool        `json:"active"`
+	StartDate   pgtype.Date `json:"start_date"`
+	Weeks       int32       `json:"weeks"`
 }
 
 type UpdateTrainingRow struct {
-	ID              uuid.UUID          `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Active          bool               `json:"active"`
-	StartDate       pgtype.Date        `json:"start_date"`
-	EndDate         pgtype.Date        `json:"end_date"`
-	SessionsPerWeek int32              `json:"sessions_per_week"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	Weeks       int32              `json:"weeks"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Another user's training updates nothing (no row).
@@ -703,8 +1027,7 @@ func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) 
 		arg.Description,
 		arg.Active,
 		arg.StartDate,
-		arg.EndDate,
-		arg.SessionsPerWeek,
+		arg.Weeks,
 	)
 	var i UpdateTrainingRow
 	err := row.Scan(
@@ -714,35 +1037,64 @@ func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) 
 		&i.Active,
 		&i.StartDate,
 		&i.EndDate,
-		&i.SessionsPerWeek,
+		&i.Weeks,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const updateTrainingUnit = `-- name: UpdateTrainingUnit :execrows
-UPDATE training_units
-SET position = $3, name = $4, notes = $5
-WHERE id = $1 AND training_id = $2
+const updateTrainingSession = `-- name: UpdateTrainingSession :execrows
+UPDATE sessions
+SET position = $1, name = $2, notes = $3, updated_at = now()
+WHERE id = $4 AND training_id = $5::uuid
 `
 
-type UpdateTrainingUnitParams struct {
-	ID         uuid.UUID `json:"id"`
-	TrainingID uuid.UUID `json:"training_id"`
+type UpdateTrainingSessionParams struct {
 	Position   int32     `json:"position"`
 	Name       string    `json:"name"`
 	Notes      string    `json:"notes"`
+	ID         uuid.UUID `json:"id"`
+	TrainingID uuid.UUID `json:"training_id"`
 }
 
-// Matching training_id too means a unit id from another training updates nothing (0 rows).
-func (q *Queries) UpdateTrainingUnit(ctx context.Context, arg UpdateTrainingUnitParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateTrainingUnit,
-		arg.ID,
-		arg.TrainingID,
+// Matching training_id too means a session id from another training updates nothing (0 rows).
+func (q *Queries) UpdateTrainingSession(ctx context.Context, arg UpdateTrainingSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateTrainingSession,
 		arg.Position,
 		arg.Name,
 		arg.Notes,
+		arg.ID,
+		arg.TrainingID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateWeekSession = `-- name: UpdateWeekSession :execrows
+UPDATE training_week_sessions
+SET week = $3, position = $4, session_id = $5
+WHERE id = $1 AND training_id = $2
+`
+
+type UpdateWeekSessionParams struct {
+	ID         uuid.UUID `json:"id"`
+	TrainingID uuid.UUID `json:"training_id"`
+	Week       int32     `json:"week"`
+	Position   int32     `json:"position"`
+	SessionID  uuid.UUID `json:"session_id"`
+}
+
+// Matching training_id too means a slot id from another training updates nothing (0 rows).
+func (q *Queries) UpdateWeekSession(ctx context.Context, arg UpdateWeekSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateWeekSession,
+		arg.ID,
+		arg.TrainingID,
+		arg.Week,
+		arg.Position,
+		arg.SessionID,
 	)
 	if err != nil {
 		return 0, err

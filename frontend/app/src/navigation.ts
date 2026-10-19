@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { BoltIcon, ClipboardDocumentListIcon, DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
+import { BoltIcon, ClipboardDocumentListIcon, DevicePhoneMobileIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 
 export interface NavItem {
   name: string
@@ -12,6 +12,7 @@ export interface NavItem {
 // layout, except the tracker, which has its own mobile layout.
 export const navigation: NavItem[] = [
   { name: 'Exercises', to: { name: 'exercises' }, icon: BoltIcon },
+  { name: 'Sessions', to: { name: 'sessions' }, icon: Squares2X2Icon },
   { name: 'Trainings', to: { name: 'trainings' }, icon: ClipboardDocumentListIcon },
   { name: 'Tracker', to: { name: 'track' }, icon: DevicePhoneMobileIcon },
 ]

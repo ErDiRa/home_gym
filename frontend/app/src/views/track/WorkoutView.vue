@@ -19,10 +19,10 @@
         <template v-else>Started {{ formatTime(workout.started_at) }}</template>
         <template v-if="training"> · {{ training.name }}</template>
       </p>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-900">{{ workout.unit_name }}</h1>
-      <p v-if="unit?.notes" class="mt-1 text-sm text-slate-600">{{ unit.notes }}</p>
-      <p v-if="!unit" class="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-        This unit is no longer in its training, so only the logged sets are shown.
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">{{ workout.session_name }}</h1>
+      <p v-if="session?.notes" class="mt-1 text-sm text-slate-600">{{ session.notes }}</p>
+      <p v-if="!session" class="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        This session is no longer in its training, so only the logged sets are shown.
       </p>
 
       <section
@@ -157,7 +157,7 @@ const notes = ref('')
 // Ratings picked while finishing, by exercise id; saved with the workout.
 const ratingDrafts = reactive(new Map<string, number>())
 
-const unit = computed(() => training.value?.units.find((u) => u.id === workout.value?.unit_id) ?? null)
+const session = computed(() => training.value?.sessions.find((s) => s.id === workout.value?.session_id) ?? null)
 const allCards = computed(() => [...blocks.value.flatMap((b) => b.exercises), ...extras.value])
 const plannedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.length, 0))
 const loggedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.filter((r) => r.logged).length, 0))
@@ -179,7 +179,7 @@ onMounted(async () => {
     notes.value = loaded.notes
     // The training may have been deleted since; then only the logged sets are shown.
     if (loaded.training_id) training.value = await trainings.getTraining(loaded.training_id).catch(() => null)
-    const cards = buildCards(unit.value, loaded.sets, lookups.kindOf, lookups.defaultUnit('load'))
+    const cards = buildCards(session.value, loaded.sets, lookups.kindOf, lookups.defaultUnit('load'))
     blocks.value = cards.blocks
     extras.value = cards.extras
     // A finished workout opens with its notes, for reading and correcting.

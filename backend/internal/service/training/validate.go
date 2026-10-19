@@ -20,35 +20,68 @@ func validate(in *Input, lk lookups) error {
 	if in.Name == "" || tooLong(in.Name, 100) {
 		return service.Invalid("name is required (max 100 characters)")
 	}
-	start, startErr := time.Parse(time.DateOnly, in.StartDate)
-	end, endErr := time.Parse(time.DateOnly, in.EndDate)
-	if startErr != nil || endErr != nil {
-		return service.Invalid("start_date and end_date are required (YYYY-MM-DD)")
+	start, err := time.Parse(time.DateOnly, in.StartDate)
+	if err != nil {
+		return service.Invalid("start_date is required (YYYY-MM-DD)")
 	}
-	if end.Before(start) {
-		return service.Invalid("end_date must not be before start_date")
+	if start.Weekday() != time.Monday {
+		return service.Invalid("start_date must be a Monday")
 	}
-	in.start, in.end = pgtype.Date{Time: start, Valid: true}, pgtype.Date{Time: end, Valid: true}
-	if in.SessionsPerWeek < 1 || in.SessionsPerWeek > 14 {
-		return service.Invalid("sessions_per_week must be 1-14")
+	in.start = pgtype.Date{Time: start, Valid: true}
+	if in.Weeks < 1 || in.Weeks > maxWeeks {
+		return service.Invalid(fmt.Sprintf("weeks must be 1-%d", maxWeeks))
 	}
-	// A unit id sent twice would update the same row twice and lose one of the units.
-	seenUnits := map[uuid.UUID]bool{}
-	for i := range in.Units {
-		u := &in.Units[i]
-		u.Name, u.Notes = strings.TrimSpace(u.Name), strings.TrimSpace(u.Notes)
-		if u.Name == "" || tooLong(u.Name, 100) {
-			return service.Invalid("every unit needs a name (max 100 characters)")
+	// A session id sent twice would update the same row twice and lose one of the sessions.
+	seenSessions := map[uuid.UUID]bool{}
+	for i := range in.Sessions {
+		s := &in.Sessions[i]
+		if err := validateSession(s, lk); err != nil {
+			return err
 		}
-		if u.ID != nil {
-			if seenUnits[*u.ID] {
-				return service.Invalid("a unit appears twice")
+		if s.ID != nil {
+			if seenSessions[*s.ID] {
+				return service.Invalid("a session appears twice")
 			}
-			seenUnits[*u.ID] = true
+			seenSessions[*s.ID] = true
 		}
-		for j := range u.Blocks {
-			if msg := checkBlock(&u.Blocks[j], lk); msg != "" {
-				return service.Invalid(fmt.Sprintf("%s, block %s: %s", u.Name, blockLetter(j), msg))
+	}
+	return checkSchedule(in)
+}
+
+// validateSession trims and validates a session of a training or a library template, in place.
+func validateSession(s *SessionInput, lk lookups) error {
+	s.Name, s.Notes = strings.TrimSpace(s.Name), strings.TrimSpace(s.Notes)
+	if s.Name == "" || tooLong(s.Name, 100) {
+		return service.Invalid("every session needs a name (max 100 characters)")
+	}
+	for j := range s.Blocks {
+		if msg := checkBlock(&s.Blocks[j], lk); msg != "" {
+			return service.Invalid(fmt.Sprintf("%s, block %s: %s", s.Name, blockLetter(j), msg))
+		}
+	}
+	return nil
+}
+
+// checkSchedule validates the week plan: one list per week, each with at most maxSlots
+// sessions of the training (by index), and no slot id twice.
+func checkSchedule(in *Input) error {
+	if len(in.Schedule) != int(in.Weeks) {
+		return service.Invalid(fmt.Sprintf("the schedule needs one list of sessions per week (%d)", in.Weeks))
+	}
+	seenSlots := map[uuid.UUID]bool{}
+	for w, week := range in.Schedule {
+		if len(week) > maxSlots {
+			return service.Invalid(fmt.Sprintf("week %d: at most %d sessions a week", w+1, maxSlots))
+		}
+		for _, slot := range week {
+			if slot.Session < 0 || slot.Session >= len(in.Sessions) {
+				return service.Invalid(fmt.Sprintf("week %d: unknown session", w+1))
+			}
+			if slot.ID != nil {
+				if seenSlots[*slot.ID] {
+					return service.Invalid("a slot of the schedule appears twice")
+				}
+				seenSlots[*slot.ID] = true
 			}
 		}
 	}
@@ -198,7 +231,7 @@ func boundsText(u unit) string {
 	return fmt.Sprintf("between %g and %g", lo, hi)
 }
 
-// blockLetter labels a block by its position in the unit: A, B, ... Z, then 27, 28...
+// blockLetter labels a block by its position in the session: A, B, ... Z, then 27, 28...
 func blockLetter(i int) string {
 	if i < 26 {
 		return string(rune('A' + i))

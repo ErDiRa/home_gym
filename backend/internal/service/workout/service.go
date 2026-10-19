@@ -1,9 +1,10 @@
 // Package workout tracks the sessions a user does of their trainings.
 //
-// A training asks for a number of sessions per week instead of fixed days. A workout is one
-// session: the user starts it from one of a training's units whenever there is time, logs
-// every set as they go and finishes it. The week view counts the finished workouts against
-// the active training's target and suggests the unit that comes next in turn.
+// A training plans the sessions of each of its weeks instead of fixed days. A workout is one
+// session done: the user starts it from a planned slot of the week whenever there is time, logs
+// every set as they go and finishes it. Several trainings can be active side by side (e.g.
+// strength, warm-ups and mobility); the week view shows one of them at a time: its planned
+// sessions of the week next to the finished workouts, which mark their slots done.
 package workout
 
 import (
@@ -23,10 +24,9 @@ import (
 
 // Queries is the part of repos.Queries this service uses; *repos.Queries satisfies it.
 type Queries interface {
-	GetActiveTraining(ctx context.Context, userID uuid.UUID) (repos.GetActiveTrainingRow, error)
-	ListTrainingUnits(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingUnitsRow, error)
-	GetUnit(ctx context.Context, arg repos.GetUnitParams) (repos.GetUnitRow, error)
-	GetLastUnitID(ctx context.Context, arg repos.GetLastUnitIDParams) (*uuid.UUID, error)
+	ListActiveTrainings(ctx context.Context, userID uuid.UUID) ([]repos.ListActiveTrainingsRow, error)
+	ListWeekPlan(ctx context.Context, arg repos.ListWeekPlanParams) ([]repos.ListWeekPlanRow, error)
+	GetWeekSession(ctx context.Context, arg repos.GetWeekSessionParams) (repos.GetWeekSessionRow, error)
 	CreateWorkout(ctx context.Context, arg repos.CreateWorkoutParams) (repos.Workout, error)
 	GetWorkout(ctx context.Context, arg repos.GetWorkoutParams) (repos.Workout, error)
 	GetCurrentWorkout(ctx context.Context, userID uuid.UUID) (repos.Workout, error)
@@ -48,16 +48,25 @@ type Service struct {
 // New builds the service on Postgres.
 func New(pool *pgxpool.Pool) *Service { return &Service{q: repos.New(pool)} }
 
-// Workout is a session with the sets logged so far, in the order of the unit.
+// Workout is a session done, with the sets logged so far, in the order of the session.
 type Workout struct {
-	ID          uuid.UUID                  `json:"id"`
-	TrainingID  *uuid.UUID                 `json:"training_id"` // nil once the training is deleted
-	UnitID      *uuid.UUID                 `json:"unit_id"`     // nil once the unit is removed
-	UnitName    string                     `json:"unit_name"`
-	StartedAt   pgtype.Timestamptz         `json:"started_at"`
-	CompletedAt pgtype.Timestamptz         `json:"completed_at"` // null while in progress
-	Notes       string                     `json:"notes"`
-	Sets        []repos.ListWorkoutSetsRow `json:"sets"`
+	ID            uuid.UUID                  `json:"id"`
+	TrainingID    *uuid.UUID                 `json:"training_id"`     // nil once the training is deleted
+	WeekSessionID *uuid.UUID                 `json:"week_session_id"` // the slot; nil once it is removed
+	SessionID     *uuid.UUID                 `json:"session_id"`      // nil once the session is removed
+	SessionName   string                     `json:"session_name"`
+	StartedAt     pgtype.Timestamptz         `json:"started_at"`
+	CompletedAt   pgtype.Timestamptz         `json:"completed_at"` // null while in progress
+	Notes         string                     `json:"notes"`
+	Sets          []repos.ListWorkoutSetsRow `json:"sets"`
+}
+
+// fromRow turns a workout row and its sets into a Workout.
+func fromRow(w repos.Workout, sets []repos.ListWorkoutSetsRow) Workout {
+	return Workout{
+		ID: w.ID, TrainingID: w.TrainingID, WeekSessionID: w.WeekSessionID, SessionID: w.SessionID,
+		SessionName: w.SessionName, StartedAt: w.StartedAt, CompletedAt: w.CompletedAt, Notes: w.Notes, Sets: sets,
+	}
 }
 
 // withSets reads the sets of a workout row into a Workout.
@@ -66,10 +75,7 @@ func withSets(ctx context.Context, q Queries, w repos.Workout) (Workout, error) 
 	if err != nil {
 		return Workout{}, err
 	}
-	return Workout{
-		ID: w.ID, TrainingID: w.TrainingID, UnitID: w.UnitID, UnitName: w.UnitName,
-		StartedAt: w.StartedAt, CompletedAt: w.CompletedAt, Notes: w.Notes, Sets: sets,
-	}, nil
+	return fromRow(w, sets), nil
 }
 
 // mapError turns a failed query into the error the caller sees. Errors that are already a

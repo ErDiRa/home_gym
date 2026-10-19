@@ -74,10 +74,10 @@ const columnDefs: ColDef<Training>[] = [
     valueFormatter: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
     getQuickFilterText: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
   },
-  { field: 'sessions_per_week', headerName: 'Per week', flex: 1, minWidth: 110 },
+  { field: 'weeks', headerName: 'Weeks', flex: 1, minWidth: 90 },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
-  { field: 'unit_count', headerName: 'Units', flex: 1, minWidth: 90 },
-  { field: 'exercise_count', headerName: 'Exercises', flex: 1, minWidth: 110 },
+  { field: 'session_count', headerName: 'Sessions', flex: 1, minWidth: 110 },
+  { field: 'planned_count', headerName: 'Planned', flex: 1, minWidth: 100, headerTooltip: 'Planned sessions over all weeks' },
   {
     field: 'updated_at',
     headerName: 'Updated',

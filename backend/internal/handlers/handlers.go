@@ -62,9 +62,14 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Get("/load-units", h.ListLoadUnits)
 			r.Post("/load-units", h.CreateLoadUnit)
 
+			r.Get("/sessions", h.ListSessions)
+			r.Post("/sessions", h.CreateSession)
+			r.Get("/sessions/{id}", h.GetSession)
+			r.Put("/sessions/{id}", h.UpdateSession)
+			r.Delete("/sessions/{id}", h.DeleteSession)
+
 			r.Get("/trainings", h.ListTrainings)
 			r.Post("/trainings", h.CreateTraining)
-			r.Get("/trainings/active", h.GetActiveTraining)
 			r.Get("/trainings/{id}", h.GetTraining)
 			r.Put("/trainings/{id}", h.UpdateTraining)
 			r.Delete("/trainings/{id}", h.DeleteTraining)

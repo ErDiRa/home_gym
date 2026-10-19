@@ -1,34 +1,30 @@
--- name: GetActiveTraining :one
--- The training the week is planned by: the user's active one (at most one).
-SELECT id, name, start_date, end_date, sessions_per_week
+-- name: ListActiveTrainings :many
+-- The trainings the tracker offers: the user's active ones, by name.
+SELECT id, name, start_date, end_date, weeks
 FROM trainings
-WHERE user_id = $1 AND active AND deleted_at IS NULL;
+WHERE user_id = $1 AND active AND deleted_at IS NULL
+ORDER BY lower(name), start_date;
 
--- name: ListTrainingUnits :many
--- The units of a training, done in turn.
-SELECT id, name FROM training_units
-WHERE training_id = $1
-ORDER BY position;
+-- name: ListWeekPlan :many
+-- The sessions planned for one week of a training, in order.
+SELECT ws.id, ws.session_id, s.name
+FROM training_week_sessions ws
+JOIN sessions s ON s.id = ws.session_id
+WHERE ws.training_id = $1 AND ws.week = $2
+ORDER BY ws.position;
 
--- name: GetUnit :one
--- A unit of one of the user's trainings, for starting a workout of it.
-SELECT tu.id, tu.name, tu.training_id
-FROM training_units tu
-JOIN trainings t ON t.id = tu.training_id AND t.user_id = $2 AND t.deleted_at IS NULL
-WHERE tu.id = $1;
-
--- name: GetLastUnitID :one
--- The unit of the user's last finished workout of a training, to suggest the next one.
-SELECT unit_id FROM workouts
-WHERE user_id = $1 AND training_id = $2 AND unit_id IS NOT NULL
-  AND completed_at IS NOT NULL AND deleted_at IS NULL
-ORDER BY completed_at DESC
-LIMIT 1;
+-- name: GetWeekSession :one
+-- A slot of the week plan of one of the user's trainings, for starting a workout of it.
+SELECT ws.id, ws.training_id, ws.session_id, s.name
+FROM training_week_sessions ws
+JOIN sessions s ON s.id = ws.session_id
+JOIN trainings t ON t.id = ws.training_id AND t.user_id = $2 AND t.deleted_at IS NULL
+WHERE ws.id = $1;
 
 -- name: CreateWorkout :one
 -- Fails on idx_workouts_user_in_progress when the user has a workout in progress.
-INSERT INTO workouts (user_id, training_id, unit_id, unit_name)
-VALUES ($1, $2, $3, $4)
+INSERT INTO workouts (user_id, training_id, week_session_id, session_id, session_name)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetWorkout :one
@@ -56,8 +52,9 @@ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 SELECT
     w.id,
     w.training_id,
-    w.unit_id,
-    w.unit_name,
+    w.week_session_id,
+    w.session_id,
+    w.session_name,
     w.started_at,
     w.completed_at,
     w.notes,
@@ -68,7 +65,7 @@ WHERE w.user_id = $1 AND w.deleted_at IS NULL
 ORDER BY w.completed_at DESC;
 
 -- name: ListWorkoutSets :many
--- A workout's sets in the order of the unit, with the names of the exercise and units.
+-- A workout's sets in the order of the session, with the names of the exercise and units.
 SELECT
     ws.id,
     ws.exercise_id,

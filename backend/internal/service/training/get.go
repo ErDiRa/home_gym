@@ -8,19 +8,20 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// Get returns one of the user's trainings with its units, blocks and exercises in order.
+// Get returns one of the user's trainings with its sessions, blocks, exercises and schedule.
 func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (Training, error) {
 	t, err := load(ctx, s.q, userID, id)
 	return t, mapError(err)
 }
 
-// load reads one of the user's trainings with its units, blocks and exercises in order.
+// load reads one of the user's trainings with its sessions, blocks and exercises in order, and
+// its schedule with one list per week.
 func load(ctx context.Context, q Queries, userID, id uuid.UUID) (Training, error) {
 	training, err := q.GetTraining(ctx, repos.GetTrainingParams{ID: id, UserID: userID})
 	if err != nil {
 		return Training{}, err
 	}
-	units, err := q.ListTrainingUnits(ctx, id)
+	sessions, err := q.ListTrainingSessions(ctx, id)
 	if err != nil {
 		return Training{}, err
 	}
@@ -32,8 +33,32 @@ func load(ctx context.Context, q Queries, userID, id uuid.UUID) (Training, error
 	if err != nil {
 		return Training{}, err
 	}
+	slots, err := q.ListWeekSessions(ctx, id)
+	if err != nil {
+		return Training{}, err
+	}
 
-	// The lists come back ordered by position within their parent, so appending keeps order.
+	blocksBySession := groupBlocks(blocks, exercises)
+	resp := Training{GetTrainingRow: training, Sessions: make([]Session, 0, len(sessions))}
+	for _, s := range sessions {
+		resp.Sessions = append(resp.Sessions, Session{ID: s.ID, Name: s.Name, Notes: s.Notes, Blocks: orEmpty(blocksBySession[s.ID])})
+	}
+	resp.Schedule = make([][]Slot, training.Weeks)
+	for i := range resp.Schedule {
+		resp.Schedule[i] = []Slot{}
+	}
+	for _, s := range slots {
+		// Slots of weeks past the end (only possible by hand in the database) are left out.
+		if s.Week <= training.Weeks {
+			resp.Schedule[s.Week-1] = append(resp.Schedule[s.Week-1], Slot{ID: s.ID, SessionID: s.SessionID})
+		}
+	}
+	return resp, nil
+}
+
+// groupBlocks builds the blocks with their exercises, grouped by session. The rows come back
+// ordered by position within their parent, so appending keeps the order.
+func groupBlocks(blocks []repos.ListTrainingBlocksRow, exercises []repos.ListTrainingExercisesRow) map[uuid.UUID][]Block {
 	exercisesByBlock := map[uuid.UUID][]Exercise{}
 	for _, e := range exercises {
 		exercisesByBlock[e.BlockID] = append(exercisesByBlock[e.BlockID], Exercise{
@@ -47,9 +72,9 @@ func load(ctx context.Context, q Queries, userID, id uuid.UUID) (Training, error
 			},
 		})
 	}
-	blocksByUnit := map[uuid.UUID][]Block{}
+	blocksBySession := map[uuid.UUID][]Block{}
 	for _, b := range blocks {
-		blocksByUnit[b.UnitID] = append(blocksByUnit[b.UnitID], Block{
+		blocksBySession[b.SessionID] = append(blocksBySession[b.SessionID], Block{
 			ID: b.ID, Kind: b.Kind, Name: b.Name, Sets: b.Sets, Notes: b.Notes,
 			AmountWithUnits: AmountWithUnits{
 				Amount: Amount{
@@ -61,9 +86,5 @@ func load(ctx context.Context, q Queries, userID, id uuid.UUID) (Training, error
 			Exercises: orEmpty(exercisesByBlock[b.ID]),
 		})
 	}
-	resp := Training{GetTrainingRow: training, Units: make([]Unit, 0, len(units))}
-	for _, u := range units {
-		resp.Units = append(resp.Units, Unit{ID: u.ID, Name: u.Name, Notes: u.Notes, Blocks: orEmpty(blocksByUnit[u.ID])})
-	}
-	return resp, nil
+	return blocksBySession
 }

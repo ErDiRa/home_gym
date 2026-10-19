@@ -17,10 +17,9 @@ func ptr[T any](v T) *T { return &v }
 // fakeQueries is an in-memory Queries: it returns the canned rows set on it (pgx.ErrNoRows
 // where there are none) and records the writes.
 type fakeQueries struct {
-	training  *repos.GetActiveTrainingRow
-	units     []repos.ListTrainingUnitsRow
-	unit      *repos.GetUnitRow
-	lastUnit  *uuid.UUID
+	trainings []repos.ListActiveTrainingsRow
+	plan      []repos.ListWeekPlanRow
+	slot      *repos.GetWeekSessionRow
 	workout   *repos.Workout // what GetWorkout and FinishWorkout find
 	current   *repos.Workout
 	done      []repos.ListWorkoutsRow
@@ -36,6 +35,7 @@ type fakeQueries struct {
 	finished []repos.FinishWorkoutParams
 	upserts  []repos.UpsertWorkoutSetParams
 	listed   []repos.ListWorkoutsParams
+	planned  []repos.ListWeekPlanParams
 }
 
 // newFake returns a fake with a "reps" unit (from 1) and an "RPE" load unit (1-10).
@@ -55,23 +55,17 @@ func found[T any](v *T) (T, error) {
 	return *v, nil
 }
 
-func (f *fakeQueries) GetActiveTraining(context.Context, uuid.UUID) (repos.GetActiveTrainingRow, error) {
-	return found(f.training)
+func (f *fakeQueries) ListActiveTrainings(context.Context, uuid.UUID) ([]repos.ListActiveTrainingsRow, error) {
+	return f.trainings, nil
 }
 
-func (f *fakeQueries) ListTrainingUnits(context.Context, uuid.UUID) ([]repos.ListTrainingUnitsRow, error) {
-	return f.units, nil
+func (f *fakeQueries) ListWeekPlan(_ context.Context, arg repos.ListWeekPlanParams) ([]repos.ListWeekPlanRow, error) {
+	f.planned = append(f.planned, arg)
+	return f.plan, nil
 }
 
-func (f *fakeQueries) GetUnit(context.Context, repos.GetUnitParams) (repos.GetUnitRow, error) {
-	return found(f.unit)
-}
-
-func (f *fakeQueries) GetLastUnitID(context.Context, repos.GetLastUnitIDParams) (*uuid.UUID, error) {
-	if f.lastUnit == nil {
-		return nil, pgx.ErrNoRows
-	}
-	return f.lastUnit, nil
+func (f *fakeQueries) GetWeekSession(context.Context, repos.GetWeekSessionParams) (repos.GetWeekSessionRow, error) {
+	return found(f.slot)
 }
 
 func (f *fakeQueries) CreateWorkout(_ context.Context, arg repos.CreateWorkoutParams) (repos.Workout, error) {
@@ -79,7 +73,8 @@ func (f *fakeQueries) CreateWorkout(_ context.Context, arg repos.CreateWorkoutPa
 		return repos.Workout{}, f.createErr
 	}
 	f.created = append(f.created, arg)
-	return repos.Workout{ID: uuid.New(), UserID: arg.UserID, TrainingID: arg.TrainingID, UnitID: arg.UnitID, UnitName: arg.UnitName}, nil
+	return repos.Workout{ID: uuid.New(), UserID: arg.UserID, TrainingID: arg.TrainingID,
+		WeekSessionID: arg.WeekSessionID, SessionID: arg.SessionID, SessionName: arg.SessionName}, nil
 }
 
 func (f *fakeQueries) GetWorkout(context.Context, repos.GetWorkoutParams) (repos.Workout, error) {

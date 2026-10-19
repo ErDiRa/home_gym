@@ -9,9 +9,8 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// Duplicate copies one of the user's trainings, with its units, blocks and exercises. The copy
-// starts inactive, and as the next phase: its period, of the same length, starts the day after
-// the source's ends.
+// Duplicate copies one of the user's trainings, with its sessions and schedule. The copy starts
+// inactive, and as the next phase: as many weeks, from the Monday after the source ends.
 func (s *Service) Duplicate(ctx context.Context, userID, id uuid.UUID) (repos.CreateTrainingRow, error) {
 	// The source was validated when it was saved, so the copy isn't checked again.
 	var training repos.CreateTrainingRow
@@ -20,17 +19,19 @@ func (s *Service) Duplicate(ctx context.Context, userID, id uuid.UUID) (repos.Cr
 		if err != nil {
 			return err
 		}
-		// Whole days, so the shift is the same in every time zone.
-		shift := int(source.EndDate.Time.Sub(source.StartDate.Time).Hours()/24) + 1
 		training, err = q.CreateTraining(ctx, repos.CreateTrainingParams{
 			UserID: userID, Name: source.Name, Description: source.Description,
-			StartDate: addDays(source.StartDate, shift), EndDate: addDays(source.EndDate, shift),
-			SessionsPerWeek: source.SessionsPerWeek,
+			StartDate: addDays(source.EndDate, 1), Weeks: source.Weeks, // the end is a Sunday
 		})
 		if err != nil {
 			return err
 		}
-		return insertUnits(ctx, q, userID, training.ID, copyUnits(source.Units))
+		sessions, schedule := copyPlan(source)
+		ids, err := insertSessions(ctx, q, userID, training.ID, sessions)
+		if err != nil {
+			return err
+		}
+		return writeSchedule(ctx, q, training.ID, schedule, ids)
 	})
 	if err != nil {
 		return repos.CreateTrainingRow{}, mapError(err)

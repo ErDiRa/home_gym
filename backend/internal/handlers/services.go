@@ -27,11 +27,15 @@ import (
 type TrainingService interface {
 	List(ctx context.Context, userID uuid.UUID) ([]trainingrepos.ListTrainingsRow, error)
 	Get(ctx context.Context, userID, id uuid.UUID) (training.Training, error)
-	Active(ctx context.Context, userID uuid.UUID) (*training.Training, error)
 	Create(ctx context.Context, userID uuid.UUID, in training.Input) (trainingrepos.CreateTrainingRow, error)
 	Update(ctx context.Context, userID, id uuid.UUID, in training.Input) (trainingrepos.UpdateTrainingRow, error)
 	Duplicate(ctx context.Context, userID, id uuid.UUID) (trainingrepos.CreateTrainingRow, error)
 	Delete(ctx context.Context, userID, id uuid.UUID) error
+	ListSessions(ctx context.Context, userID uuid.UUID) ([]trainingrepos.ListLibrarySessionsRow, error)
+	GetSession(ctx context.Context, userID, id uuid.UUID) (training.LibrarySession, error)
+	CreateSession(ctx context.Context, userID uuid.UUID, in training.SessionInput) (training.LibrarySession, error)
+	UpdateSession(ctx context.Context, userID, id uuid.UUID, in training.SessionInput) (training.LibrarySession, error)
+	DeleteSession(ctx context.Context, userID, id uuid.UUID) error
 }
 
 type ExerciseService interface {
@@ -60,9 +64,9 @@ type FeedbackService interface {
 }
 
 type WorkoutService interface {
-	Week(ctx context.Context, userID uuid.UUID, from, to time.Time) (workout.Week, error)
+	Week(ctx context.Context, userID, trainingID uuid.UUID, monday, from, to time.Time) (workout.Week, error)
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]workoutrepos.ListWorkoutsRow, error)
-	Start(ctx context.Context, userID, unitID uuid.UUID) (workout.Workout, error)
+	Start(ctx context.Context, userID, weekSessionID uuid.UUID) (workout.Workout, error)
 	Current(ctx context.Context, userID uuid.UUID) (*workout.Workout, error)
 	Get(ctx context.Context, userID, id uuid.UUID) (workout.Workout, error)
 	Finish(ctx context.Context, userID, id uuid.UUID, notes string) (workout.Workout, error)

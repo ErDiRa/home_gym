@@ -11,18 +11,18 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
 
-// Start begins a workout of a unit of one of the user's trainings. A user does one workout at
-// a time: while one is in progress, starting another is a conflict.
-func (s *Service) Start(ctx context.Context, userID, unitID uuid.UUID) (Workout, error) {
-	unit, err := s.q.GetUnit(ctx, repos.GetUnitParams{ID: unitID, UserID: userID})
+// Start begins a workout of a planned slot of one of the user's trainings. A user does one
+// workout at a time: while one is in progress, starting another is a conflict.
+func (s *Service) Start(ctx context.Context, userID, weekSessionID uuid.UUID) (Workout, error) {
+	slot, err := s.q.GetWeekSession(ctx, repos.GetWeekSessionParams{ID: weekSessionID, UserID: userID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Workout{}, service.InvalidCause("unknown unit", err)
+		return Workout{}, service.InvalidCause("unknown planned session", err)
 	}
 	if err != nil {
 		return Workout{}, err
 	}
 	w, err := s.q.CreateWorkout(ctx, repos.CreateWorkoutParams{
-		UserID: userID, TrainingID: &unit.TrainingID, UnitID: &unit.ID, UnitName: unit.Name,
+		UserID: userID, TrainingID: &slot.TrainingID, WeekSessionID: &slot.ID, SessionID: &slot.SessionID, SessionName: slot.Name,
 	})
 	if isUniqueViolation(err) {
 		return Workout{}, service.Conflict("finish or discard the workout in progress first", err)
@@ -30,8 +30,5 @@ func (s *Service) Start(ctx context.Context, userID, unitID uuid.UUID) (Workout,
 	if err != nil {
 		return Workout{}, err
 	}
-	return Workout{
-		ID: w.ID, TrainingID: w.TrainingID, UnitID: w.UnitID, UnitName: w.UnitName,
-		StartedAt: w.StartedAt, CompletedAt: w.CompletedAt, Notes: w.Notes, Sets: []repos.ListWorkoutSetsRow{},
-	}, nil
+	return fromRow(w, []repos.ListWorkoutSetsRow{}), nil
 }

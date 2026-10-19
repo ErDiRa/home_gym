@@ -19,7 +19,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'home', redirect: () => ({ name: isPhone() ? 'track' : 'dashboard' }) },
     {
-      // Planning (desktop first): exercises and trainings; later analytics and the wiki.
+      // Planning (desktop first): exercises, the session library and trainings; later analytics and the wiki.
       path: '/dashboard',
       component: () => import('./layouts/DashboardLayout.vue'),
       meta: { requiresAuth: true },
@@ -35,6 +35,17 @@ const router = createRouter({
           path: 'exercises/:id',
           name: 'exercise-edit',
           component: () => import('./views/exercises/ExerciseFormView.vue'),
+        },
+        { path: 'sessions', name: 'sessions', component: () => import('./views/sessions/SessionsView.vue') },
+        {
+          path: 'sessions/new',
+          name: 'session-new',
+          component: () => import('./views/sessions/SessionFormView.vue'),
+        },
+        {
+          path: 'sessions/:id',
+          name: 'session-edit',
+          component: () => import('./views/sessions/SessionFormView.vue'),
         },
         {
           path: 'trainings',

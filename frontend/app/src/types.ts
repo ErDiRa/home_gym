@@ -47,10 +47,11 @@ export interface ExerciseDetail extends ExerciseInput {
   id: string
 }
 
-// A training is a tree: units (e.g. "Day A", done in turn, as many sessions a week as the
-// training asks for) hold blocks (e.g. "Warm-up", "Superset"), and blocks hold one or more
-// exercises with their prescription. The *Input types are what the form sends, the others
-// what the server returns.
+// A training runs over whole weeks from a Monday. Its sessions (e.g. "Session 1") hold blocks
+// (e.g. "Warm-up", "Superset"), and blocks hold one or more exercises with their prescription;
+// its schedule plans each week with up to 7 of its sessions. Session templates of the same shape
+// live in the library; adding one to a training copies it. The *Input types are what the forms
+// send, the others what the server returns.
 
 // The kind of a training block (single, superset, complex...). Its rules come from the server,
 // so new kinds need no code: how many exercises it takes, and whether sets, reps and load are
@@ -115,12 +116,19 @@ export interface TrainingBlockInput extends Amount {
   exercises: TrainingExerciseInput[]
 }
 
-export interface TrainingUnitInput {
-  // Set for existing units, so they keep their id.
+export interface TrainingSessionInput {
+  // Set for a training's existing sessions, so they keep their id.
   id?: string
   name: string
   notes: string
   blocks: TrainingBlockInput[]
+}
+
+// A planned session of a week: session is its index in TrainingInput.sessions (new sessions
+// have no id yet).
+export interface SlotInput {
+  id?: string // set for existing slots, so the workouts done of them stay linked
+  session: number
 }
 
 // What the training form sends; every list is in order.
@@ -128,10 +136,10 @@ export interface TrainingInput {
   name: string
   description: string
   active: boolean
-  start_date: string // YYYY-MM-DD, first day of the period
-  end_date: string // YYYY-MM-DD, last day of the period
-  sessions_per_week: number // 1-14, done on any days
-  units: TrainingUnitInput[]
+  start_date: string // YYYY-MM-DD, a Monday
+  weeks: number // 1-52
+  sessions: TrainingSessionInput[]
+  schedule: SlotInput[][] // one list per week, up to 7 sessions each
 }
 
 export interface TrainingBlock extends Amount, AmountUnitNames {
@@ -143,11 +151,17 @@ export interface TrainingBlock extends Amount, AmountUnitNames {
   exercises: TrainingExercise[]
 }
 
-export interface TrainingUnit {
+export interface TrainingSession {
   id: string
   name: string
   notes: string
   blocks: TrainingBlock[]
+}
+
+// A planned session of a week.
+export interface Slot {
+  id: string
+  session_id: string
 }
 
 // A whole training as the edit form and the tracker load it.
@@ -157,9 +171,10 @@ export interface TrainingDetail {
   description: string
   active: boolean
   start_date: string
-  end_date: string
-  sessions_per_week: number
-  units: TrainingUnit[]
+  end_date: string // the last Sunday
+  weeks: number
+  sessions: TrainingSession[]
+  schedule: Slot[][] // one list per week
 }
 
 // A row of the trainings list.
@@ -170,10 +185,30 @@ export interface Training {
   active: boolean
   start_date: string
   end_date: string
-  sessions_per_week: number
+  weeks: number
   updated_at: string
-  unit_count: number
+  session_count: number
+  planned_count: number // planned sessions over all weeks
+}
+
+// A session template of the library, as listed.
+export interface LibrarySession {
+  id: string
+  name: string
+  notes: string
+  updated_at: string
+  block_count: number
   exercise_count: number
+}
+
+// A session template with its blocks; the form sends a TrainingSessionInput without id.
+export interface LibrarySessionDetail {
+  id: string
+  name: string
+  notes: string
+  created_at: string
+  updated_at: string
+  blocks: TrainingBlock[]
 }
 
 // How the user rated an exercise (1-5), with their notes.
@@ -184,7 +219,7 @@ export interface ExerciseRating {
   updated_at: string
 }
 
-// A performed set: the exercise's place in the unit (block and position in the block, from 1),
+// A performed set: the exercise's place in the session (block and position in the block, from 1),
 // the set number and what was actually done.
 export interface SetInput {
   exercise_id: string
@@ -211,13 +246,14 @@ export interface WorkoutSet extends LoggedSet {
   load_unit_name: string
 }
 
-// One session: a unit of a training, done on any day. completed_at is null while in progress.
-// training_id and unit_id become null when the training or unit is deleted later.
+// A session done: started from a planned slot of a week, done on any day. completed_at is null
+// while in progress. The ids become null when the training, slot or session is deleted later.
 export interface Workout {
   id: string
   training_id: string | null
-  unit_id: string | null
-  unit_name: string
+  week_session_id: string | null
+  session_id: string | null
+  session_name: string
   started_at: string
   completed_at: string | null
   notes: string
@@ -228,26 +264,32 @@ export interface Workout {
 export interface WorkoutSummary {
   id: string
   training_id: string | null
-  unit_id: string | null
-  unit_name: string
+  week_session_id: string | null
+  session_id: string | null
+  session_name: string
   started_at: string
   completed_at: string
   notes: string
   set_count: number
 }
 
-// A week as the tracker shows it: what the active training asks for, the workouts finished,
-// the unit to do next and the workout in progress.
+// An active training as the tracker offers it.
+export interface ActiveTraining {
+  id: string
+  name: string
+  start_date: string
+  end_date: string
+  weeks: number
+}
+
+// A week as the tracker shows it: the active trainings to switch between, the sessions the
+// chosen one plans for the week, the workouts finished (the ones started from a slot mark it
+// done) and the workout in progress, of any training.
 export interface Week {
-  training: {
-    id: string
-    name: string
-    start_date: string
-    end_date: string
-    sessions_per_week: number
-  } | null // null when no training is active
-  units: { id: string; name: string }[] // the active training's, in order
+  trainings: ActiveTraining[] // by name
+  training: ActiveTraining | null // the chosen one; null when none is active
+  week_number: number | null // of the training, from 1; null outside its weeks
+  planned: { id: string; session_id: string; name: string }[] // the week's slots, in order
   done: WorkoutSummary[]
-  next_unit_id: string | null
   current: Workout | null
 }

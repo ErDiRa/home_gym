@@ -1,11 +1,15 @@
 // Package training manages the trainings users plan for themselves.
 //
-// A training belongs to one user and is a tree: units (e.g. "Day A", done in turn, as many
-// sessions per week as the training asks for) hold blocks, and blocks hold one or more
-// exercises. A block has a kind (single, superset, complex, see block_kinds) that decides how
-// many exercises it takes and whether sets, reps and load are set once on the block or per
-// exercise. The same shape is sent to and returned from the API. Every usecase acts on the
-// given user's trainings only; another user's look missing.
+// A training belongs to one user and runs over whole weeks from a Monday. It has its own
+// sessions (e.g. "Session 1"), which hold blocks, and blocks hold one or more exercises, plus a
+// schedule: the sessions planned for each week, up to 7, repeats allowed. A block has a kind
+// (single, superset, complex, see block_kinds) that decides how many exercises it takes and
+// whether sets, reps and load are set once on the block or per exercise. The same shape is sent
+// to and returned from the API.
+//
+// The user's library holds session templates of the same shape; adding one to a training copies
+// it (the client sends the copy), so the two are independent afterwards. Every usecase acts on
+// the given user's data only; another user's looks missing.
 package training
 
 import (
@@ -27,20 +31,29 @@ import (
 type Queries interface {
 	ListTrainings(ctx context.Context, userID uuid.UUID) ([]repos.ListTrainingsRow, error)
 	GetTraining(ctx context.Context, arg repos.GetTrainingParams) (repos.GetTrainingRow, error)
-	GetActiveTrainingID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
-	ListTrainingUnits(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingUnitsRow, error)
+	ListTrainingSessions(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingSessionsRow, error)
 	ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingBlocksRow, error)
 	ListTrainingExercises(ctx context.Context, trainingID uuid.UUID) ([]repos.ListTrainingExercisesRow, error)
+	ListWeekSessions(ctx context.Context, trainingID uuid.UUID) ([]repos.ListWeekSessionsRow, error)
 	CreateTraining(ctx context.Context, arg repos.CreateTrainingParams) (repos.CreateTrainingRow, error)
 	UpdateTraining(ctx context.Context, arg repos.UpdateTrainingParams) (repos.UpdateTrainingRow, error)
-	DeactivateUserTrainings(ctx context.Context, userID uuid.UUID) error
 	DeleteTraining(ctx context.Context, arg repos.DeleteTrainingParams) (int64, error)
-	InsertTrainingUnit(ctx context.Context, arg repos.InsertTrainingUnitParams) (uuid.UUID, error)
-	UpdateTrainingUnit(ctx context.Context, arg repos.UpdateTrainingUnitParams) (int64, error)
-	DeleteTrainingUnitsExcept(ctx context.Context, arg repos.DeleteTrainingUnitsExceptParams) error
+	InsertSession(ctx context.Context, arg repos.InsertSessionParams) (uuid.UUID, error)
+	UpdateTrainingSession(ctx context.Context, arg repos.UpdateTrainingSessionParams) (int64, error)
+	DeleteTrainingSessionsExcept(ctx context.Context, arg repos.DeleteTrainingSessionsExceptParams) error
 	DeleteTrainingBlocks(ctx context.Context, trainingID uuid.UUID) error
-	InsertTrainingBlock(ctx context.Context, arg repos.InsertTrainingBlockParams) (uuid.UUID, error)
-	InsertTrainingExercise(ctx context.Context, arg repos.InsertTrainingExerciseParams) (int64, error)
+	InsertWeekSession(ctx context.Context, arg repos.InsertWeekSessionParams) error
+	UpdateWeekSession(ctx context.Context, arg repos.UpdateWeekSessionParams) (int64, error)
+	DeleteWeekSessionsExcept(ctx context.Context, arg repos.DeleteWeekSessionsExceptParams) error
+	ListLibrarySessions(ctx context.Context, userID uuid.UUID) ([]repos.ListLibrarySessionsRow, error)
+	GetLibrarySession(ctx context.Context, arg repos.GetLibrarySessionParams) (repos.GetLibrarySessionRow, error)
+	ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([]repos.ListSessionBlocksRow, error)
+	ListSessionExercises(ctx context.Context, sessionID uuid.UUID) ([]repos.ListSessionExercisesRow, error)
+	UpdateLibrarySession(ctx context.Context, arg repos.UpdateLibrarySessionParams) (int64, error)
+	DeleteSessionBlocks(ctx context.Context, sessionID uuid.UUID) error
+	DeleteLibrarySession(ctx context.Context, arg repos.DeleteLibrarySessionParams) (int64, error)
+	InsertSessionBlock(ctx context.Context, arg repos.InsertSessionBlockParams) (uuid.UUID, error)
+	InsertSessionExercise(ctx context.Context, arg repos.InsertSessionExerciseParams) (int64, error)
 	ListBlockKinds(ctx context.Context) ([]repos.ListBlockKindsRow, error)
 	ListRepUnits(ctx context.Context) ([]repos.ListRepUnitsRow, error)
 	ListLoadUnits(ctx context.Context) ([]repos.ListLoadUnitsRow, error)
@@ -102,25 +115,41 @@ type BlockInput struct {
 	Exercises []ExerciseInput `json:"exercises"`
 }
 
-type UnitInput struct {
-	// ID is set for units that already exist, so they keep their id; new units have none.
+// SessionInput is a session of a training, or a library template.
+type SessionInput struct {
+	// ID is set for a training's sessions that already exist, so they keep their id; new ones
+	// have none. Ignored for templates (the id is in the URL).
 	ID     *uuid.UUID   `json:"id"`
 	Name   string       `json:"name"`
 	Notes  string       `json:"notes"`
 	Blocks []BlockInput `json:"blocks"`
 }
 
+// SlotInput is one planned session of a week. Session is the index of the session in
+// Input.Sessions, as new sessions have no id yet.
+type SlotInput struct {
+	// ID is set for slots that already exist, so they keep their id (workouts point at them).
+	ID      *uuid.UUID `json:"id"`
+	Session int        `json:"session"`
+}
+
+// maxWeeks and maxSlots bound a training: at most a year, at most 7 sessions a week.
+const (
+	maxWeeks = 52
+	maxSlots = 7
+)
+
 // Input is a whole training for Create and Update, the tree at once.
 type Input struct {
-	Name            string      `json:"name"`
-	Description     string      `json:"description"`
-	Active          bool        `json:"active"`
-	StartDate       string      `json:"start_date"` // YYYY-MM-DD, first day of the period
-	EndDate         string      `json:"end_date"`   // YYYY-MM-DD, last day of the period
-	SessionsPerWeek int32       `json:"sessions_per_week"`
-	Units           []UnitInput `json:"units"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Active      bool           `json:"active"`
+	StartDate   string         `json:"start_date"` // YYYY-MM-DD, a Monday
+	Weeks       int32          `json:"weeks"`
+	Sessions    []SessionInput `json:"sessions"`
+	Schedule    [][]SlotInput  `json:"schedule"` // one list per week, len == Weeks
 
-	start, end pgtype.Date // StartDate and EndDate, parsed by validate
+	start pgtype.Date // StartDate, parsed by validate
 }
 
 // AmountWithUnits is an Amount with the names of its units, for display.
@@ -150,17 +179,24 @@ type Block struct {
 	Exercises []Exercise `json:"exercises"`
 }
 
-type Unit struct {
+type Session struct {
 	ID     uuid.UUID `json:"id"`
 	Name   string    `json:"name"`
 	Notes  string    `json:"notes"`
 	Blocks []Block   `json:"blocks"`
 }
 
+// Slot is one planned session of a week.
+type Slot struct {
+	ID        uuid.UUID `json:"id"`
+	SessionID uuid.UUID `json:"session_id"`
+}
+
 // Training is the whole training tree; the embedded row's fields sit at the top level.
 type Training struct {
 	repos.GetTrainingRow
-	Units []Unit `json:"units"`
+	Sessions []Session `json:"sessions"`
+	Schedule [][]Slot  `json:"schedule"` // one list per week
 }
 
 // mapError turns a failed query into the error the caller sees. Errors that are already a

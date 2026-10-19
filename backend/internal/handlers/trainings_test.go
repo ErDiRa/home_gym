@@ -29,7 +29,7 @@ type fakeTrainings struct {
 
 func (f *fakeTrainings) Get(_ context.Context, userID, id uuid.UUID) (training.Training, error) {
 	f.userID = userID
-	return training.Training{GetTrainingRow: trainingrepos.GetTrainingRow{ID: id, Name: "Strength"}, Units: []training.Unit{}}, f.err
+	return training.Training{GetTrainingRow: trainingrepos.GetTrainingRow{ID: id, Name: "Strength"}, Sessions: []training.Session{}, Schedule: [][]training.Slot{}}, f.err
 }
 
 func (f *fakeTrainings) Create(_ context.Context, userID uuid.UUID, in training.Input) (trainingrepos.CreateTrainingRow, error) {
@@ -81,8 +81,9 @@ func TestTrainingHandlers(t *testing.T) {
 	}
 
 	fake = &fakeTrainings{}
-	rec = serve(t, fake, http.MethodPost, "/trainings", `{"name":"Strength","sessions_per_week":3,"units":[{"name":"Day A"}]}`)
-	if rec.Code != http.StatusCreated || fake.input.Name != "Strength" || fake.input.SessionsPerWeek != 3 || fake.input.Units[0].Name != "Day A" || fake.userID != testUser {
+	rec = serve(t, fake, http.MethodPost, "/trainings", `{"name":"Strength","weeks":4,"sessions":[{"name":"Session 1"}],"schedule":[[{"session":0}],[],[],[]]}`)
+	if rec.Code != http.StatusCreated || fake.input.Name != "Strength" || fake.input.Weeks != 4 || fake.input.Sessions[0].Name != "Session 1" ||
+		len(fake.input.Schedule) != 4 || fake.input.Schedule[0][0].Session != 0 || fake.userID != testUser {
 		t.Errorf("POST = %d %s, service got %+v for %v", rec.Code, rec.Body, fake.input, fake.userID)
 	}
 }

@@ -11,27 +11,13 @@ func (h *Handler) ListTrainings(w http.ResponseWriter, r *http.Request) {
 	listOwn(w, r, h.trainings.List)
 }
 
-// GetTraining returns one of the user's trainings with its units, blocks and exercises.
+// GetTraining returns one of the user's trainings with its sessions and schedule.
 func (h *Handler) GetTraining(w http.ResponseWriter, r *http.Request) {
 	userID, id, ok := userAndID(w, r, "training")
 	if !ok {
 		return
 	}
 	t, err := h.trainings.Get(r.Context(), userID, id)
-	if err != nil {
-		serviceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, t)
-}
-
-// GetActiveTraining returns the user's active training with its whole tree, or null.
-func (h *Handler) GetActiveTraining(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(w, r)
-	if !ok {
-		return
-	}
-	t, err := h.trainings.Active(r.Context(), userID)
 	if err != nil {
 		serviceError(w, r, err)
 		return

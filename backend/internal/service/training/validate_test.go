@@ -109,12 +109,13 @@ func TestCheckBlockClearsUnusedSide(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	lk := lookups{kinds: map[string]repos.ListBlockKindsRow{"single": {Code: "single", Name: "Single", MinExercises: 1}}}
-	unitID := uuid.New()
+	sessionID, slotID := uuid.New(), uuid.New()
 	valid := func() Input {
-		return Input{Name: "  Strength  ", StartDate: "2026-03-01", EndDate: "2026-03-28", SessionsPerWeek: 3, Units: []UnitInput{
-			{Name: " Day A "},
-		}}
+		return Input{Name: "  Strength  ", StartDate: "2026-03-02", Weeks: 2, Sessions: []SessionInput{
+			{Name: " Session 1 "}, {Name: "Session 2"},
+		}, Schedule: [][]SlotInput{{{Session: 0}, {Session: 1}}, {}}}
 	}
+	week := func(n int) []SlotInput { return make([]SlotInput, n) } // n times session 0
 
 	tests := []struct {
 		name    string
@@ -124,20 +125,28 @@ func TestValidate(t *testing.T) {
 		{"valid", func(*Input) {}, ""},
 		{"blank name", func(in *Input) { in.Name = "   " }, "name is required (max 100 characters)"},
 		{"long name", func(in *Input) { in.Name = strings.Repeat("ä", 101) }, "name is required (max 100 characters)"},
-		{"unit without name", func(in *Input) { in.Units[0].Name = "" }, "every unit needs a name (max 100 characters)"},
-		{"unit twice", func(in *Input) {
-			in.Units = []UnitInput{{ID: &unitID, Name: "A"}, {ID: &unitID, Name: "B"}}
-		}, "a unit appears twice"},
-		{"missing start", func(in *Input) { in.StartDate = "" }, "start_date and end_date are required (YYYY-MM-DD)"},
-		{"bad end", func(in *Input) { in.EndDate = "28.03.2026" }, "start_date and end_date are required (YYYY-MM-DD)"},
-		{"end before start", func(in *Input) { in.EndDate = "2026-02-28" }, "end_date must not be before start_date"},
-		{"one-day period", func(in *Input) { in.EndDate = "2026-03-01" }, ""},
-		{"no sessions per week", func(in *Input) { in.SessionsPerWeek = 0 }, "sessions_per_week must be 1-14"},
-		{"too many sessions per week", func(in *Input) { in.SessionsPerWeek = 15 }, "sessions_per_week must be 1-14"},
-		{"no units", func(in *Input) { in.Units = nil }, ""},
-		{"bad block names unit and letter", func(in *Input) {
-			in.Units[0].Blocks = []BlockInput{{Kind: "single"}}
-		}, "Day A, block A: a Single block needs at least 1 exercise"},
+		{"session without name", func(in *Input) { in.Sessions[0].Name = "" }, "every session needs a name (max 100 characters)"},
+		{"session twice", func(in *Input) {
+			in.Sessions = []SessionInput{{ID: &sessionID, Name: "A"}, {ID: &sessionID, Name: "B"}}
+		}, "a session appears twice"},
+		{"missing start", func(in *Input) { in.StartDate = "" }, "start_date is required (YYYY-MM-DD)"},
+		{"bad start", func(in *Input) { in.StartDate = "02.03.2026" }, "start_date is required (YYYY-MM-DD)"},
+		{"start on a Sunday", func(in *Input) { in.StartDate = "2026-03-01" }, "start_date must be a Monday"},
+		{"no weeks", func(in *Input) { in.Weeks = 0 }, "weeks must be 1-52"},
+		{"too many weeks", func(in *Input) { in.Weeks = 53 }, "weeks must be 1-52"},
+		{"schedule shorter than the weeks", func(in *Input) { in.Weeks = 3 }, "the schedule needs one list of sessions per week (3)"},
+		{"seven sessions a week", func(in *Input) { in.Schedule[1] = week(7) }, ""},
+		{"eight sessions a week", func(in *Input) { in.Schedule[1] = week(8) }, "week 2: at most 7 sessions a week"},
+		{"unknown session index", func(in *Input) { in.Schedule[0][1].Session = 2 }, "week 1: unknown session"},
+		{"negative session index", func(in *Input) { in.Schedule[0][1].Session = -1 }, "week 1: unknown session"},
+		{"slot twice", func(in *Input) {
+			in.Schedule[0][0].ID, in.Schedule[0][1].ID = &slotID, &slotID
+		}, "a slot of the schedule appears twice"},
+		{"unplanned session", func(in *Input) { in.Schedule = [][]SlotInput{{}, {}} }, ""},
+		{"no sessions", func(in *Input) { in.Sessions, in.Schedule = nil, [][]SlotInput{{}, {}} }, ""},
+		{"bad block names session and letter", func(in *Input) {
+			in.Sessions[0].Blocks = []BlockInput{{Kind: "single"}}
+		}, "Session 1, block A: a Single block needs at least 1 exercise"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -159,8 +168,8 @@ func TestValidate(t *testing.T) {
 		if err := validate(&in, lk); err != nil {
 			t.Fatal(err)
 		}
-		if u := in.Units[0]; in.Name != "Strength" || u.Name != "Day A" {
-			t.Errorf("names not trimmed: %q, %q", in.Name, u.Name)
+		if s := in.Sessions[0]; in.Name != "Strength" || s.Name != "Session 1" {
+			t.Errorf("names not trimmed: %q, %q", in.Name, s.Name)
 		}
 	})
 }

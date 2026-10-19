@@ -7,12 +7,15 @@ import type {
   ExerciseInput,
   ExerciseRating,
   Focus,
+  LibrarySession,
+  LibrarySessionDetail,
   LoggedSet,
   Option,
   SetInput,
   Training,
   TrainingDetail,
   TrainingInput,
+  TrainingSessionInput,
   Unit,
   Week,
   Workout,
@@ -86,16 +89,27 @@ export const deleteTraining = (id: string) => api.delete(`/trainings/${id}`)
 // Copies a training (inactive) as the next phase.
 export const duplicateTraining = (id: string) => api.post<Training>(`/trainings/${id}/duplicate`)
 
+// The session library: templates that trainings copy.
+export const listSessions = () => api.get<LibrarySession[]>('/sessions')
+export const getSession = (id: string) => api.get<LibrarySessionDetail>(`/sessions/${id}`)
+export const createSession = (input: TrainingSessionInput) => api.post<LibrarySessionDetail>('/sessions', input)
+export const updateSession = (id: string, input: TrainingSessionInput) =>
+  api.put<LibrarySessionDetail>(`/sessions/${id}`, input)
+export const deleteSession = (id: string) => api.delete(`/sessions/${id}`)
+
 // A period [from, to) as query parameters; instants, so the server needs no time zone.
 const period = (from: Date, to: Date) =>
   new URLSearchParams({ from: from.toISOString(), to: to.toISOString() }).toString()
 
-export const getWeek = (from: Date, to: Date) => api.get<Week>(`/week?${period(from, to)}`)
+// The week starting on the local Monday from (a YYYY-MM-DD date plus the instants), planned by
+// one of the active trainings (the first without one).
+export const getWeek = (monday: string, from: Date, to: Date, trainingId?: string) =>
+  api.get<Week>(`/week?date=${monday}&${period(from, to)}${trainingId ? `&training=${trainingId}` : ''}`)
 // Workouts finished in [from, to), newest first.
 export const listWorkouts = (from: Date, to: Date) => api.get<WorkoutSummary[]>(`/workouts?${period(from, to)}`)
 export const getWorkout = (id: string) => api.get<Workout>(`/workouts/${id}`)
 // 409 while another workout is in progress.
-export const startWorkout = (unitId: string) => api.post<Workout>('/workouts', { unit_id: unitId })
+export const startWorkout = (weekSessionId: string) => api.post<Workout>('/workouts', { week_session_id: weekSessionId })
 // Logs a set, or corrects it when the same block, position and set number was logged before.
 export const logSet = (workoutId: string, set: SetInput) => api.put<LoggedSet>(`/workouts/${workoutId}/sets`, set)
 export const deleteSet = (workoutId: string, setId: string) => api.delete(`/workouts/${workoutId}/sets/${setId}`)

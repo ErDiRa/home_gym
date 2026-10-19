@@ -109,23 +109,21 @@ type RepUnit struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type Training struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Active          bool               `json:"active"`
-	StartDate       pgtype.Date        `json:"start_date"`
-	EndDate         pgtype.Date        `json:"end_date"`
-	SessionsPerWeek int32              `json:"sessions_per_week"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+type Session struct {
+	ID         uuid.UUID          `json:"id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	TrainingID *uuid.UUID         `json:"training_id"`
+	Position   int32              `json:"position"`
+	Name       string             `json:"name"`
+	Notes      string             `json:"notes"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type TrainingBlock struct {
+type SessionBlock struct {
 	ID        uuid.UUID  `json:"id"`
-	UnitID    uuid.UUID  `json:"unit_id"`
+	SessionID uuid.UUID  `json:"session_id"`
 	Position  int32      `json:"position"`
 	Kind      string     `json:"kind"`
 	Name      string     `json:"name"`
@@ -140,7 +138,7 @@ type TrainingBlock struct {
 	Notes     string     `json:"notes"`
 }
 
-type TrainingExercise struct {
+type SessionExercise struct {
 	ID         uuid.UUID  `json:"id"`
 	BlockID    uuid.UUID  `json:"block_id"`
 	ExerciseID uuid.UUID  `json:"exercise_id"`
@@ -157,12 +155,26 @@ type TrainingExercise struct {
 	Notes      string     `json:"notes"`
 }
 
-type TrainingUnit struct {
+type Training struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Active      bool               `json:"active"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	Weeks       int32              `json:"weeks"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type TrainingWeekSession struct {
 	ID         uuid.UUID `json:"id"`
 	TrainingID uuid.UUID `json:"training_id"`
+	Week       int32     `json:"week"`
 	Position   int32     `json:"position"`
-	Name       string    `json:"name"`
-	Notes      string    `json:"notes"`
+	SessionID  uuid.UUID `json:"session_id"`
 }
 
 type User struct {
@@ -177,15 +189,16 @@ type User struct {
 }
 
 type Workout struct {
-	ID          uuid.UUID          `json:"id"`
-	UserID      uuid.UUID          `json:"user_id"`
-	TrainingID  *uuid.UUID         `json:"training_id"`
-	UnitID      *uuid.UUID         `json:"unit_id"`
-	UnitName    string             `json:"unit_name"`
-	StartedAt   pgtype.Timestamptz `json:"started_at"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	Notes       string             `json:"notes"`
-	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	ID            uuid.UUID          `json:"id"`
+	UserID        uuid.UUID          `json:"user_id"`
+	TrainingID    *uuid.UUID         `json:"training_id"`
+	WeekSessionID *uuid.UUID         `json:"week_session_id"`
+	SessionID     *uuid.UUID         `json:"session_id"`
+	SessionName   string             `json:"session_name"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
+	Notes         string             `json:"notes"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type WorkoutSet struct {

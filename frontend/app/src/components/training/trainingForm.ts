@@ -1,8 +1,17 @@
-import type { Amount, BlockKind, ExerciseType, TrainingDetail, TrainingInput, Unit } from '../../types'
+import type {
+  Amount,
+  BlockKind,
+  ExerciseType,
+  TrainingBlock,
+  TrainingDetail,
+  TrainingInput,
+  TrainingSessionInput,
+  Unit,
+} from '../../types'
 import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 
-// Editable rows of the training form. key keeps v-for stable while rows move, since the same
-// exercise may appear several times and new units and blocks have no id yet. Blocks and
+// Editable rows of the training and session forms. key keeps v-for stable while rows move, since
+// the same exercise may appear several times and new sessions and blocks have no id yet. Blocks and
 // exercises both keep sets, so switching kinds doesn't lose them; toInput sends the side the
 // kind uses.
 export interface ExerciseRow extends Amount {
@@ -24,13 +33,28 @@ export interface BlockRow extends Amount {
   exercises: ExerciseRow[]
 }
 
-export interface UnitRow {
+export interface SessionRow {
   key: number
-  id?: string
+  id?: string // a training's saved session; never set for library templates
   name: string
   notes: string
   blocks: BlockRow[]
 }
+
+// A planned session of a week: the session row it points at, by key (new sessions have no id).
+export interface SlotRow {
+  key: number
+  id?: string // saved slots keep their id, so the workouts done of them stay linked
+  sessionKey: number
+}
+
+export interface WeekRow {
+  key: number
+  slots: SlotRow[]
+}
+
+// At most this many sessions a week, like the server.
+export const MAX_SLOTS = 7
 
 // Keys only need to be unique on the page, so a module-wide counter will do.
 let lastKey = 0
@@ -69,38 +93,53 @@ export const newBlock = (): BlockRow => ({
   ...emptyAmount(),
 })
 
-export const newUnit = (name: string): UnitRow => ({
+export const newSession = (name: string): SessionRow => ({
   key: nextKey(),
   name,
   notes: '',
   blocks: [newBlock()],
 })
 
-// Turns a loaded training into editable rows. The side the kind doesn't use has no sets, so it
-// borrows them from the other side: switching to another kind then starts from a sensible value.
-export function toRows(training: TrainingDetail): UnitRow[] {
-  return training.units.map((u) => ({
+export const newWeek = (slots: SlotRow[] = []): WeekRow => ({ key: nextKey(), slots })
+
+// Turns a loaded session into an editable row: with its id for a training's own session,
+// without one for a copy (e.g. a library template added to a training).
+export function toSessionRow(
+  s: { id?: string; name: string; notes: string; blocks: TrainingBlock[] },
+  keepId: boolean,
+): SessionRow {
+  return { key: nextKey(), id: keepId ? s.id : undefined, name: s.name, notes: s.notes, blocks: toBlockRows(s.blocks) }
+}
+
+// Turns a loaded training into editable sessions and weeks (one row per week).
+export function toRows(training: TrainingDetail): { sessions: SessionRow[]; weeks: WeekRow[] } {
+  const sessions = training.sessions.map((s) => toSessionRow(s, true))
+  const keyOf = new Map(training.sessions.map((s, i) => [s.id, sessions[i].key]))
+  const weeks = training.schedule.map((slots) =>
+    newWeek(slots.map((slot) => ({ key: nextKey(), id: slot.id, sessionKey: keyOf.get(slot.session_id)! }))),
+  )
+  return { sessions, weeks }
+}
+
+// The side the kind doesn't use has no sets, so it borrows them from the other side: switching
+// to another kind then starts from a sensible value.
+function toBlockRows(blocks: TrainingBlock[]): BlockRow[] {
+  return blocks.map((b) => ({
     key: nextKey(),
-    id: u.id,
-    name: u.name,
-    notes: u.notes,
-    blocks: u.blocks.map((b) => ({
+    kind: b.kind,
+    name: b.name,
+    sets: b.sets ?? b.exercises[0]?.sets ?? DEFAULT_SETS,
+    notes: b.notes,
+    ...pickAmount(b),
+    exercises: b.exercises.map((e) => ({
       key: nextKey(),
-      kind: b.kind,
-      name: b.name,
-      sets: b.sets ?? b.exercises[0]?.sets ?? DEFAULT_SETS,
-      notes: b.notes,
-      ...pickAmount(b),
-      exercises: b.exercises.map((e) => ({
-        key: nextKey(),
-        exercise_id: e.exercise_id,
-        name: e.name,
-        type: e.type,
-        sets: e.sets ?? b.sets ?? DEFAULT_SETS,
-        tempo: e.tempo,
-        notes: e.notes,
-        ...pickAmount(e),
-      })),
+      exercise_id: e.exercise_id,
+      name: e.name,
+      type: e.type,
+      sets: e.sets ?? b.sets ?? DEFAULT_SETS,
+      tempo: e.tempo,
+      notes: e.notes,
+      ...pickAmount(e),
     })),
   }))
 }
@@ -113,34 +152,55 @@ function cleanAmount(a: Amount): Amount {
   return out
 }
 
-// Builds the request body from the rows, sending sets only on the side the block's kind uses
+// Builds a session of the request body, sending sets only on the side the block's kind uses
 // (the server clears reps and load on the unused side itself).
-export function toInput(fields: Omit<TrainingInput, 'units'>, units: UnitRow[]): TrainingInput {
+export function toSessionInput({ id, name, notes, blocks }: SessionRow): TrainingSessionInput {
+  return {
+    id,
+    name,
+    notes,
+    blocks: blocks.map((b) => {
+      const sharedSets = useLookupsStore().kindOf(b.kind)?.shared_sets ?? true
+      return {
+        kind: b.kind,
+        name: b.name,
+        sets: sharedSets ? b.sets : null,
+        notes: b.notes,
+        ...cleanAmount(b),
+        exercises: b.exercises.map((e) => ({
+          exercise_id: e.exercise_id,
+          sets: sharedSets ? null : e.sets,
+          tempo: e.tempo,
+          notes: e.notes,
+          ...cleanAmount(e),
+        })),
+      }
+    }),
+  }
+}
+
+// Builds the training's request body; the slots point at their sessions by index.
+export function toInput(
+  fields: Omit<TrainingInput, 'sessions' | 'schedule'>,
+  sessions: SessionRow[],
+  weeks: WeekRow[],
+): TrainingInput {
+  const index = new Map(sessions.map((s, i) => [s.key, i]))
   return {
     ...fields,
-    units: units.map(({ id, name, notes, blocks }) => ({
-      id,
-      name,
-      notes,
-      blocks: blocks.map((b) => {
-        const sharedSets = useLookupsStore().kindOf(b.kind)?.shared_sets ?? true
-        return {
-          kind: b.kind,
-          name: b.name,
-          sets: sharedSets ? b.sets : null,
-          notes: b.notes,
-          ...cleanAmount(b),
-          exercises: b.exercises.map((e) => ({
-            exercise_id: e.exercise_id,
-            sets: sharedSets ? null : e.sets,
-            tempo: e.tempo,
-            notes: e.notes,
-            ...cleanAmount(e),
-          })),
-        }
-      }),
-    })),
+    sessions: sessions.map(toSessionInput),
+    schedule: weeks.map((w) => w.slots.map((slot) => ({ id: slot.id, session: index.get(slot.sessionKey)! }))),
   }
+}
+
+// Why a session can't be saved yet, if anything; mirrors the server's checks.
+export function sessionProblem(s: SessionRow): string {
+  if (!s.name.trim()) return 'Every session needs a name.'
+  for (const [b, block] of s.blocks.entries()) {
+    const p = blockProblem(block)
+    if (p) return `${s.name}, block ${blockLetter(b)}: ${p}`
+  }
+  return ''
 }
 
 // Moves the item at index one step up (-1) or down (1).
@@ -149,7 +209,7 @@ export function move<T>(list: T[], index: number, by: -1 | 1) {
   list.splice(index + by, 0, item)
 }
 
-// Labels a block by its position in the unit: A, B, ... Z, then 27, 28...
+// Labels a block by its position in the session: A, B, ... Z, then 27, 28...
 export const blockLetter = (index: number) => (index < 26 ? String.fromCharCode(65 + index) : String(index + 1))
 
 // Labels an exercise: just the block's letter when it's the block's only exercise, else A1, A2...

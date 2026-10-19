@@ -12,7 +12,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
 
-// SetInput is one set as it was done. The exercise's place in the unit (block and position
+// SetInput is one set as it was done. The exercise's place in the session (block and position
 // in the block, from 1) and the set number identify the set: logging it again corrects it.
 type SetInput struct {
 	ExerciseID       uuid.UUID  `json:"exercise_id"`

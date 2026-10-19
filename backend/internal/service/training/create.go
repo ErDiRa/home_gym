@@ -9,7 +9,7 @@ import (
 )
 
 // Create validates a new training and saves it for the user with its whole tree in one
-// transaction. Saving it active deactivates the user's other trainings.
+// transaction.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (repos.CreateTrainingRow, error) {
 	lk, err := loadLookups(ctx, s.q)
 	if err != nil {
@@ -20,22 +20,19 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (repos
 	}
 	var training repos.CreateTrainingRow
 	err = s.inTx(ctx, func(q Queries) error {
-		// Deactivate the user's trainings first, or the one-active-per-user index rejects the
-		// new active one.
-		if in.Active {
-			if err := q.DeactivateUserTrainings(ctx, userID); err != nil {
-				return err
-			}
-		}
 		var err error
 		training, err = q.CreateTraining(ctx, repos.CreateTrainingParams{
 			UserID: userID, Name: in.Name, Description: in.Description, Active: in.Active,
-			StartDate: in.start, EndDate: in.end, SessionsPerWeek: in.SessionsPerWeek,
+			StartDate: in.start, Weeks: in.Weeks,
 		})
 		if err != nil {
 			return err
 		}
-		return insertUnits(ctx, q, userID, training.ID, in.Units)
+		ids, err := insertSessions(ctx, q, userID, training.ID, in.Sessions)
+		if err != nil {
+			return err
+		}
+		return writeSchedule(ctx, q, training.ID, in.Schedule, ids)
 	})
 	if err != nil {
 		return repos.CreateTrainingRow{}, mapError(err)

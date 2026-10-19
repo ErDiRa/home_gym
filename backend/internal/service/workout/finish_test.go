@@ -13,7 +13,7 @@ import (
 
 func TestFinish(t *testing.T) {
 	f, _, _ := newFake()
-	f.workout = &repos.Workout{ID: uuid.New(), UnitName: "Day A"}
+	f.workout = &repos.Workout{ID: uuid.New(), SessionName: "Session 1"}
 	f.sets = []repos.ListWorkoutSetsRow{{ID: uuid.New(), ExerciseName: "Squat", SetNumber: 1}}
 
 	got, err := (&Service{q: f}).Finish(context.Background(), uuid.New(), f.workout.ID, "  felt strong ")
