@@ -51,6 +51,34 @@ The backend works out of the box with dev defaults. To override them, copy `back
 | `COOKIE_SECURE`           | Set to `true` when served over HTTPS                         |
 | `CORS_ALLOWED_ORIGINS`    | Allowed frontend origins                                     |
 | `LOG_LEVEL`, `LOG_FORMAT` | `debug`/`info`/`warn`/`error`, `text`/`json`                 |
+| `STATIC_DIR`              | Serve the built frontend from this directory (set in the image) |
+
+## Production
+
+The root `Dockerfile` builds one image: the Go API, which also serves the built frontend (`index.html` with `no-cache`, the hashed `assets/` cached for a year, unknown paths fall back to `index.html` for the client routes). `deploy/docker-compose.yml` runs it with Postgres and [Caddy](https://caddyserver.com) (automatic HTTPS); container logs use Docker's `json-file` driver, rotated at 10 MB with 5 compressed files kept.
+
+```sh
+# Locally: build for linux/amd64 and push (after `docker login ghcr.io`)
+task image:push APP_IMAGE=ghcr.io/<user>/homegym:<tag>
+
+# On the server: a checkout of this repo (the compose file mounts the schema from backend/db)
+cp deploy/.env.example deploy/.env    # set DOMAIN, APP_IMAGE, passwords, JWT_SECRET
+task prod:up                          # or: cd deploy && docker compose pull && docker compose up -d
+task prod:logs
+```
+
+DNS for `DOMAIN` must point at the server and ports 80/443 must be open. The first start of an empty database volume loads the schema and the lookups (`seed-lookups.sql`), no dev users or exercises. Create a user with:
+
+```sh
+cd deploy && docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```sql
+INSERT INTO users (email, first_name, last_name, password_hash)
+VALUES ('you@example.com', 'First', 'Last', crypt('password', gen_salt('bf', 12)));
+```
+
+Schema changes are not applied to an existing volume; there is no migration tool yet.
 
 ## Project layout
 
@@ -58,6 +86,7 @@ The backend works out of the box with dev defaults. To override them, copy `back
 backend/
   cmd/api/            entrypoint
   internal/handlers/  HTTP handlers and routes (thin adapters over the services)
+  internal/web/       serves the built frontend in production
   internal/service/   business logic, one package per domain (training, workout, ...):
                       one file per usecase, its SQL in queries.sql and the
                       sqlc-generated code in repos/ (don't edit by hand)
@@ -65,6 +94,8 @@ backend/
   db/seed/            dev seed data
 frontend/
   app/                the app: dashboard (exercises, trainings) and tracker (mobile first)
+deploy/               production compose file, Caddyfile and .env.example
+Dockerfile            production image (frontend build + Go binary)
 ```
 
 ## Development

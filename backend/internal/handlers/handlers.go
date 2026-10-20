@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/erdira/homegym/backend/internal/auth"
@@ -38,6 +40,13 @@ func New(s Services, tokens *auth.TokenManager, secureCookies bool) *Handler {
 // else needs a signed-in user and acts on that user's own data only.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
+		// JSON like every other API response (chi answers in plain text by default).
+		r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+			writeError(w, r, http.StatusNotFound, "not found")
+		})
+		r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+			writeError(w, r, http.StatusMethodNotAllowed, "method not allowed")
+		})
 		r.Post("/auth/login", h.Login)
 		r.Post("/auth/logout", h.Logout)
 		r.Group(func(r chi.Router) {

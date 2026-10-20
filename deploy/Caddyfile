@@ -1,0 +1,5 @@
+# TLS certificates (Let's Encrypt) are obtained and renewed automatically for $DOMAIN.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8080
+}

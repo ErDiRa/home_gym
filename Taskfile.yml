@@ -50,3 +50,30 @@ tasks:
   dev:
     desc: Run the backend containers and the Vite dev server together
     deps: [backend:up, app:dev]
+
+  image:build:
+    desc: Build the production image (API + built frontend) for linux/amd64, tagged $APP_IMAGE
+    requires:
+      vars: [APP_IMAGE]
+    cmds:
+      - docker buildx build --platform linux/amd64 -t {{.APP_IMAGE}} --load .
+
+  image:push:
+    desc: Build the production image for linux/amd64 and push it as $APP_IMAGE (docker login ghcr.io first)
+    requires:
+      vars: [APP_IMAGE]
+    cmds:
+      - docker buildx build --platform linux/amd64 -t {{.APP_IMAGE}} --push .
+
+  prod:up:
+    desc: "On the server: pull the image and (re)start the production stack (needs deploy/.env)"
+    dir: deploy
+    cmds:
+      - docker compose pull
+      - docker compose up -d --wait
+
+  prod:logs:
+    desc: "On the server: follow the app's logs"
+    dir: deploy
+    cmds:
+      - docker compose logs -f app

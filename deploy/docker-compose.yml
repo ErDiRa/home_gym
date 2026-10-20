@@ -1,0 +1,75 @@
+# Production: Postgres + the app image + Caddy (HTTPS). Run from deploy/ with a filled-in .env:
+#   docker compose pull && docker compose up -d
+
+# Docker keeps each container's stdout as JSON files; rotate them at 10 MB, keep 5 (gzipped).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+    compress: "true"
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      # PostgreSQL 18+ images keep data under /var/lib/postgresql
+      - pgdata:/var/lib/postgresql
+      # Run once, on first initialisation of an empty volume: the schema (incl. block kinds and
+      # units) and the shared lookups. No dev users or exercises; users are created manually.
+      - ../backend/db/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/000001_init_schema.up.sql:ro
+      - ../backend/db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DB_SOURCE: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?set DOMAIN in .env}
+      COOKIE_SECURE: "true"
+      LOG_FORMAT: json
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Non-root (UID 10001 from the image) and locked down: nothing in the container is written
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # No published port: only Caddy reaches it, over the compose network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and ACME account; keep them, or Let's Encrypt rate limits hit on recreate
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

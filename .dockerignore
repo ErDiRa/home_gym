@@ -1,0 +1,12 @@
+# Only backend/ and frontend/app/ go into the image; keep build output, deps and secrets out
+.git
+build
+deploy
+*.xlsx
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+backend/tmp
+backend/db/seed/local
+**/.DS_Store

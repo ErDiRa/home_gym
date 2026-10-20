@@ -25,6 +25,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/lookup"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	"github.com/erdira/homegym/backend/internal/service/workout"
+	"github.com/erdira/homegym/backend/internal/web"
 )
 
 func main() {
@@ -91,6 +92,12 @@ func run() error {
 		Accounts:  account.New(dbpool),
 	}
 	handlers.New(services, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)
+	// In production the built frontend is served next to the API (same origin, so the auth
+	// cookie just works); in dev STATIC_DIR is unset and Vite serves it.
+	if dir := os.Getenv("STATIC_DIR"); dir != "" {
+		r.Handle("/*", web.SPA(dir))
+		logger.Info("serving frontend", "dir", dir)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
