@@ -8,22 +8,17 @@
       </span>
     </header>
 
-    <ul v-if="lines.length" class="space-y-1.5 px-4 py-3">
-      <li v-for="line in lines" :key="line.key" class="flex items-center gap-3">
-        <!-- Exercises of one block are joined by a line between their labels. -->
-        <span class="relative flex w-8 shrink-0 justify-center self-stretch">
-          <span
-            v-if="line.group"
-            class="absolute left-1/2 w-px -translate-x-1/2 bg-slate-300"
-            :class="{ 'top-1/2 -bottom-1.5': line.group === 'first', '-top-1.5 -bottom-1.5': line.group === 'middle', '-top-1.5 bottom-1/2': line.group === 'last' }"
-          />
-          <span
-            class="relative flex h-7 min-w-8 items-center justify-center rounded-md bg-slate-100 px-1 text-xs font-semibold text-slate-600"
-          >
-            {{ line.label }}
-          </span>
+    <ul v-if="lines.length" class="space-y-2.5 px-4 py-3">
+      <li v-for="line in lines" :key="line.key" class="flex items-start gap-3">
+        <span
+          class="flex h-7 min-w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 px-1 text-xs font-semibold text-slate-600"
+        >
+          {{ line.label }}
         </span>
-        <span class="min-w-0 flex-1 truncate text-sm text-slate-700">{{ line.name }}</span>
+        <span class="min-w-0 flex-1 pt-0.5">
+          <span class="block truncate text-sm font-medium text-slate-800">{{ line.name }}</span>
+          <span v-if="line.detail" class="line-clamp-2 text-xs text-slate-500">{{ line.detail }}</span>
+        </span>
       </li>
     </ul>
   </article>
@@ -34,7 +29,7 @@ import { CheckIcon } from '@heroicons/vue/24/outline'
 import { CheckCircleIcon } from '@heroicons/vue/24/solid'
 import type { SummaryLine } from './workoutPlan'
 
-// A planned session of the week: the unit's name and its exercises at a glance, checked once done.
+// A planned session of the week: its name and its blocks at a glance, checked once done.
 defineProps<{
   name: string
   lines: SummaryLine[]

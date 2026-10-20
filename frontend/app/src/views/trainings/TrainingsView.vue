@@ -4,6 +4,7 @@
       <h1 class="text-xl font-bold text-slate-900">Trainings</h1>
       <div class="flex items-center gap-4">
         <span class="text-sm text-slate-500">{{ trainings.length }} trainings</span>
+        <AppButton variant="secondary" :to="{ name: 'training-new', query: { import: '1' } }">Import</AppButton>
         <AppButton :to="{ name: 'training-new' }">New training</AppButton>
       </div>
     </div>

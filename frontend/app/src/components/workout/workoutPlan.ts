@@ -246,23 +246,23 @@ export function buildCards(
 
 // One line of a session card's summary: an exercise with its label, and where it sits in a
 // block of several (to draw them joined), else null.
+// One block of a session card: its letter, its name (its exercises when it has none) and below
+// what it holds: a WOD's format and the exercises, unless the name already says just that.
 export interface SummaryLine {
   key: string
   label: string
   name: string
-  group: 'first' | 'middle' | 'last' | null
+  detail: string
 }
 
-// The session's exercises in plan order, as a session card lists them.
+// The session's blocks in plan order, as a session card lists them.
 export function sessionSummary(session: TrainingSession): SummaryLine[] {
-  return session.blocks.flatMap((b, i) =>
-    b.exercises.map((e, j) => ({
-      key: `${i + 1}-${j + 1}`,
-      label: exerciseLabel(b.exercises.length, i, j),
-      name: e.name,
-      group: b.exercises.length === 1 ? null : j === 0 ? 'first' : j === b.exercises.length - 1 ? 'last' : 'middle',
-    })),
-  )
+  return session.blocks.map((b, i) => {
+    const exercises = [...new Set(b.exercises.map((e) => e.name))].join(', ')
+    const name = b.name.trim() || exercises
+    const parts = [b.score_type ? wodSummary(b, b.sets) : '', exercises === name ? '' : exercises]
+    return { key: String(i + 1), label: blockLetter(i), name, detail: parts.filter(Boolean).join(' — ') }
+  })
 }
 
 // A number input's value: v-model.number leaves '' in an emptied input, which counts as none.

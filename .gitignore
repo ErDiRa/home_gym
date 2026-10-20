@@ -62,3 +62,7 @@ CLAUDE.md
 backend/db/seed/local/*
 !backend/db/seed/local/README.md
 Übungsarchiv.xlsx
+
+# Local training imports and their source data
+/import/
+/.claude/

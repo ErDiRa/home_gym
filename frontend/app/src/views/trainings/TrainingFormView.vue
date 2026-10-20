@@ -26,7 +26,12 @@
           Delete
         </AppButton>
       </div>
+      <AppButton v-else variant="secondary" size="md" :disabled="saving" @click="importOpen = true">
+        <ArrowUpTrayIcon class="size-4" aria-hidden="true" />
+        Import JSON
+      </AppButton>
     </div>
+    <ImportTrainingDialog v-if="!trainingId" v-model:open="importOpen" @imported="applyImport" />
     <p class="mt-1 mb-6 text-sm text-slate-500"><span class="text-red-600">*</span> Required</p>
 
     <form class="space-y-4" @submit.prevent="submit">
@@ -143,14 +148,16 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ArrowLeftIcon, BookOpenIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, ArrowUpTrayIcon, BookOpenIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import AppCheckbox from '../../components/form/AppCheckbox.vue'
 import SegmentedControl from '../../components/form/SegmentedControl.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ActionMenu from '../../components/ui/ActionMenu.vue'
+import ImportTrainingDialog from '../../components/training/ImportTrainingDialog.vue'
 import SessionEditor from '../../components/training/SessionEditor.vue'
+import type { ImportedTraining } from '../../components/training/trainingImport'
 import WeekPlanner from '../../components/training/WeekPlanner.vue'
 import {
   MAX_SLOTS,
@@ -200,6 +207,7 @@ const weekCount = computed(() => weeks.value.length)
 const endDate = computed(() => (startDate.value && weekCount.value ? addDays(startDate.value, weekCount.value * 7 - 1) : ''))
 const saving = ref(false)
 const copying = ref(false)
+const importOpen = ref(false)
 
 // Any date picks the Monday of its week, as trainings run over whole weeks.
 function setStart(value: string) {
@@ -267,8 +275,31 @@ onMounted(async () => {
     }
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 404 ? 'Training not found.' : 'Could not load the training.')
+    return
   }
+  // The trainings list links here with ?import=1 to start with the import.
+  if (!trainingId && route.query.import) importOpen.value = true
 })
+
+// Replaces the draft with an imported training (one week); asks first if the draft was edited.
+async function applyImport(imported: ImportedTraining) {
+  const edited = name.value.trim() || description.value.trim() || sessions.value.some((s) => s.blocks.some((b) => b.exercises.length))
+  if (
+    edited &&
+    !(await confirmDialog({
+      title: 'Replace the draft?',
+      message: 'The imported training replaces what you entered so far.',
+      confirmLabel: 'Replace',
+    }))
+  )
+    return
+  name.value = imported.name
+  description.value = imported.description
+  startDate.value = imported.startDate
+  sessions.value = imported.sessions
+  weeks.value = imported.weeks
+  toast.success('Imported. Check the training, then create it.')
+}
 
 // Copies a template of the library into the training, as a new session of its own.
 async function addFromLibrary(id: string) {
