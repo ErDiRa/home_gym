@@ -26,7 +26,7 @@ type CreateWorkoutParams struct {
 	SessionName   string     `json:"session_name"`
 }
 
-// Fails on idx_workouts_user_in_progress when the user has a workout in progress.
+// Fails on idx_workouts_slot_in_progress when the slot already has a workout in progress.
 func (q *Queries) CreateWorkout(ctx context.Context, arg CreateWorkoutParams) (Workout, error) {
 	row := q.db.QueryRow(ctx, createWorkout,
 		arg.UserID,
@@ -119,14 +119,19 @@ func (q *Queries) FinishWorkout(ctx context.Context, arg FinishWorkoutParams) (W
 	return i, err
 }
 
-const getCurrentWorkout = `-- name: GetCurrentWorkout :one
+const getSlotWorkoutInProgress = `-- name: GetSlotWorkoutInProgress :one
 SELECT id, user_id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, deleted_at FROM workouts
-WHERE user_id = $1 AND completed_at IS NULL AND deleted_at IS NULL
+WHERE week_session_id = $1 AND user_id = $2 AND completed_at IS NULL AND deleted_at IS NULL
 `
 
-// The user's workout in progress (at most one).
-func (q *Queries) GetCurrentWorkout(ctx context.Context, userID uuid.UUID) (Workout, error) {
-	row := q.db.QueryRow(ctx, getCurrentWorkout, userID)
+type GetSlotWorkoutInProgressParams struct {
+	WeekSessionID *uuid.UUID `json:"week_session_id"`
+	UserID        uuid.UUID  `json:"user_id"`
+}
+
+// The workout in progress of a slot of the user's (at most one).
+func (q *Queries) GetSlotWorkoutInProgress(ctx context.Context, arg GetSlotWorkoutInProgressParams) (Workout, error) {
+	row := q.db.QueryRow(ctx, getSlotWorkoutInProgress, arg.WeekSessionID, arg.UserID)
 	var i Workout
 	err := row.Scan(
 		&i.ID,
@@ -391,7 +396,7 @@ type ListWorkoutSetsRow struct {
 	BlockPosition    int32              `json:"block_position"`
 	ExercisePosition int32              `json:"exercise_position"`
 	SetNumber        int32              `json:"set_number"`
-	RepsValue        float64            `json:"reps_value"`
+	RepsValue        *float64           `json:"reps_value"`
 	RepsUnit         uuid.UUID          `json:"reps_unit"`
 	RepsUnitName     string             `json:"reps_unit_name"`
 	PerSide          bool               `json:"per_side"`
@@ -529,7 +534,7 @@ type UpsertWorkoutSetParams struct {
 	BlockPosition    int32      `json:"block_position"`
 	ExercisePosition int32      `json:"exercise_position"`
 	SetNumber        int32      `json:"set_number"`
-	RepsValue        float64    `json:"reps_value"`
+	RepsValue        *float64   `json:"reps_value"`
 	RepsUnit         uuid.UUID  `json:"reps_unit"`
 	PerSide          bool       `json:"per_side"`
 	LoadValue        *float64   `json:"load_value"`

@@ -19,7 +19,7 @@ type SetInput struct {
 	BlockPosition    int32      `json:"block_position"`
 	ExercisePosition int32      `json:"exercise_position"`
 	SetNumber        int32      `json:"set_number"`
-	RepsValue        *float64   `json:"reps_value"`
+	RepsValue        *float64   `json:"reps_value"` // nil when only the load was logged
 	RepsUnit         *uuid.UUID `json:"reps_unit"`
 	PerSide          bool       `json:"per_side"`
 	LoadValue        *float64   `json:"load_value"` // nil without load, e.g. bodyweight
@@ -41,7 +41,7 @@ func (s *Service) LogSet(ctx context.Context, userID, workoutID uuid.UUID, in Se
 	set, err := s.q.UpsertWorkoutSet(ctx, repos.UpsertWorkoutSetParams{
 		WorkoutID: workoutID, ExerciseID: in.ExerciseID, UserID: userID,
 		BlockPosition: in.BlockPosition, ExercisePosition: in.ExercisePosition, SetNumber: in.SetNumber,
-		RepsValue: *in.RepsValue, RepsUnit: *in.RepsUnit, PerSide: in.PerSide,
+		RepsValue: in.RepsValue, RepsUnit: *in.RepsUnit, PerSide: in.PerSide,
 		LoadValue: in.LoadValue, LoadUnit: in.LoadUnit,
 	})
 	// Another user's, a deleted or an unknown exercise.
@@ -66,7 +66,8 @@ func (s *Service) DeleteSet(ctx context.Context, userID, workoutID, setID uuid.U
 	return nil
 }
 
-// checkSet validates a set: reps are required, load is optional, and both must lie within
+// checkSet validates a set: whatever was entered of it is kept, so reps and load are each
+// optional but not both; the reps unit is always given (the plan's). Values must lie within
 // their unit's bounds (e.g. RPE 1-10), like the planned amounts of a training.
 func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 	switch {
@@ -76,10 +77,12 @@ func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 		return service.Invalid("block_position and exercise_position must be 1 or more")
 	case in.SetNumber < 1 || in.SetNumber > 100:
 		return service.Invalid("set_number must be 1-100")
-	case in.RepsValue == nil || in.RepsUnit == nil:
-		return service.Invalid("reps need a value and a unit")
+	case in.RepsUnit == nil:
+		return service.Invalid("reps_unit is required")
 	case (in.LoadValue == nil) != (in.LoadUnit == nil):
 		return service.Invalid("load needs a value and a unit")
+	case in.RepsValue == nil && in.LoadValue == nil:
+		return service.Invalid("enter the reps or the load")
 	}
 
 	repUnits, err := s.q.ListRepUnits(ctx)
@@ -90,8 +93,10 @@ func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 	if i < 0 {
 		return service.Invalid("unknown reps unit")
 	}
-	if msg := checkBounds("reps", *in.RepsValue, repUnits[i].Name, repUnits[i].MinValue, repUnits[i].MaxValue); msg != "" {
-		return service.Invalid(msg)
+	if in.RepsValue != nil {
+		if msg := checkBounds("reps", *in.RepsValue, repUnits[i].Name, repUnits[i].MinValue, repUnits[i].MaxValue); msg != "" {
+			return service.Invalid(msg)
+		}
 	}
 	if in.LoadValue == nil {
 		return nil

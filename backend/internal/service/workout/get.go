@@ -2,11 +2,9 @@ package workout
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
@@ -18,22 +16,6 @@ func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (Workout, error
 		return Workout{}, mapError(err)
 	}
 	return withSets(ctx, s.q, w)
-}
-
-// Current returns the user's workout in progress with its sets; nil when there is none.
-func (s *Service) Current(ctx context.Context, userID uuid.UUID) (*Workout, error) {
-	w, err := s.q.GetCurrentWorkout(ctx, userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	workout, err := withSets(ctx, s.q, w)
-	if err != nil {
-		return nil, err
-	}
-	return &workout, nil
 }
 
 // List returns the user's workouts finished in [from, to), newest first.

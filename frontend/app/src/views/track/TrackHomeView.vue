@@ -8,17 +8,6 @@
     </div>
 
     <template v-else-if="week">
-      <!-- A workout in progress of another training than the one shown can be resumed from here. -->
-      <RouterLink
-        v-if="week.current && week.current.training_id !== week.training?.id"
-        :to="{ name: 'workout', params: { id: week.current.id } }"
-        class="mb-4 flex min-h-11 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-900 active:bg-indigo-100"
-      >
-        <PlayCircleIcon class="size-5 shrink-0" aria-hidden="true" />
-        <span class="min-w-0 flex-1 truncate">In progress: {{ week.current.session_name }}</span>
-        <ChevronRightIcon class="size-4 shrink-0" aria-hidden="true" />
-      </RouterLink>
-
       <template v-if="week.training">
         <p class="text-sm text-slate-500">
           <template v-if="week.week_number">Week {{ week.week_number }} of {{ week.training.weeks }} · </template>
@@ -58,7 +47,10 @@
 
       <!-- This week's sessions: the done ones checked, then what's left. -->
       <section v-if="sessions.length" class="mt-6" aria-labelledby="week-heading">
-        <h2 id="week-heading" class="font-semibold text-slate-900">This week</h2>
+        <h2 id="week-heading" class="flex items-baseline justify-between gap-2 font-semibold text-slate-900">
+          This week
+          <span class="text-sm font-normal text-slate-500">{{ weekDates }}</span>
+        </h2>
         <ul class="mt-2 space-y-3">
           <li v-for="s in sessions" :key="s.key">
             <RouterLink
@@ -89,13 +81,12 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ChevronRightIcon, PlayCircleIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import SessionCard from '../../components/workout/SessionCard.vue'
 import { sessionSummary, type SummaryLine } from '../../components/workout/workoutPlan'
-import { formatPeriod, today } from '../../dates'
+import { addDays, formatDate, formatPeriod, toIso, today, weekStart } from '../../dates'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWorkoutsStore } from '../../stores/workouts'
 import type { TrainingDetail } from '../../types'
@@ -105,8 +96,8 @@ interface Session {
   name: string
   lines: SummaryLine[]
   done: boolean
-  workoutId?: string // done or already started: opens the workout
-  slotId?: string // otherwise: starts the planned session
+  workoutId?: string // done: opens the workout
+  slotId?: string // otherwise: starts the planned session, or reopens the one started before
 }
 
 const route = useRoute()
@@ -125,6 +116,10 @@ const linesOf = (sessionId: string | null) => {
 
 // The training shown, chosen in the URL (?training=id) so a reload or going back keeps it;
 // without one the server picks the first active training.
+// The current calendar week, e.g. "19 Oct – 25 Oct 2026" (trainings run over calendar weeks).
+const monday = toIso(weekStart())
+const weekDates = `${formatDate(monday, { year: false })} – ${formatDate(addDays(monday, 6))}`
+
 const chosen = computed(() => (typeof route.query.training === 'string' ? route.query.training : undefined))
 
 // The week's planned sessions of the training shown, in order, each done when a finished workout
@@ -136,13 +131,12 @@ const sessions = computed((): Session[] => {
   const doneBySlot = new Map(w.done.filter((d) => d.week_session_id).map((d) => [d.week_session_id, d]))
   const list: Session[] = w.planned.map((slot) => {
     const done = doneBySlot.get(slot.id)
-    const current = w.current?.week_session_id === slot.id ? w.current : undefined
     return {
       key: slot.id,
       name: slot.name,
       lines: linesOf(slot.session_id),
       done: !!done,
-      workoutId: done?.id ?? current?.id,
+      workoutId: done?.id,
       slotId: slot.id,
     }
   })
@@ -151,11 +145,6 @@ const sessions = computed((): Session[] => {
   for (const d of w.done) {
     if (!ofTraining(d.training_id) || (d.week_session_id && planned.has(d.week_session_id))) continue
     list.push({ key: d.id, name: d.session_name, lines: linesOf(d.session_id), done: true, workoutId: d.id })
-  }
-  // One in progress of another training gets the banner above instead.
-  if (w.current && ofTraining(w.current.training_id) && !planned.has(w.current.week_session_id ?? '')) {
-    const c = w.current
-    list.push({ key: c.id, name: c.session_name, lines: linesOf(c.session_id), done: false, workoutId: c.id })
   }
   return list
 })
@@ -178,13 +167,7 @@ async function start(slotId: string) {
     const workout = await store.startWorkout(slotId)
     await router.push({ name: 'workout', params: { id: workout.id } })
   } catch (e) {
-    // Another workout was started meanwhile (e.g. on another device): show it.
-    if (e instanceof ApiError && e.status === 409) {
-      toast.error('Another workout is already in progress.')
-      await load()
-    } else {
-      toast.error('Could not start the workout.')
-    }
+    toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not start the workout.')
   } finally {
     starting.value = false
   }

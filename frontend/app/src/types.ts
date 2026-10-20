@@ -226,10 +226,10 @@ export interface SetInput {
   block_position: number
   exercise_position: number
   set_number: number
-  reps_value: number
+  reps_value: number | null // null when only the load was logged
   reps_unit: string
   per_side: boolean
-  load_value: number | null // null without load, e.g. bodyweight
+  load_value: number | null // null without load, e.g. bodyweight; never both null
   load_unit: string | null
 }
 
@@ -291,5 +291,4 @@ export interface Week {
   week_number: number | null // of the training, from 1; null outside its weeks
   planned: { id: string; session_id: string; name: string }[] // the week's slots, in order
   done: WorkoutSummary[]
-  current: Workout | null
 }

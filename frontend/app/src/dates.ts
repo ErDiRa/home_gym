@@ -39,15 +39,30 @@ export function nextMonday(): string {
   return toIso(today)
 }
 
-export function formatDate(date: string, options?: Intl.DateTimeFormatOptions): string {
-  return parse(date).toLocaleDateString(undefined, options)
+// Dates show in English whatever the browser's language, as day, 3-letter month and year, e.g.
+// "19 Oct 2026" (Intl's en-GB would write "Sept"), optionally with the weekday ("Mon, 19 Oct 2026").
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+export interface DateFormat {
+  weekday?: boolean
+  /** false leaves out the year, e.g. for the days of a week shown next to its training. */
+  year?: boolean
 }
 
-// A training period, e.g. "12 Oct – 8 Nov 2026".
+function format(d: Date, { weekday = false, year = true }: DateFormat = {}): string {
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]}${year ? ` ${d.getFullYear()}` : ''}`
+  return weekday ? `${WEEKDAYS[d.getDay()]}, ${day}` : day
+}
+
+// A YYYY-MM-DD date, e.g. "19 Oct 2026".
+export function formatDate(date: string, options?: DateFormat): string {
+  return format(parse(date), options)
+}
+
+// A training period, e.g. "19 Oct 2026 – 15 Nov 2026".
 export function formatPeriod(start: string, end: string): string {
-  const sameYear = start.slice(0, 4) === end.slice(0, 4)
-  const from = formatDate(start, sameYear ? { day: 'numeric', month: 'short' } : { dateStyle: 'medium' })
-  return `${from} – ${formatDate(end, { dateStyle: 'medium' })}`
+  return `${formatDate(start)} – ${formatDate(end)}`
 }
 
 // The local start (Monday, 00:00) of the week that is `offset` weeks from the current one.
@@ -65,7 +80,13 @@ export function nextWeek(start: Date): Date {
   return d
 }
 
-// A moment as a short local day, e.g. "Mon, 12 Oct".
-export function formatDay(at: string | Date): string {
-  return new Date(at).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+// A moment as its local day, e.g. "Mon, 19 Oct 2026" (weekday: false for "19 Oct 2026").
+export function formatDay(at: string | Date, { weekday = true }: { weekday?: boolean } = {}): string {
+  return format(new Date(at), { weekday })
+}
+
+// A moment's local time of day, 24-hour, e.g. "08:41".
+export function formatTime(at: string | Date): string {
+  const d = new Date(at)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }

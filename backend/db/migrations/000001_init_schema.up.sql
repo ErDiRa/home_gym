@@ -288,13 +288,15 @@ CREATE TABLE workouts (
 );
 
 CREATE INDEX idx_workouts_user_completed ON workouts (user_id, completed_at) WHERE deleted_at IS NULL;
-CREATE UNIQUE INDEX idx_workouts_user_in_progress ON workouts (user_id)
+-- Several workouts can be in progress at once (e.g. a warm-up and the strength session), but a
+-- slot of the week plan has at most one.
+CREATE UNIQUE INDEX idx_workouts_slot_in_progress ON workouts (week_session_id)
     WHERE completed_at IS NULL AND deleted_at IS NULL;
 
 -- One performed set of a workout. It points at the exercise rather than at session_exercises
 -- (rewritten on every save) and keeps the exercise's place in the session (block and position
 -- within the block, both from 1) for grouping. Reps and load are what was actually done, in
--- the same units as planned.
+-- the same units as planned; either may be missing (a set logged partly), not both.
 CREATE TABLE workout_sets (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workout_id        UUID NOT NULL REFERENCES workouts (id) ON DELETE CASCADE,
@@ -302,13 +304,14 @@ CREATE TABLE workout_sets (
     block_position    INT NOT NULL CHECK (block_position >= 1),
     exercise_position INT NOT NULL CHECK (exercise_position >= 1),
     set_number        INT NOT NULL CHECK (set_number BETWEEN 1 AND 100),
-    reps_value        NUMERIC(7, 2) NOT NULL,
+    reps_value        NUMERIC(7, 2),
     reps_unit         UUID NOT NULL REFERENCES rep_units (id) ON DELETE RESTRICT,
     per_side          BOOLEAN NOT NULL DEFAULT false,
     load_value        NUMERIC(7, 2),
     load_unit         UUID REFERENCES load_units (id) ON DELETE RESTRICT,
     completed_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK ((load_value IS NULL) = (load_unit IS NULL)),
+    CHECK (reps_value IS NOT NULL OR load_value IS NOT NULL),
     UNIQUE (workout_id, block_position, exercise_position, set_number)
 );
 

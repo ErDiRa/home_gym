@@ -29,7 +29,7 @@ type Queries interface {
 	GetWeekSession(ctx context.Context, arg repos.GetWeekSessionParams) (repos.GetWeekSessionRow, error)
 	CreateWorkout(ctx context.Context, arg repos.CreateWorkoutParams) (repos.Workout, error)
 	GetWorkout(ctx context.Context, arg repos.GetWorkoutParams) (repos.Workout, error)
-	GetCurrentWorkout(ctx context.Context, userID uuid.UUID) (repos.Workout, error)
+	GetSlotWorkoutInProgress(ctx context.Context, arg repos.GetSlotWorkoutInProgressParams) (repos.Workout, error)
 	FinishWorkout(ctx context.Context, arg repos.FinishWorkoutParams) (repos.Workout, error)
 	DeleteWorkout(ctx context.Context, arg repos.DeleteWorkoutParams) (int64, error)
 	ListWorkouts(ctx context.Context, arg repos.ListWorkoutsParams) ([]repos.ListWorkoutsRow, error)

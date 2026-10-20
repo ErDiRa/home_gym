@@ -1,29 +1,29 @@
 -- Dev seed: sample exercises (needs seed-lookups.sql and seed-user.sql), owned by me@example.com.
 -- Skips names the user already has.
--- video_url points to a YouTube search for the exercise; replace with a specific video as needed.
+-- video_url is a YouTube form tutorial for the exercise (a /watch link, so the app embeds it).
 WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (VALUES
-    ('Bench Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps', 'Deltoids'], 'Barbell press lying on a flat bench.', 'https://www.youtube.com/results?search_query=Bench+Press+exercise+form', ARRAY['Weightlifting'], 'strength'),
-    ('Incline Dumbbell Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Deltoids', 'Triceps'], 'Dumbbell press on a 30° incline bench.', 'https://www.youtube.com/results?search_query=Incline+Dumbbell+Press+exercise+form', ARRAY['Weightlifting'], 'strength'),
-    ('Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes', 'Hamstrings'], 'Barbell back squat to parallel.', 'https://www.youtube.com/results?search_query=Squat+exercise+form', ARRAY['Weightlifting', 'Functional fitness'], 'strength'),
-    ('Leg Extension', ARRAY['Knee'], ARRAY['Quadriceps'], 'Seated machine knee extension.', 'https://www.youtube.com/results?search_query=Leg+Extension+exercise+form', ARRAY['Knee health'], 'strength'),
-    ('Deadlift', ARRAY['Hip', 'Knee'], ARRAY['Hamstrings', 'Glutes', 'Back'], 'Conventional barbell deadlift from the floor.', 'https://www.youtube.com/results?search_query=Deadlift+exercise+form', ARRAY['Weightlifting', 'Functional fitness'], 'strength'),
-    ('Hip Thrust', ARRAY['Hip'], ARRAY['Glutes', 'Hamstrings'], 'Barbell hip thrust with shoulders on a bench.', 'https://www.youtube.com/results?search_query=Hip+Thrust+exercise+form', ARRAY['Weightlifting', 'Hip health'], 'strength'),
-    ('Overhead Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Deltoids', 'Triceps'], 'Standing barbell press overhead.', 'https://www.youtube.com/results?search_query=Overhead+Press+exercise+form', ARRAY['Weightlifting', 'Shoulder health'], 'strength'),
-    ('Lateral Raise', ARRAY['Shoulder'], ARRAY['Deltoids'], 'Dumbbell raise to the side up to shoulder height.', 'https://www.youtube.com/results?search_query=Lateral+Raise+exercise+form', ARRAY['Shoulder health'], 'strength'),
-    ('Barbell Row', ARRAY['Elbow', 'Shoulder'], ARRAY['Back', 'Biceps'], 'Bent-over barbell row.', 'https://www.youtube.com/results?search_query=Barbell+Row+exercise+form', ARRAY['Weightlifting'], 'strength'),
-    ('Pull-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Bodyweight pull-up with an overhand grip.', 'https://www.youtube.com/results?search_query=Pull-up+exercise+form', ARRAY['Functional fitness', 'Shoulder health'], 'strength'),
-    ('Bicep Curl', ARRAY['Elbow'], ARRAY['Biceps'], 'Standing dumbbell curl.', 'https://www.youtube.com/results?search_query=Bicep+Curl+exercise+form', ARRAY['Weightlifting'], 'strength'),
-    ('Triceps Pushdown', ARRAY['Elbow'], ARRAY['Triceps'], 'Cable pushdown with a rope or bar.', 'https://www.youtube.com/results?search_query=Triceps+Pushdown+exercise+form', ARRAY['Weightlifting', 'Elbow health'], 'strength'),
-    ('Calf Raise', ARRAY['Ankle'], ARRAY['Calves'], 'Standing calf raise on a step.', 'https://www.youtube.com/results?search_query=Calf+Raise+exercise+form', ARRAY['Functional fitness'], 'strength'),
-    ('Kettlebell Swing', ARRAY['Hip'], ARRAY['Glutes', 'Hamstrings', 'Core'], 'Two-handed hip hinge swing to chest height.', 'https://www.youtube.com/results?search_query=Kettlebell+Swing+exercise+form', ARRAY['Functional fitness'], 'strength'),
-    ('Romanian Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge with soft knees, weight close to the legs.', 'https://www.youtube.com/results?search_query=Romanian+Deadlift+exercise+form', ARRAY['Functional fitness', 'Hip health'], 'strength'),
-    ('Single Leg Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge on one leg, the free leg reaching back.', 'https://www.youtube.com/results?search_query=Single+Leg+Deadlift+exercise+form', ARRAY['Functional fitness', 'Hip health'], 'strength'),
-    ('Bulgarian Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Split squat with the rear foot on a bench.', 'https://www.youtube.com/results?search_query=Bulgarian+Split+Squat+exercise+form', ARRAY['Functional fitness', 'Knee health'], 'strength'),
-    ('Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Static lunge, lowering the back knee towards the floor.', 'https://www.youtube.com/results?search_query=Split+Squat+exercise+form', ARRAY['Functional fitness'], 'strength'),
-    ('Walking Lunge', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Alternating forward lunges while walking.', 'https://www.youtube.com/results?search_query=Walking+Lunge+exercise+form', ARRAY['Functional fitness'], 'strength'),
-    ('Box Pistol Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Single-leg squat down to a box.', 'https://www.youtube.com/results?search_query=Box+Pistol+Squat+exercise+form', ARRAY['Functional fitness', 'Knee health'], 'strength'),
-    ('Push-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps'], 'Bodyweight push-up, hands elevated to make it easier.', 'https://www.youtube.com/results?search_query=Push-up+exercise+form', ARRAY['Functional fitness'], 'strength'),
-    ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/results?search_query=Ring+Row+exercise+form', ARRAY['Functional fitness', 'Shoulder health'], 'strength')
+    ('Bench Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps', 'Deltoids'], 'Barbell press lying on a flat bench.', 'https://www.youtube.com/watch?v=4Y2ZdHCOXok', ARRAY['Weightlifting'], 'strength'),
+    ('Incline Dumbbell Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Deltoids', 'Triceps'], 'Dumbbell press on a 30° incline bench.', 'https://www.youtube.com/watch?v=IP4oeKh1Sd4', ARRAY['Weightlifting'], 'strength'),
+    ('Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes', 'Hamstrings'], 'Barbell back squat to parallel.', 'https://www.youtube.com/watch?v=ultWZbUMPL8', ARRAY['Weightlifting', 'Functional fitness'], 'strength'),
+    ('Leg Extension', ARRAY['Knee'], ARRAY['Quadriceps'], 'Seated machine knee extension.', 'https://www.youtube.com/watch?v=ljO4jkwv8wQ', ARRAY['Knee health'], 'strength'),
+    ('Deadlift', ARRAY['Hip', 'Knee'], ARRAY['Hamstrings', 'Glutes', 'Back'], 'Conventional barbell deadlift from the floor.', 'https://www.youtube.com/watch?v=XxWcirHIwVo', ARRAY['Weightlifting', 'Functional fitness'], 'strength'),
+    ('Hip Thrust', ARRAY['Hip'], ARRAY['Glutes', 'Hamstrings'], 'Barbell hip thrust with shoulders on a bench.', 'https://www.youtube.com/watch?v=xDmFkJxPzeM', ARRAY['Weightlifting', 'Hip health'], 'strength'),
+    ('Overhead Press', ARRAY['Shoulder', 'Elbow'], ARRAY['Deltoids', 'Triceps'], 'Standing barbell press overhead.', 'https://www.youtube.com/watch?v=QAQ64hK4Xxs', ARRAY['Weightlifting', 'Shoulder health'], 'strength'),
+    ('Lateral Raise', ARRAY['Shoulder'], ARRAY['Deltoids'], 'Dumbbell raise to the side up to shoulder height.', 'https://www.youtube.com/watch?v=PzsMitRdI_8', ARRAY['Shoulder health'], 'strength'),
+    ('Barbell Row', ARRAY['Elbow', 'Shoulder'], ARRAY['Back', 'Biceps'], 'Bent-over barbell row.', 'https://www.youtube.com/watch?v=kBWAon7ItDw', ARRAY['Weightlifting'], 'strength'),
+    ('Pull-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Bodyweight pull-up with an overhand grip.', 'https://www.youtube.com/watch?v=eGo4IYlbE5g', ARRAY['Functional fitness', 'Shoulder health'], 'strength'),
+    ('Bicep Curl', ARRAY['Elbow'], ARRAY['Biceps'], 'Standing dumbbell curl.', 'https://www.youtube.com/watch?v=cBSD6mQIPQk', ARRAY['Weightlifting'], 'strength'),
+    ('Triceps Pushdown', ARRAY['Elbow'], ARRAY['Triceps'], 'Cable pushdown with a rope or bar.', 'https://www.youtube.com/watch?v=-zLyUAo1gMw', ARRAY['Weightlifting', 'Elbow health'], 'strength'),
+    ('Calf Raise', ARRAY['Ankle'], ARRAY['Calves'], 'Standing calf raise on a step.', 'https://www.youtube.com/watch?v=SVtg-1loH4c', ARRAY['Functional fitness'], 'strength'),
+    ('Kettlebell Swing', ARRAY['Hip'], ARRAY['Glutes', 'Hamstrings', 'Core'], 'Two-handed hip hinge swing to chest height.', 'https://www.youtube.com/watch?v=hp3qVqIHNOI', ARRAY['Functional fitness'], 'strength'),
+    ('Romanian Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge with soft knees, weight close to the legs.', 'https://www.youtube.com/watch?v=_oyxCn2iSjU', ARRAY['Functional fitness', 'Hip health'], 'strength'),
+    ('Single Leg Deadlift', ARRAY['Hip'], ARRAY['Hamstrings', 'Glutes'], 'Hip hinge on one leg, the free leg reaching back.', 'https://www.youtube.com/watch?v=Zfr6wizR8rs', ARRAY['Functional fitness', 'Hip health'], 'strength'),
+    ('Bulgarian Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Split squat with the rear foot on a bench.', 'https://www.youtube.com/watch?v=SkNsa3eBwLA', ARRAY['Functional fitness', 'Knee health'], 'strength'),
+    ('Split Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Static lunge, lowering the back knee towards the floor.', 'https://www.youtube.com/watch?v=la0pLPq-3A8', ARRAY['Functional fitness'], 'strength'),
+    ('Walking Lunge', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Alternating forward lunges while walking.', 'https://www.youtube.com/watch?v=DlhojghkaQ0', ARRAY['Functional fitness'], 'strength'),
+    ('Box Pistol Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Single-leg squat down to a box.', 'https://www.youtube.com/watch?v=kc4YfSHjbYE', ARRAY['Functional fitness', 'Knee health'], 'strength'),
+    ('Push-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps'], 'Bodyweight push-up, hands elevated to make it easier.', 'https://www.youtube.com/watch?v=IODxDxX7oi4', ARRAY['Functional fitness'], 'strength'),
+    ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/watch?v=_SsRDWz3U6g', ARRAY['Functional fitness', 'Shoulder health'], 'strength')
 ), new_exercises AS (
     INSERT INTO exercises (user_id, name, description, type)
     SELECT u.id, v.name, v.description, v.type

@@ -78,7 +78,6 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Get("/week", h.GetWeek)
 			r.Get("/workouts", h.ListWorkouts)
 			r.Post("/workouts", h.StartWorkout)
-			r.Get("/workouts/current", h.GetCurrentWorkout)
 			r.Get("/workouts/{id}", h.GetWorkout)
 			r.Delete("/workouts/{id}", h.DeleteWorkout)
 			r.Post("/workouts/{id}/finish", h.FinishWorkout)

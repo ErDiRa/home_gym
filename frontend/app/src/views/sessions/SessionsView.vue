@@ -43,6 +43,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
 import TextInput from '../../components/form/TextInput.vue'
+import { formatDay } from '../../dates'
 import { useSessionsStore } from '../../stores/sessions'
 import type { LibrarySession } from '../../types'
 
@@ -65,7 +66,7 @@ const columnDefs: ColDef<LibrarySession>[] = [
     headerName: 'Updated',
     flex: 1,
     minWidth: 120,
-    valueFormatter: (p) => (p.value ? new Date(p.value as string).toLocaleDateString() : ''),
+    valueFormatter: (p) => (p.value ? formatDay(p.value as string, { weekday: false }) : ''),
   },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: true, resizable: true }

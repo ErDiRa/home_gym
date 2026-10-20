@@ -184,7 +184,7 @@ BEGIN
 
     -- An exercise with several videos.
     INSERT INTO exercise_videos (exercise_id, position, url)
-    SELECT pg_temp.exercise_id('Squat'), coalesce(max(position), 0) + 1, 'https://www.youtube.com/results?search_query=Squat+tempo+31X1'
+    SELECT pg_temp.exercise_id('Squat'), coalesce(max(position), 0) + 1, 'https://www.youtube.com/watch?v=gcNh17Ckjgg'
     FROM exercise_videos WHERE exercise_id = pg_temp.exercise_id('Squat');
 
     -- Exercise ratings: some exercises are rated, the rest not.

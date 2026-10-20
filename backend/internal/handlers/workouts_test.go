@@ -24,6 +24,7 @@ type fakeWorkouts struct {
 	monday, from, to time.Time
 	set              workout.SetInput
 	slot             uuid.UUID
+	inProgress       bool // Start finds the slot already in progress
 }
 
 func (f *fakeWorkouts) Week(_ context.Context, userID, trainingID uuid.UUID, monday, from, to time.Time) (workout.Week, error) {
@@ -34,9 +35,9 @@ func (f *fakeWorkouts) Week(_ context.Context, userID, trainingID uuid.UUID, mon
 	return workout.Week{Planned: []workoutrepos.ListWeekPlanRow{}, Done: []workoutrepos.ListWorkoutsRow{}}, nil
 }
 
-func (f *fakeWorkouts) Start(_ context.Context, userID, weekSessionID uuid.UUID) (workout.Workout, error) {
+func (f *fakeWorkouts) Start(_ context.Context, userID, weekSessionID uuid.UUID) (workout.Workout, bool, error) {
 	f.userID, f.slot = userID, weekSessionID
-	return workout.Workout{ID: uuid.New(), WeekSessionID: &weekSessionID}, nil
+	return workout.Workout{ID: uuid.New(), WeekSessionID: &weekSessionID}, !f.inProgress, nil
 }
 
 func (f *fakeWorkouts) LogSet(_ context.Context, userID, workoutID uuid.UUID, in workout.SetInput) (workoutrepos.WorkoutSet, error) {
@@ -91,6 +92,11 @@ func TestStartWorkout(t *testing.T) {
 	rec := serveWorkouts(fake, http.MethodPost, "/workouts", `{"week_session_id":"`+slot.String()+`"}`)
 	if rec.Code != http.StatusCreated || fake.userID != testUser || fake.slot != slot {
 		t.Errorf("POST = %d %s, service got %v", rec.Code, rec.Body, fake.slot)
+	}
+	// The slot's workout in progress comes back as is.
+	rec = serveWorkouts(&fakeWorkouts{inProgress: true}, http.MethodPost, "/workouts", `{"week_session_id":"`+slot.String()+`"}`)
+	if rec.Code != http.StatusOK {
+		t.Errorf("POST of a slot in progress = %d, want 200", rec.Code)
 	}
 }
 

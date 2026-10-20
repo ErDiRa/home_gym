@@ -22,7 +22,7 @@ JOIN trainings t ON t.id = ws.training_id AND t.user_id = $2 AND t.deleted_at IS
 WHERE ws.id = $1;
 
 -- name: CreateWorkout :one
--- Fails on idx_workouts_user_in_progress when the user has a workout in progress.
+-- Fails on idx_workouts_slot_in_progress when the slot already has a workout in progress.
 INSERT INTO workouts (user_id, training_id, week_session_id, session_id, session_name)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
@@ -31,10 +31,10 @@ RETURNING *;
 SELECT * FROM workouts
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
--- name: GetCurrentWorkout :one
--- The user's workout in progress (at most one).
+-- name: GetSlotWorkoutInProgress :one
+-- The workout in progress of a slot of the user's (at most one).
 SELECT * FROM workouts
-WHERE user_id = $1 AND completed_at IS NULL AND deleted_at IS NULL;
+WHERE week_session_id = $1 AND user_id = $2 AND completed_at IS NULL AND deleted_at IS NULL;
 
 -- name: FinishWorkout :one
 -- Finishing again keeps the first completion time and only replaces the notes.
@@ -97,7 +97,7 @@ INSERT INTO workout_sets (
 )
 SELECT
     sqlc.arg(workout_id), e.id, sqlc.arg(block_position), sqlc.arg(exercise_position), sqlc.arg(set_number),
-    sqlc.arg(reps_value), sqlc.arg(reps_unit), sqlc.arg(per_side), sqlc.narg(load_value), sqlc.narg(load_unit)
+    sqlc.narg(reps_value), sqlc.arg(reps_unit), sqlc.arg(per_side), sqlc.narg(load_value), sqlc.narg(load_unit)
 FROM exercises e
 WHERE e.id = sqlc.arg(exercise_id) AND e.user_id = sqlc.arg(user_id) AND e.deleted_at IS NULL
 ON CONFLICT (workout_id, block_position, exercise_position, set_number)

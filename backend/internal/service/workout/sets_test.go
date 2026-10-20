@@ -21,7 +21,22 @@ func TestLogSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := f.upserts[0]
-	if u.UserID != userID || u.WorkoutID != f.workout.ID || u.BlockPosition != 2 || u.SetNumber != 3 || u.RepsValue != 8 || *u.LoadValue != 8.5 {
+	if u.UserID != userID || u.WorkoutID != f.workout.ID || u.BlockPosition != 2 || u.SetNumber != 3 || *u.RepsValue != 8 || *u.LoadValue != 8.5 {
+		t.Errorf("upserted %+v", u)
+	}
+}
+
+// A set logged partly keeps what was entered: here only the load, no reps.
+func TestLogSetLoadOnly(t *testing.T) {
+	f, reps, rpe := newFake()
+	f.workout = &repos.Workout{ID: uuid.New()}
+	in := SetInput{ExerciseID: uuid.New(), BlockPosition: 1, ExercisePosition: 1, SetNumber: 1,
+		RepsUnit: &reps, LoadValue: ptr(7.0), LoadUnit: &rpe}
+
+	if _, err := (&Service{q: f}).LogSet(context.Background(), uuid.New(), f.workout.ID, in); err != nil {
+		t.Fatal(err)
+	}
+	if u := f.upserts[0]; u.RepsValue != nil || *u.LoadValue != 7 {
 		t.Errorf("upserted %+v", u)
 	}
 }
@@ -39,7 +54,8 @@ func TestLogSetRejects(t *testing.T) {
 		{"no exercise", func(in *SetInput) { in.ExerciseID = uuid.Nil }, "exercise_id is required"},
 		{"no block", func(in *SetInput) { in.BlockPosition = 0 }, "block_position and exercise_position must be 1 or more"},
 		{"set 0", func(in *SetInput) { in.SetNumber = 0 }, "set_number must be 1-100"},
-		{"no reps", func(in *SetInput) { in.RepsValue = nil }, "reps need a value and a unit"},
+		{"no reps unit", func(in *SetInput) { in.RepsUnit = nil }, "reps_unit is required"},
+		{"nothing entered", func(in *SetInput) { in.RepsValue = nil }, "enter the reps or the load"},
 		{"load without unit", func(in *SetInput) { in.LoadValue = ptr(10.0) }, "load needs a value and a unit"},
 		{"unknown reps unit", func(in *SetInput) { in.RepsUnit = ptr(uuid.New()) }, "unknown reps unit"},
 		{"reps below unit", func(in *SetInput) { in.RepsValue = ptr(0.0) }, "reps in reps must be between 1 and 99999"},

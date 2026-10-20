@@ -21,7 +21,7 @@ type fakeQueries struct {
 	plan      []repos.ListWeekPlanRow
 	slot      *repos.GetWeekSessionRow
 	workout   *repos.Workout // what GetWorkout and FinishWorkout find
-	current   *repos.Workout
+	inSlot    *repos.Workout // what GetSlotWorkoutInProgress finds
 	done      []repos.ListWorkoutsRow
 	sets      []repos.ListWorkoutSetsRow
 	repUnits  []repos.ListRepUnitsRow
@@ -81,8 +81,8 @@ func (f *fakeQueries) GetWorkout(context.Context, repos.GetWorkoutParams) (repos
 	return found(f.workout)
 }
 
-func (f *fakeQueries) GetCurrentWorkout(context.Context, uuid.UUID) (repos.Workout, error) {
-	return found(f.current)
+func (f *fakeQueries) GetSlotWorkoutInProgress(context.Context, repos.GetSlotWorkoutInProgressParams) (repos.Workout, error) {
+	return found(f.inSlot)
 }
 
 func (f *fakeQueries) FinishWorkout(_ context.Context, arg repos.FinishWorkoutParams) (repos.Workout, error) {

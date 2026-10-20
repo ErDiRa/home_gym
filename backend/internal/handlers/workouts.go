@@ -11,8 +11,7 @@ import (
 )
 
 // GetWeek returns the week for the tracker: the active trainings, the sessions the chosen one
-// (training, optional: else the first) plans for it, the workouts finished and the workout in
-// progress. The client sends its local week: the Monday as date (YYYY-MM-DD) and the bounds
+// (training, optional: else the first) plans for it and the workouts finished. The client sends its local week: the Monday as date (YYYY-MM-DD) and the bounds
 // from and to (RFC 3339).
 func (h *Handler) GetWeek(w http.ResponseWriter, r *http.Request) {
 	// An unparseable date is left zero, which the service rejects; an unparseable training is
@@ -52,8 +51,8 @@ type startWorkoutRequest struct {
 	WeekSessionID uuid.UUID `json:"week_session_id"`
 }
 
-// StartWorkout begins a workout of a planned session (a slot of the week plan); 409 while
-// another one is in progress.
+// StartWorkout begins a workout of a planned session (a slot of the week plan): 201, or 200 with
+// the workout already in progress of that slot.
 func (h *Handler) StartWorkout(w http.ResponseWriter, r *http.Request) {
 	userID, ok := userIDFromRequest(w, r)
 	if !ok {
@@ -63,26 +62,16 @@ func (h *Handler) StartWorkout(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	wo, err := h.workouts.Start(r.Context(), userID, req.WeekSessionID)
+	wo, created, err := h.workouts.Start(r.Context(), userID, req.WeekSessionID)
 	if err != nil {
 		serviceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, wo)
-}
-
-// GetCurrentWorkout returns the workout in progress with its sets, or null.
-func (h *Handler) GetCurrentWorkout(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromRequest(w, r)
-	if !ok {
-		return
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
 	}
-	wo, err := h.workouts.Current(r.Context(), userID)
-	if err != nil {
-		serviceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, wo)
+	writeJSON(w, status, wo)
 }
 
 // GetWorkout returns one of the user's workouts with its sets.
@@ -121,7 +110,7 @@ func (h *Handler) FinishWorkout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, wo)
 }
 
-// DeleteWorkout discards the workout in progress or removes a finished one.
+// DeleteWorkout discards a workout in progress or removes a finished one.
 func (h *Handler) DeleteWorkout(w http.ResponseWriter, r *http.Request) {
 	userID, id, ok := userAndID(w, r, "workout")
 	if !ok {

@@ -40,7 +40,7 @@ import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ActiveCell from '../../components/grid/ActiveCell.vue'
-import { formatPeriod } from '../../dates'
+import { formatDay, formatPeriod } from '../../dates'
 import { useTrainingsStore } from '../../stores/trainings'
 import type { Training } from '../../types'
 
@@ -84,7 +84,7 @@ const columnDefs: ColDef<Training>[] = [
     headerName: 'Updated',
     flex: 1,
     minWidth: 120,
-    valueFormatter: (p) => (p.value ? new Date(p.value as string).toLocaleDateString() : ''),
+    valueFormatter: (p) => (p.value ? formatDay(p.value as string, { weekday: false }) : ''),
   },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: true, resizable: true }

@@ -66,8 +66,7 @@ type FeedbackService interface {
 type WorkoutService interface {
 	Week(ctx context.Context, userID, trainingID uuid.UUID, monday, from, to time.Time) (workout.Week, error)
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]workoutrepos.ListWorkoutsRow, error)
-	Start(ctx context.Context, userID, weekSessionID uuid.UUID) (workout.Workout, error)
-	Current(ctx context.Context, userID uuid.UUID) (*workout.Workout, error)
+	Start(ctx context.Context, userID, weekSessionID uuid.UUID) (w workout.Workout, created bool, err error)
 	Get(ctx context.Context, userID, id uuid.UUID) (workout.Workout, error)
 	Finish(ctx context.Context, userID, id uuid.UUID, notes string) (workout.Workout, error)
 	Delete(ctx context.Context, userID, id uuid.UUID) error

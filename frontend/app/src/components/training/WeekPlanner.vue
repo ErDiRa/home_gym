@@ -71,11 +71,10 @@ const props = defineProps<{ sessions: SessionRow[]; startDate: string }>()
 const weeks = defineModel<WeekRow[]>({ required: true })
 
 const nameOf = (key: number) => props.sessions.find((s) => s.key === key)?.name || 'Unnamed session'
-// E.g. "19 Oct – 25 Oct".
+// E.g. "19 Oct – 25 Oct" (the year is in the training's start date).
 const weekLabel = (w: number) => {
   const monday = addDays(props.startDate, w * 7)
-  const short: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
-  return `${formatDate(monday, short)} – ${formatDate(addDays(monday, 6), short)}`
+  return `${formatDate(monday, { year: false })} – ${formatDate(addDays(monday, 6), { year: false })}`
 }
 
 // The training's sessions to pick from; their keys are numbers, the menu's ids strings.

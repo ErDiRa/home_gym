@@ -208,7 +208,7 @@ type WorkoutSet struct {
 	BlockPosition    int32              `json:"block_position"`
 	ExercisePosition int32              `json:"exercise_position"`
 	SetNumber        int32              `json:"set_number"`
-	RepsValue        float64            `json:"reps_value"`
+	RepsValue        *float64           `json:"reps_value"`
 	RepsUnit         uuid.UUID          `json:"reps_unit"`
 	PerSide          bool               `json:"per_side"`
 	LoadValue        *float64           `json:"load_value"`

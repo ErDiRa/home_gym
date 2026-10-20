@@ -124,7 +124,7 @@ import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import { confirmDialog } from '../../confirm'
 import { buildCards, changed, num, type BlockCard, type ExerciseCard, type SetRow } from '../../components/workout/workoutPlan'
-import { formatDay } from '../../dates'
+import { formatDay, formatTime } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useTrainingsStore } from '../../stores/trainings'
@@ -160,7 +160,6 @@ const loggedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.fi
 const rateable = computed(() => [...new Map(allCards.value.map((c) => [c.exerciseId, { id: c.exerciseId, name: c.name }])).values()])
 const ratingOf = (exerciseId: string) => ratingDrafts.get(exerciseId) ?? exercises.ratings.get(exerciseId)?.rating ?? 0
 
-const formatTime = (at: string) => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
 onMounted(async () => {
   try {
@@ -196,12 +195,13 @@ async function toggle(card: ExerciseCard, row: SetRow) {
       row.logged = null
       return
     }
+    // Whatever was entered is saved, also only the reps or only the load; just not nothing.
     const reps = num(row.reps)
-    if (reps === null) {
-      toast.error(`Enter the ${card.repsUnitName || 'reps'} of set ${row.number} first.`)
+    const load = num(row.load)
+    if (reps === null && load === null) {
+      toast.error(`Enter the ${card.repsUnitName || 'reps'} or the load of set ${row.number} first.`)
       return
     }
-    const load = num(row.load)
     row.logged = await workouts.logSet(workout.value.id, {
       exercise_id: card.exerciseId,
       block_position: card.blockPosition,
@@ -230,6 +230,19 @@ async function openFinish() {
 
 async function finish() {
   if (!workout.value) return
+  // Logging every set isn't required, but finishing with sets left open asks first.
+  const open = plannedCount.value - loggedCount.value
+  if (!workout.value.completed_at && open > 0) {
+    const ok = await confirmDialog({
+      title: loggedCount.value ? `${open} of ${plannedCount.value} sets not logged` : 'No sets logged',
+      message: loggedCount.value
+        ? 'You can still log them later from the history. Finish the workout anyway?'
+        : 'Only your notes and ratings are saved; sets can still be logged later from the history. Finish it anyway?',
+      confirmLabel: 'Finish anyway',
+      cancelLabel: 'Keep logging',
+    })
+    if (!ok) return
+  }
   saving.value = true
   try {
     const done = !workout.value.completed_at

@@ -12,14 +12,13 @@ import (
 
 // Week is a week of training as the tracker shows it: the active trainings to choose from, and
 // for the chosen one the sessions it plans for the week; the workouts finished so far (the ones
-// started from a slot mark it done) and the workout in progress, of any training.
+// started from a slot mark it done), of any training.
 type Week struct {
 	Trainings  []repos.ListActiveTrainingsRow `json:"trainings"`   // the active ones, by name
 	Training   *repos.ListActiveTrainingsRow  `json:"training"`    // the chosen one; nil when none is active
 	WeekNumber *int32                         `json:"week_number"` // of the training, from 1; nil outside its weeks
 	Planned    []repos.ListWeekPlanRow        `json:"planned"`     // the week's slots, in order
 	Done       []repos.ListWorkoutsRow        `json:"done"`        // finished in the week, any training
-	Current    *Workout                       `json:"current"`     // the workout in progress, if any
 }
 
 // Week returns the user's week starting on monday (a local calendar date); from and to are the
@@ -34,15 +33,11 @@ func (s *Service) Week(ctx context.Context, userID, trainingID uuid.UUID, monday
 	if err != nil {
 		return Week{}, err
 	}
-	current, err := s.Current(ctx, userID)
-	if err != nil {
-		return Week{}, err
-	}
 	trainings, err := s.q.ListActiveTrainings(ctx, userID)
 	if err != nil {
 		return Week{}, err
 	}
-	week := Week{Trainings: trainings, Planned: []repos.ListWeekPlanRow{}, Done: done, Current: current}
+	week := Week{Trainings: trainings, Planned: []repos.ListWeekPlanRow{}, Done: done}
 	if len(trainings) == 0 {
 		return week, nil
 	}

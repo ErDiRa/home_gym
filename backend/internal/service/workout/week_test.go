@@ -100,15 +100,12 @@ func TestWeekPicksTraining(t *testing.T) {
 
 func TestWeekWithoutTraining(t *testing.T) {
 	f, _, _ := newFake()
-	current := repos.Workout{ID: uuid.New(), SessionName: "Session 1"}
-	f.current = &current
-
 	got, err := (&Service{q: f}).Week(context.Background(), uuid.New(), uuid.Nil, mondayDate, monday, sunday)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Workouts done and the one in progress still show without an active training.
-	if got.Training != nil || got.WeekNumber != nil || got.Planned == nil || got.Done == nil || got.Current == nil || got.Current.ID != current.ID {
+	// Workouts done still show without an active training.
+	if got.Training != nil || got.WeekNumber != nil || got.Planned == nil || got.Done == nil {
 		t.Errorf("week = %+v", got)
 	}
 	if l := f.listed[0]; !l.FromTime.Time.Equal(monday) || !l.ToTime.Time.Equal(sunday) {
@@ -137,12 +134,4 @@ func TestListPeriod(t *testing.T) {
 	}
 	_, err := s.List(context.Background(), uuid.New(), monday, monday.AddDate(1, 0, 2))
 	wantError(t, err, service.KindInvalid, "the period can be at most a year")
-}
-
-func TestCurrentNone(t *testing.T) {
-	f, _, _ := newFake()
-	got, err := (&Service{q: f}).Current(context.Background(), uuid.New())
-	if err != nil || got != nil {
-		t.Errorf("current = %+v, %v", got, err)
-	}
 }

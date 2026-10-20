@@ -67,7 +67,7 @@
           </label>
         </div>
         <p v-if="endDate" class="mt-1 text-xs text-slate-500">
-          Ends on {{ formatDate(endDate, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) }}. Sessions are
+          Ends on {{ formatDate(endDate, { weekday: true }) }}. Sessions are
           done on any days of their week.
         </p>
       </fieldset>

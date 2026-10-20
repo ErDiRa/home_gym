@@ -12,16 +12,17 @@
         </p>
       </div>
       <AppButton
-        v-if="videoUrl"
-        :href="videoUrl"
+        v-if="videoUrls.length"
         variant="ghost"
         size="touch"
         icon
         class="-mt-2 -mr-2"
-        :aria-label="`Video for ${card.name}`"
+        :aria-label="videoUrls.length > 1 ? `Videos for ${card.name}` : `Video for ${card.name}`"
+        @click="videosOpen = true"
       >
         <VideoCameraIcon class="size-6" aria-hidden="true" />
       </AppButton>
+      <ExerciseVideoSheet :open="videosOpen" :name="card.name" :urls="videoUrls" @close="videosOpen = false" />
     </div>
 
     <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. -->
@@ -85,11 +86,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { ArrowPathIcon, CheckIcon, PlusIcon, VideoCameraIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import SelectField from '../form/SelectField.vue'
 import TextInput from '../form/TextInput.vue'
+import ExerciseVideoSheet from './ExerciseVideoSheet.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { changed, type ExerciseCard, type SetRow } from './workoutPlan'
@@ -100,7 +102,11 @@ const emit = defineEmits<{ toggle: [row: SetRow] }>()
 const lookups = useLookupsStore()
 const exercises = useExercisesStore()
 
-const videoUrl = computed(() => exercises.exercises.find((e) => e.id === card.value.exerciseId)?.video_urls[0])
+// The exercise's videos, shown in a sheet; only http(s) links count.
+const videoUrls = computed(() =>
+  (exercises.exercises.find((e) => e.id === card.value.exerciseId)?.video_urls ?? []).filter((u) => /^https?:\/\//i.test(u)),
+)
+const videosOpen = ref(false)
 
 function buttonLabel(row: SetRow) {
   if (!row.logged) return `Log set ${row.number}`

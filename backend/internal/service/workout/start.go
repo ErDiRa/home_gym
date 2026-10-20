@@ -11,24 +11,31 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
 
-// Start begins a workout of a planned slot of one of the user's trainings. A user does one
-// workout at a time: while one is in progress, starting another is a conflict.
-func (s *Service) Start(ctx context.Context, userID, weekSessionID uuid.UUID) (Workout, error) {
+// Start begins a workout of a planned slot of one of the user's trainings. Several workouts can
+// be in progress at once (e.g. a warm-up and the strength session), but a slot has at most one:
+// starting a slot that is already in progress returns that workout with its sets instead, with
+// created false (e.g. started meanwhile on another device).
+func (s *Service) Start(ctx context.Context, userID, weekSessionID uuid.UUID) (w Workout, created bool, err error) {
 	slot, err := s.q.GetWeekSession(ctx, repos.GetWeekSessionParams{ID: weekSessionID, UserID: userID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Workout{}, service.InvalidCause("unknown planned session", err)
+		return Workout{}, false, service.InvalidCause("unknown planned session", err)
 	}
 	if err != nil {
-		return Workout{}, err
+		return Workout{}, false, err
 	}
-	w, err := s.q.CreateWorkout(ctx, repos.CreateWorkoutParams{
+	row, err := s.q.CreateWorkout(ctx, repos.CreateWorkoutParams{
 		UserID: userID, TrainingID: &slot.TrainingID, WeekSessionID: &slot.ID, SessionID: &slot.SessionID, SessionName: slot.Name,
 	})
 	if isUniqueViolation(err) {
-		return Workout{}, service.Conflict("finish or discard the workout in progress first", err)
+		existing, err := s.q.GetSlotWorkoutInProgress(ctx, repos.GetSlotWorkoutInProgressParams{WeekSessionID: &slot.ID, UserID: userID})
+		if err != nil {
+			return Workout{}, false, err
+		}
+		w, err := withSets(ctx, s.q, existing)
+		return w, false, err
 	}
 	if err != nil {
-		return Workout{}, err
+		return Workout{}, false, err
 	}
-	return fromRow(w, []repos.ListWorkoutSetsRow{}), nil
+	return fromRow(row, []repos.ListWorkoutSetsRow{}), true, nil
 }

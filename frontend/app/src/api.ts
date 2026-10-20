@@ -108,7 +108,7 @@ export const getWeek = (monday: string, from: Date, to: Date, trainingId?: strin
 // Workouts finished in [from, to), newest first.
 export const listWorkouts = (from: Date, to: Date) => api.get<WorkoutSummary[]>(`/workouts?${period(from, to)}`)
 export const getWorkout = (id: string) => api.get<Workout>(`/workouts/${id}`)
-// 409 while another workout is in progress.
+// A slot started before (and not finished) returns that workout instead of a new one.
 export const startWorkout = (weekSessionId: string) => api.post<Workout>('/workouts', { week_session_id: weekSessionId })
 // Logs a set, or corrects it when the same block, position and set number was logged before.
 export const logSet = (workoutId: string, set: SetInput) => api.put<LoggedSet>(`/workouts/${workoutId}/sets`, set)
