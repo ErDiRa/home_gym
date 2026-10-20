@@ -7,11 +7,11 @@
         <AppButton :to="{ name: 'exercise-new' }">New exercise</AppButton>
       </div>
     </div>
-    <input
+    <TextInput
       v-model="query"
       type="search"
       placeholder="Search exercises..."
-      class="mb-4 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+      class="mb-4"
     />
 
     <p v-if="error" class="text-center text-red-600">{{ error }}</p>
@@ -38,6 +38,7 @@ import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent }
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import TextInput from '../../components/form/TextInput.vue'
 import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
 import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'

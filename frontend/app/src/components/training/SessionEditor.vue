@@ -1,25 +1,26 @@
 <template>
   <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="flex items-center gap-2" :class="{ 'mb-2': !collapsed }">
-      <button
+      <AppButton
         v-if="collapsible"
-        type="button"
-        class="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        variant="ghost"
+        size="sm"
+        icon
         :aria-expanded="!collapsed"
         :aria-controls="bodyId"
         :aria-label="`${collapsed ? 'Expand' : 'Collapse'} ${session.name || label}`"
         @click="collapsed = !collapsed"
       >
         <ChevronRightIcon class="size-5 transition-transform" :class="{ 'rotate-90': !collapsed }" aria-hidden="true" />
-      </button>
-      <input
+      </AppButton>
+      <TextInput
         v-model="session.name"
         type="text"
         required
         maxlength="100"
         placeholder="Session name, e.g. Session 1"
         :aria-label="`${label} name`"
-        :class="[inputClass, 'mt-0! flex-1 text-base! font-semibold']"
+        class="flex-1 text-base! font-semibold!"
       />
       <MoveRemoveButtons
         v-if="count !== undefined"
@@ -30,18 +31,12 @@
         @remove="emit('remove')"
       />
     </div>
-    <p v-if="collapsed" class="mt-1 ml-9 text-xs text-slate-500">
+    <p v-if="collapsed" class="mt-1 ml-10 text-xs text-slate-500">
       {{ summary }}
       <span v-if="problem" class="ml-1 text-amber-700">· {{ problem }}</span>
     </p>
     <div v-show="!collapsed" :id="bodyId">
-      <input
-        v-model="session.notes"
-        type="text"
-        placeholder="Notes for this session"
-        :aria-label="`${label} notes`"
-        :class="[inputClass, 'mt-0! mb-3']"
-      />
+      <TextInput v-model="session.notes" type="text" placeholder="Notes for this session" :aria-label="`${label} notes`" class="mb-3" />
       <div class="space-y-3">
         <TrainingBlockEditor
           v-for="(block, b) in session.blocks"
@@ -65,6 +60,7 @@
 import { computed, ref, useId } from 'vue'
 import { ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
+import TextInput from '../form/TextInput.vue'
 import MoveRemoveButtons from './MoveRemoveButtons.vue'
 import TrainingBlockEditor from './TrainingBlockEditor.vue'
 import { move, newBlock, sessionProblem, type SessionRow } from './trainingForm'
@@ -90,7 +86,4 @@ const summary = computed(() => {
 })
 // Shown while folded, so a problem isn't hidden.
 const problem = computed(() => (collapsed.value ? sessionProblem(session.value) : ''))
-
-const inputClass =
-  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 </script>

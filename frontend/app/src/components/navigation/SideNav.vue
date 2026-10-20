@@ -27,9 +27,7 @@
       </span>
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-medium text-white">{{ state.user?.email }}</p>
-        <button type="button" class="text-xs text-slate-400 hover:text-white hover:underline" @click="logout">
-          Sign out
-        </button>
+        <AppButton variant="inverse" size="xs" class="-ml-2 text-slate-400!" @click="logout">Sign out</AppButton>
       </div>
     </div>
   </aside>
@@ -37,6 +35,7 @@
 
 <script setup lang="ts">
 import { logout } from '../../api'
+import AppButton from '../button/AppButton.vue'
 import { state } from '../../session'
 import type { NavItem } from '../../navigation'
 

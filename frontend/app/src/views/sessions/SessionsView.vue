@@ -11,11 +11,11 @@
       Your library of session templates. Adding one to a training copies it, so the training keeps its version when you edit the
       template.
     </p>
-    <input
+    <TextInput
       v-model="query"
       type="search"
       placeholder="Search sessions..."
-      class="mb-4 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+      class="mb-4"
     />
 
     <p v-if="error" class="text-center text-red-600">{{ error }}</p>
@@ -42,6 +42,7 @@ import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent }
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import TextInput from '../../components/form/TextInput.vue'
 import { useSessionsStore } from '../../stores/sessions'
 import type { LibrarySession } from '../../types'
 

@@ -44,6 +44,7 @@ import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import SessionEditor from '../../components/training/SessionEditor.vue'
 import { newSession, sessionProblem, toSessionInput, toSessionRow, type SessionRow } from '../../components/training/trainingForm'
+import { confirmDialog } from '../../confirm'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useSessionsStore } from '../../stores/sessions'
@@ -99,7 +100,14 @@ async function submit() {
 }
 
 async function remove() {
-  if (!sessionId || !confirm(`Delete the session "${session.value?.name}"? Trainings keep their copies.`)) return
+  if (!sessionId) return
+  const ok = await confirmDialog({
+    title: `Delete the session "${session.value?.name}"?`,
+    message: 'It is removed from your library. Trainings keep their copies.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   saving.value = true
   try {
     await store.deleteSession(sessionId)

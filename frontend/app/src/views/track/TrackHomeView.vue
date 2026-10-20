@@ -25,21 +25,17 @@
           {{ formatPeriod(week.training.start_date, week.training.end_date) }}
         </p>
         <!-- Several active trainings (e.g. strength, warm-ups, mobility): the heading switches. -->
-        <div v-if="week.trainings.length > 1" class="relative mt-1">
-          <label for="training-switch" class="sr-only">Training</label>
-          <select
-            id="training-switch"
-            :value="week.training.id"
-            class="min-h-11 w-full appearance-none truncate rounded-xl border border-slate-300 bg-white py-1.5 pr-10 pl-3 text-xl font-bold tracking-tight text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-            @change="pick(($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="t in week.trainings" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
-          <ChevronUpDownIcon
-            class="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2 text-slate-500"
-            aria-hidden="true"
-          />
-        </div>
+        <SelectField
+          v-if="week.trainings.length > 1"
+          :model-value="week.training.id"
+          :options="week.trainings"
+          :searchable="false"
+          size="touch"
+          aria-label="Training"
+          field-class="text-xl! font-bold tracking-tight"
+          class="mt-1"
+          @update:model-value="(id) => id && pick(id)"
+        />
         <h1 v-else class="text-2xl font-bold tracking-tight text-slate-900">{{ week.training.name }}</h1>
         <p
           v-if="!week.week_number || !week.planned.length"
@@ -93,9 +89,10 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ChevronRightIcon, ChevronUpDownIcon, PlayCircleIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, PlayCircleIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import SelectField from '../../components/form/SelectField.vue'
 import SessionCard from '../../components/workout/SessionCard.vue'
 import { sessionSummary, type SummaryLine } from '../../components/workout/workoutPlan'
 import { formatPeriod, today } from '../../dates'

@@ -7,27 +7,15 @@
       >
         {{ letter }}
       </span>
-      <div role="radiogroup" :aria-label="`Block ${letter} kind`" class="flex rounded-md border border-slate-300 bg-white p-0.5">
-        <label
-          v-for="k in lookups.blockKinds"
-          :key="k.code"
-          :title="k.description"
-          :class="[
-            'cursor-pointer rounded px-2.5 py-1 text-xs font-medium has-focus-visible:ring-2 has-focus-visible:ring-indigo-200',
-            block.kind === k.code ? 'bg-indigo-600 text-white' : 'text-slate-700 hover:bg-slate-100',
-          ]"
-        >
-          <input v-model="block.kind" type="radio" :name="`block-kind-${block.key}`" :value="k.code" class="sr-only" />
-          {{ k.name }}
-        </label>
-      </div>
-      <input
+      <SegmentedControl v-model="block.kind" :options="kindOptions" :label="`Block ${letter} kind`" size="xs" />
+      <TextInput
         v-model="block.name"
         type="text"
         maxlength="100"
         placeholder="Name (optional), e.g. Warm-up"
         :aria-label="`Block ${letter} name`"
-        :class="[inputClass, 'min-w-40 flex-1 font-medium']"
+        size="sm"
+        class="w-auto! min-w-40 flex-1 font-medium!"
       />
       <MoveRemoveButtons :index="index" :count="count" :label="`block ${letter}`" @move="emit('move', $event)" @remove="emit('remove')" />
     </div>
@@ -35,25 +23,27 @@
     <div v-if="kind?.shared_sets || kind?.shared_reps || kind?.shared_load" class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
       <label v-if="kind?.shared_sets" class="text-xs font-medium text-slate-600">
         Sets<span class="text-red-600" aria-hidden="true"> *</span>
-        <input
+        <TextInput
           v-model.number="block.sets"
           type="number"
           min="1"
           max="100"
           required
           :aria-label="`Block ${letter} sets`"
-          :class="[inputClass, 'mt-1 block h-8 w-16']"
+          size="sm"
+          class="mt-1 w-16!"
         />
       </label>
       <AmountInput v-if="kind?.shared_reps" v-model="block" part="reps" :label="`Block ${letter}`" hint="same for all" />
       <AmountInput v-if="kind?.shared_load" v-model="block" part="load" :label="`Block ${letter}`" hint="same for all" />
     </div>
-    <input
+    <TextInput
       v-model="block.notes"
       type="text"
       placeholder="Notes, e.g. 90s rest between rounds"
       :aria-label="`Block ${letter} notes`"
-      :class="[inputClass, 'mb-3 w-full']"
+      size="sm"
+      class="mb-3"
     />
 
     <ol v-if="block.exercises.length" class="mb-3 space-y-2">
@@ -74,14 +64,15 @@
         <div class="flex flex-wrap items-end gap-x-4 gap-y-2 pl-9">
           <label v-if="!kind?.shared_sets" class="text-xs font-medium text-slate-600">
             Sets<span class="text-red-600" aria-hidden="true"> *</span>
-            <input
+            <TextInput
               v-model.number="item.sets"
               type="number"
               min="1"
               max="100"
               required
               :aria-label="`${exerciseLabel(block.exercises.length, index, i)} sets`"
-              :class="[inputClass, 'mt-1 block h-8 w-16']"
+              size="sm"
+              class="mt-1 w-16!"
             />
           </label>
           <AmountInput
@@ -98,18 +89,19 @@
           />
           <label class="text-xs font-medium text-slate-600" title="Eccentric, pause, concentric, pause in seconds; X = explosive">
             Tempo
-            <input
+            <TextInput
               v-model="item.tempo"
               type="text"
               maxlength="20"
               placeholder="31X1"
               :aria-label="`${exerciseLabel(block.exercises.length, index, i)} tempo`"
-              :class="[inputClass, 'mt-1 block h-8 w-20']"
+              size="sm"
+              class="mt-1 w-20!"
             />
           </label>
           <label class="min-w-40 flex-1 text-xs font-medium text-slate-600">
             Notes
-            <input v-model="item.notes" type="text" placeholder="e.g. slow eccentric" :class="[inputClass, 'mt-1 block h-8 w-full']" />
+            <TextInput v-model="item.notes" type="text" placeholder="e.g. slow eccentric" size="sm" class="mt-1" />
           </label>
         </div>
       </li>
@@ -136,6 +128,8 @@ import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
+import SegmentedControl from '../form/SegmentedControl.vue'
+import TextInput from '../form/TextInput.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
 import RatingBadge from '../exercise/RatingBadge.vue'
 import AmountInput from './AmountInput.vue'
@@ -157,8 +151,7 @@ const lookups = useLookupsStore()
 // The user's ratings by exercise id.
 const { ratings } = storeToRefs(useExercisesStore())
 
-const inputClass =
-  'rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-normal text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
+const kindOptions = computed(() => lookups.blockKinds.map((k) => ({ value: k.code, label: k.name, title: k.description })))
 
 const letter = computed(() => blockLetter(props.index))
 const kind = computed(() => lookups.kindOf(block.value.kind))

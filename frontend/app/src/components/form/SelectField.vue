@@ -1,48 +1,39 @@
 <template>
-  <Combobox v-model="model" immediate nullable :disabled="disabled" as="div">
-    <ComboboxLabel v-if="label" class="mb-1 block text-sm font-medium text-slate-800">
+  <!-- Searchable: a combobox to type into. Otherwise a listbox, which opens no keyboard on phones. -->
+  <Combobox v-if="searchable" v-model="model" immediate nullable :disabled="disabled" as="div">
+    <ComboboxLabel v-if="label" :class="labelClass">
       {{ label }}<span v-if="required" class="ml-0.5 text-red-600" aria-hidden="true">*</span>
     </ComboboxLabel>
-
     <div ref="field" class="relative">
       <ComboboxInput
-        :display-value="(id) => options.find((o) => o.id === id)?.name ?? ''"
+        :display-value="(id) => nameOf(id as string | null)"
         :placeholder="placeholder"
-        class="block h-10 w-full rounded-lg border border-slate-300 bg-white py-2 pr-8 pl-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:bg-slate-50 disabled:text-slate-500"
+        :aria-label="!label ? ariaLabel : undefined"
+        :class="[fieldClasses, 'outline-none placeholder:text-slate-400']"
         @change="query = $event.target.value"
-        @focus="placeOptions"
+        @focus="place"
       />
-      <ComboboxButton class="absolute inset-y-0 right-0 flex items-center pr-2" @click="placeOptions">
-        <ChevronUpDownIcon class="size-4 text-slate-400" aria-hidden="true" />
+      <ComboboxButton :class="chevronClasses" @click="place">
+        <ChevronUpDownIcon :class="chevronSize" aria-hidden="true" />
       </ComboboxButton>
-
-      <Transition leave-active-class="transition-opacity duration-100" leave-to-class="opacity-0" @after-leave="query = ''">
-        <ComboboxOptions
-          :class="openUp ? 'bottom-full mb-1' : 'top-full mt-1'"
-          class="absolute z-20 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg focus:outline-none"
-        >
-          <li v-if="!filtered.length" class="px-3 py-2 text-slate-500">No matches.</li>
-          <ComboboxOption
-            v-for="option in filtered"
-            :key="option.id"
-            v-slot="{ active, selected }"
-            :value="option.id"
-            as="template"
-          >
-            <li
-              :class="[
-                'flex cursor-pointer items-center justify-between gap-2 px-3 py-2',
-                active ? 'bg-indigo-50 text-indigo-900' : 'text-slate-800',
-              ]"
-            >
-              <span :class="{ 'font-medium': selected }" class="truncate">{{ option.name }}</span>
-              <CheckIcon v-if="selected" class="size-4 shrink-0 text-indigo-600" aria-hidden="true" />
-            </li>
-          </ComboboxOption>
-        </ComboboxOptions>
-      </Transition>
+      <SelectOptions :options="filtered" :open-up="openUp" :size="optionSize ?? size" @closed="query = ''" />
     </div>
   </Combobox>
+
+  <Listbox v-else v-model="model" :disabled="disabled" as="div">
+    <ListboxLabel v-if="label" :class="labelClass">
+      {{ label }}<span v-if="required" class="ml-0.5 text-red-600" aria-hidden="true">*</span>
+    </ListboxLabel>
+    <div ref="field" class="relative">
+      <ListboxButton :aria-label="!label ? ariaLabel : undefined" :class="[fieldClasses, 'text-left']" @click="place">
+        <span :class="{ 'text-slate-400': model == null }" class="block truncate">{{ nameOf(model) || placeholder }}</span>
+        <span :class="chevronClasses">
+          <ChevronUpDownIcon :class="chevronSize" aria-hidden="true" />
+        </span>
+      </ListboxButton>
+      <SelectOptions :options="options" :open-up="openUp" :size="optionSize ?? size" panel-class="min-w-32" listbox />
+    </div>
+  </Listbox>
 </template>
 
 <script setup lang="ts">
@@ -52,16 +43,36 @@ import {
   ComboboxButton,
   ComboboxInput,
   ComboboxLabel,
-  ComboboxOption,
-  ComboboxOptions,
+  Listbox,
+  ListboxButton,
+  ListboxLabel,
 } from '@headlessui/vue'
-import { CheckIcon, ChevronUpDownIcon } from '@heroicons/vue/16/solid'
+import { ChevronUpDownIcon } from '@heroicons/vue/16/solid'
+import SelectOptions from './SelectOptions.vue'
+import { useDropPlacement } from './useDropPlacement'
 import type { Option } from '../../types'
 
-// A searchable select holding one option's id.
+export type FieldSize = 'sm' | 'md' | 'touch'
+
+// A select holding one option's id: searchable (a combobox, the default) or a plain listbox for
+// short lists, e.g. in the tracker. touch is the tracker's 44px size with text-base.
 const props = withDefaults(
-  defineProps<{ options: Option[]; label?: string; placeholder?: string; required?: boolean; disabled?: boolean }>(),
-  { label: '', placeholder: 'Select…' },
+  defineProps<{
+    options: Option[]
+    label?: string
+    /** Accessible name when there is no visible label. */
+    ariaLabel?: string
+    placeholder?: string
+    required?: boolean
+    disabled?: boolean
+    searchable?: boolean
+    size?: FieldSize
+    /** Size of the option rows, if not the field's (e.g. a small field with touch rows). */
+    optionSize?: FieldSize
+    /** Extra classes for the field, e.g. a large heading font. */
+    fieldClass?: string
+  }>(),
+  { label: '', ariaLabel: undefined, placeholder: 'Select…', searchable: true, size: 'md', optionSize: undefined, fieldClass: '' },
 )
 const model = defineModel<string | null>({ required: true })
 
@@ -70,16 +81,25 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   return q ? props.options.filter((o) => o.name.toLowerCase().includes(q)) : props.options
 })
+const nameOf = (id: string | null) => props.options.find((o) => o.id === id)?.name ?? ''
 
-// Open upwards when the list (max-h-60, 15rem) doesn't fit below the field.
-const OPTIONS_HEIGHT = 240
-const field = ref<HTMLElement | null>(null)
-const openUp = ref(false)
+const { field, openUp, place } = useDropPlacement()
 
-function placeOptions() {
-  const rect = field.value?.getBoundingClientRect()
-  if (!rect) return
-  const below = window.innerHeight - rect.bottom
-  openUp.value = below < OPTIONS_HEIGHT && rect.top > below
+const labelClass = 'mb-1 block text-sm font-medium text-slate-800'
+const sizeClasses: Record<FieldSize, string> = {
+  sm: 'h-8 rounded-md pr-6 pl-2 text-sm',
+  md: 'h-10 rounded-lg pr-8 pl-3 text-sm',
+  touch: 'h-11 rounded-xl pr-10 pl-3 text-base',
 }
+const fieldClasses = computed(() => [
+  'relative block w-full border border-slate-300 bg-white text-slate-900',
+  'focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500',
+  sizeClasses[props.size],
+  props.fieldClass,
+])
+const chevronClasses = computed(() => [
+  'pointer-events-auto absolute inset-y-0 right-0 flex items-center',
+  props.size === 'sm' ? 'pr-1' : props.size === 'md' ? 'pr-2' : 'pr-3',
+])
+const chevronSize = computed(() => (props.size === 'touch' ? 'size-5 text-slate-500' : 'size-4 text-slate-400'))
 </script>

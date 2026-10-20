@@ -32,47 +32,36 @@
     <form class="space-y-4" @submit.prevent="submit">
       <label class="block text-sm font-medium text-slate-800">
         Name<span class="text-red-600" aria-hidden="true"> *</span>
-        <input v-model="name" type="text" required maxlength="100" placeholder="e.g. Phase 1" :class="inputClass" />
+        <TextInput v-model="name" type="text" required maxlength="100" placeholder="e.g. Phase 1" class="mt-1" />
       </label>
       <fieldset>
         <legend class="text-sm font-medium text-slate-800">Period<span class="text-red-600" aria-hidden="true"> *</span></legend>
         <div class="mt-1 flex flex-wrap items-end gap-3">
           <label class="text-xs font-medium text-slate-600">
             Start (a Monday)
-            <input
-              :value="startDate"
+            <TextInput
+              :model-value="startDate"
               type="date"
               required
-              :class="[inputClass, 'w-44!']"
+              class="mt-1 w-44!"
               @change="setStart(($event.target as HTMLInputElement).value)"
             />
           </label>
-          <div class="flex gap-1" role="group" aria-label="Duration">
-            <button
-              v-for="w in durationWeeks"
-              :key="w"
-              type="button"
-              :aria-pressed="weekCount === w"
-              :class="
-                weekCount === w
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
-              "
-              class="h-[38px] rounded-md border px-3 text-xs font-semibold"
-              @click="setWeekCount(w)"
-            >
-              {{ w }} weeks
-            </button>
-          </div>
+          <SegmentedControl
+            :model-value="weekCount"
+            :options="durationWeeks.map((w) => ({ value: w, label: `${w} weeks` }))"
+            label="Duration"
+            @update:model-value="setWeekCount(Number($event))"
+          />
           <label class="text-xs font-medium text-slate-600">
             Weeks
-            <input
-              :value="weekCount"
+            <TextInput
+              :model-value="weekCount"
               type="number"
               min="1"
               :max="MAX_WEEKS"
               required
-              :class="[inputClass, 'w-24!']"
+              class="mt-1 w-24!"
               @change="setWeekCount(Number(($event.target as HTMLInputElement).value))"
             />
           </label>
@@ -82,16 +71,15 @@
           done on any days of their week.
         </p>
       </fieldset>
-      <label class="flex items-start gap-2 text-sm text-slate-800">
-        <input v-model="active" type="checkbox" class="mt-0.5 size-4 rounded border-slate-300 accent-indigo-600" />
-        <span>
-          <span class="font-medium">Active</span>
-          <span class="block text-xs text-slate-500">Shown in the tracker. Several trainings can be active, e.g. strength, warm-ups and mobility side by side.</span>
-        </span>
-      </label>
+      <AppCheckbox
+        v-model="active"
+        description="Shown in the tracker. Several trainings can be active, e.g. strength, warm-ups and mobility side by side."
+      >
+        Active
+      </AppCheckbox>
       <label class="block text-sm font-medium text-slate-800">
         Description
-        <textarea v-model="description" rows="2" :class="inputClass" />
+        <TextInput v-model="description" multiline rows="2" class="mt-1" />
       </label>
 
       <section class="space-y-4" aria-labelledby="sessions-heading">
@@ -124,16 +112,10 @@
             <PlusIcon class="size-4" aria-hidden="true" />
             New session
           </AppButton>
-          <select
-            v-if="library.sessions.length"
-            aria-label="Add a session from the library"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            :disabled="copying"
-            @change="addFromLibrary"
-          >
-            <option value="">+ From library…</option>
-            <option v-for="s in library.sessions" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
+          <ActionMenu v-if="library.sessions.length" :items="library.sessions" :disabled="copying" @select="addFromLibrary">
+            <BookOpenIcon class="size-4" aria-hidden="true" />
+            From library
+          </ActionMenu>
         </div>
       </section>
 
@@ -161,9 +143,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ArrowLeftIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, BookOpenIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import AppCheckbox from '../../components/form/AppCheckbox.vue'
+import SegmentedControl from '../../components/form/SegmentedControl.vue'
+import TextInput from '../../components/form/TextInput.vue'
+import ActionMenu from '../../components/ui/ActionMenu.vue'
 import SessionEditor from '../../components/training/SessionEditor.vue'
 import WeekPlanner from '../../components/training/WeekPlanner.vue'
 import {
@@ -179,6 +165,7 @@ import {
   type SessionRow,
   type WeekRow,
 } from '../../components/training/trainingForm'
+import { confirmDialog } from '../../confirm'
 import { addDays, formatDate, isMonday, nextMonday } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
@@ -193,9 +180,6 @@ const lookups = useLookupsStore()
 const library = useSessionsStore()
 // Set when editing an existing training (route /trainings/:id), absent when creating one.
 const trainingId = route.params.id as string | undefined
-
-const inputClass =
-  'mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
 
 const MAX_WEEKS = 52
 const durationWeeks = [4, 6, 8, 12]
@@ -228,10 +212,20 @@ function setStart(value: string) {
 }
 
 // More weeks start with the plan of the last one; fewer drop the last weeks' plans.
-function setWeekCount(n: number) {
+async function setWeekCount(n: number) {
   if (!Number.isInteger(n) || n < 1 || n > MAX_WEEKS) return
   const list = weeks.value
-  if (n < list.length && list.slice(n).some((w) => w.slots.length) && !confirm(`Drop the plans of weeks ${n + 1} to ${list.length}?`))
+  if (
+    n < list.length &&
+    list.slice(n).some((w) => w.slots.length) &&
+    !(await confirmDialog({
+      title: `Shorten to ${n} ${n === 1 ? 'week' : 'weeks'}?`,
+      message:
+        n + 1 === list.length ? `The plan of week ${list.length} is dropped.` : `The plans of weeks ${n + 1} to ${list.length} are dropped.`,
+      confirmLabel: 'Shorten',
+      danger: true,
+    }))
+  )
     return
   while (list.length > n) list.pop()
   while (list.length < n) {
@@ -277,11 +271,7 @@ onMounted(async () => {
 })
 
 // Copies a template of the library into the training, as a new session of its own.
-async function addFromLibrary(event: Event) {
-  const select = event.target as HTMLSelectElement
-  const id = select.value
-  select.value = '' // back to the prompt, ready for the next one
-  if (!id) return
+async function addFromLibrary(id: string) {
   copying.value = true
   try {
     sessions.value.push(toSessionRow(await library.getSession(id), false))
@@ -293,12 +283,22 @@ async function addFromLibrary(event: Event) {
 }
 
 // Removing a session also takes it out of the weeks; asks first when that loses something.
-function removeSession(index: number) {
+async function removeSession(index: number) {
   const session = sessions.value[index]
   const planned = weeks.value.some((w) => w.slots.some((s) => s.sessionKey === session.key))
   const hasExercises = session.blocks.some((b) => b.exercises.length)
-  if ((planned || hasExercises) && !confirm(`Remove "${session.name}"${planned ? ' and its place in the weeks' : ''}?`)) return
-  sessions.value.splice(index, 1)
+  if (
+    (planned || hasExercises) &&
+    !(await confirmDialog({
+      title: `Remove "${session.name || 'Unnamed session'}"?`,
+      message: planned ? 'It is also taken out of the weeks it is planned in.' : 'Its blocks and exercises are removed with it.',
+      confirmLabel: 'Remove',
+      danger: true,
+    }))
+  )
+    return
+  // Found again by key, in case the list changed while the dialog was open.
+  sessions.value = sessions.value.filter((s) => s.key !== session.key)
   for (const w of weeks.value) w.slots = w.slots.filter((s) => s.sessionKey !== session.key)
 }
 
@@ -341,7 +341,14 @@ async function submit() {
 }
 
 async function remove() {
-  if (!trainingId || !confirm(`Delete the training "${name.value}"?`)) return
+  if (!trainingId) return
+  const ok = await confirmDialog({
+    title: `Delete the training "${name.value}"?`,
+    message: 'Its sessions and week plan are deleted. Workouts already done stay in the history.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   saving.value = true
   try {
     await trainingsStore.deleteTraining(trainingId)

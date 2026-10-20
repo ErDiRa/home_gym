@@ -38,34 +38,15 @@
 				<form class="space-y-5" @submit.prevent="submit">
 					<label class="block text-sm font-medium text-slate-800">
 						Email
-						<input
-							v-model="email"
-							type="email"
-							autocomplete="email"
-							required
-							class="mt-1 block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none"
-						/>
+						<TextInput v-model="email" type="email" autocomplete="email" required class="mt-1 text-base! sm:text-sm!" />
 					</label>
 
 					<label class="block text-sm font-medium text-slate-800">
 						Password
-						<input
-							v-model="password"
-							type="password"
-							autocomplete="current-password"
-							required
-							class="mt-1 block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none"
-						/>
+						<TextInput v-model="password" type="password" autocomplete="current-password" required class="mt-1 text-base! sm:text-sm!" />
 					</label>
 
-					<label class="flex items-center gap-2 text-sm text-slate-600">
-						<input
-							v-model="remember"
-							type="checkbox"
-							class="size-4 rounded border-slate-300 accent-indigo-600"
-						/>
-						Keep me signed in
-					</label>
+					<AppCheckbox v-model="remember">Keep me signed in</AppCheckbox>
 
 					<p
 						v-if="error"
@@ -89,6 +70,8 @@
 	import { useRoute, useRouter } from 'vue-router';
 	import { ApiError, login } from '../../api';
 	import AppButton from '../../components/button/AppButton.vue';
+	import AppCheckbox from '../../components/form/AppCheckbox.vue';
+	import TextInput from '../../components/form/TextInput.vue';
 
 	const route = useRoute();
 	const router = useRouter();

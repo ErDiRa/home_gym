@@ -11,43 +11,47 @@
           {{ card.notes }}
         </p>
       </div>
-      <a
+      <AppButton
         v-if="videoUrl"
         :href="videoUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="-mt-2 -mr-2 flex size-11 shrink-0 items-center justify-center rounded-xl text-slate-500 active:bg-slate-100"
+        variant="ghost"
+        size="touch"
+        icon
+        class="-mt-2 -mr-2"
         :aria-label="`Video for ${card.name}`"
       >
         <VideoCameraIcon class="size-6" aria-hidden="true" />
-      </a>
+      </AppButton>
     </div>
 
     <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. -->
     <div class="mt-2 grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-x-2 gap-y-1.5">
       <span class="text-xs font-medium text-slate-500">Set</span>
       <span class="text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
-      <select
+      <SelectField
         v-model="card.loadUnit"
-        class="h-7 w-full rounded-md border-0 bg-transparent p-0 text-xs font-medium text-slate-500"
+        :options="lookups.loadUnits"
+        :searchable="false"
+        size="sm"
+        option-size="touch"
         :aria-label="`${card.label} load unit`"
-      >
-        <option v-for="u in lookups.loadUnits" :key="u.id" :value="u.id">{{ u.name }}</option>
-      </select>
+        field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
+      />
       <span />
 
       <template v-for="row in card.rows" :key="row.number">
         <span class="text-center text-sm font-semibold text-slate-500">{{ row.number }}</span>
-        <input
+        <TextInput
           v-model.number="row.reps"
           type="number"
           inputmode="decimal"
           min="0"
           step="any"
           :aria-label="`${card.label} set ${row.number} ${card.repsUnitName || 'reps'}`"
-          :class="[inputClass, rowClass(row)]"
+          size="touch"
+          :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
         />
-        <input
+        <TextInput
           v-model.number="row.load"
           type="number"
           inputmode="decimal"
@@ -55,42 +59,37 @@
           step="any"
           placeholder="–"
           :aria-label="`${card.label} set ${row.number} load`"
-          :class="[inputClass, rowClass(row)]"
+          size="touch"
+          :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
         />
-        <button
-          type="button"
+        <AppButton
+          size="touch"
+          icon
+          :variant="!row.logged ? 'secondary' : changed(card, row) ? 'warning' : 'success'"
           :disabled="row.saving"
           :aria-label="buttonLabel(row)"
           :title="buttonLabel(row)"
-          :class="[
-            'flex size-11 items-center justify-center rounded-xl border transition-colors disabled:opacity-50',
-            !row.logged
-              ? 'border-slate-300 bg-white text-slate-400 active:bg-slate-100'
-              : changed(card, row)
-                ? 'border-amber-500 bg-amber-500 text-white active:bg-amber-600'
-                : 'border-emerald-500 bg-emerald-500 text-white active:bg-emerald-600',
-          ]"
+          :class="{ 'text-slate-400!': !row.logged }"
           @click="emit('toggle', row)"
         >
           <ArrowPathIcon v-if="row.logged && changed(card, row)" class="size-5" aria-hidden="true" />
           <CheckIcon v-else class="size-6" aria-hidden="true" />
-        </button>
+        </AppButton>
       </template>
     </div>
-    <button
-      type="button"
-      class="mt-1 flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-indigo-600 active:bg-indigo-50"
-      @click="addSet"
-    >
+    <AppButton variant="text" size="touch" class="mt-1 -ml-3" @click="addSet">
       <PlusIcon class="size-4" aria-hidden="true" />
       Add set
-    </button>
+    </AppButton>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ArrowPathIcon, CheckIcon, PlusIcon, VideoCameraIcon } from '@heroicons/vue/24/outline'
+import AppButton from '../button/AppButton.vue'
+import SelectField from '../form/SelectField.vue'
+import TextInput from '../form/TextInput.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { changed, type ExerciseCard, type SetRow } from './workoutPlan'
@@ -101,13 +100,7 @@ const emit = defineEmits<{ toggle: [row: SetRow] }>()
 const lookups = useLookupsStore()
 const exercises = useExercisesStore()
 
-// text-base keeps iOS from zooming into the inputs.
-const inputClass =
-  'h-11 w-full min-w-0 rounded-xl border px-3 text-base text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
-
 const videoUrl = computed(() => exercises.exercises.find((e) => e.id === card.value.exerciseId)?.video_urls[0])
-
-const rowClass = (row: SetRow) => (row.logged && !changed(card.value, row) ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-white')
 
 function buttonLabel(row: SetRow) {
   if (!row.logged) return `Log set ${row.number}`

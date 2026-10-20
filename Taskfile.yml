@@ -11,7 +11,13 @@ tasks:
     desc: Run the backend dev environment (Postgres + API with hot reload)
     dir: backend
     cmds:
-      - docker compose up --build -d
+      - docker compose up -d
+
+  backend:build:
+    desc: Rebuild the backend image (only needed after changing Dockerfile.dev or go.mod/go.sum) and restart it
+    dir: backend
+    cmds:
+      - docker compose up --build -d backend
 
   backend:down:
     desc: Stop the backend containers
@@ -31,8 +37,8 @@ tasks:
     cmds:
       - docker compose down -v
       # Schema and db/seed/*.sql run on first init of the empty volume; --wait blocks until healthy
-      - docker compose up --build -d --wait db
-      - docker compose up --build -d backend
+      - docker compose up -d --wait db
+      - docker compose up -d backend
 
   app:dev:
     desc: Run the frontend in dev mode (Vite on :5173)

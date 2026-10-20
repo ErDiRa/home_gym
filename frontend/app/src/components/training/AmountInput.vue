@@ -5,40 +5,39 @@
       <span v-if="hint" class="font-normal text-slate-400"> · {{ hint }}</span>
     </legend>
     <div class="flex flex-wrap items-center gap-1">
-      <input
-        :value="value ?? ''"
+      <TextInput
+        v-model.number="value"
         type="number"
         min="0"
         step="any"
         :placeholder="part === 'reps' ? '8' : '—'"
         :aria-label="`${label} ${part}`"
-        :class="numberClass"
-        @input="value = parse($event)"
+        size="sm"
+        class="w-16!"
       />
       <span class="text-sm text-slate-400" aria-hidden="true">–</span>
-      <input
-        :value="max ?? ''"
+      <TextInput
+        v-model.number="max"
         type="number"
         min="0"
         step="any"
         placeholder="max"
         :aria-label="`${label} ${part}, upper end of a range (optional)`"
-        :class="numberClass"
-        @input="max = parse($event)"
+        size="sm"
+        class="w-16!"
       />
       <div class="w-24">
         <UnitSelect v-model="unit" :part="part" :label="`${label} ${part} unit`" />
       </div>
-      <label v-if="part === 'reps'" class="ml-1 flex items-center gap-1 text-xs text-slate-600">
-        <input v-model="amount.per_side" type="checkbox" class="size-3.5 rounded border-slate-300 accent-indigo-600" />
-        /side
-      </label>
+      <AppCheckbox v-if="part === 'reps'" v-model="amount.per_side" size="sm" class="ml-1 items-center">/side</AppCheckbox>
     </div>
   </fieldset>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppCheckbox from '../form/AppCheckbox.vue'
+import TextInput from '../form/TextInput.vue'
 import UnitSelect from './UnitSelect.vue'
 import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 import type { Amount } from '../../types'
@@ -48,15 +47,6 @@ import type { Amount } from '../../types'
 const props = defineProps<{ part: AmountPart; label: string; hint?: string }>()
 const amount = defineModel<Amount>({ required: true })
 const lookups = useLookupsStore()
-
-const numberClass =
-  'h-8 w-16 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200'
-
-// An empty or unparsable input means "not set" (null), never 0.
-const parse = (e: Event) => {
-  const raw = (e.target as HTMLInputElement).value
-  return raw === '' || Number.isNaN(Number(raw)) ? null : Number(raw)
-}
 
 // value, max and unit map onto the reps_* or load_* fields, depending on part.
 const value = computed({

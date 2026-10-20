@@ -1,12 +1,9 @@
 <template>
   <section class="pb-24">
-    <RouterLink
-      :to="{ name: workout?.completed_at ? 'history' : 'track' }"
-      class="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-slate-600 active:bg-slate-100"
-    >
+    <AppButton :to="{ name: workout?.completed_at ? 'history' : 'track' }" variant="ghost" size="touch" class="-ml-3 text-slate-600!">
       <ArrowLeftIcon class="size-4" aria-hidden="true" />
       {{ workout?.completed_at ? 'History' : 'This week' }}
-    </RouterLink>
+    </AppButton>
 
     <p v-if="loading" class="mt-6 text-center text-sm text-slate-500">Loading the workout…</p>
     <div v-else-if="error" class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
@@ -64,12 +61,7 @@
         <h2 class="font-semibold text-slate-900">{{ workout.completed_at ? 'Notes and ratings' : 'Finish workout' }}</h2>
         <label class="mt-3 block text-sm font-medium text-slate-800">
           How did it go?
-          <textarea
-            v-model="notes"
-            rows="3"
-            maxlength="2000"
-            class="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-          />
+          <TextInput v-model="notes" multiline size="touch" rows="3" maxlength="2000" class="mt-1" />
         </label>
 
         <p class="mt-4 text-sm font-medium text-slate-800">Rate the exercises <span class="font-normal text-slate-500">(optional)</span></p>
@@ -77,18 +69,19 @@
           <li v-for="e in rateable" :key="e.id" class="py-2">
             <p class="text-sm text-slate-700">{{ e.name }}</p>
             <div class="mt-1 flex" role="radiogroup" :aria-label="`Rating for ${e.name}`">
-              <button
+              <AppButton
                 v-for="star in 5"
                 :key="star"
-                type="button"
+                variant="ghost"
+                size="touch"
+                icon
                 role="radio"
                 :aria-checked="ratingOf(e.id) === star"
                 :aria-label="`${star} of 5`"
-                class="flex size-11 items-center justify-center rounded-xl active:bg-slate-100"
                 @click="ratingDrafts.set(e.id, star)"
               >
                 <StarIcon :class="star <= ratingOf(e.id) ? 'text-amber-400' : 'text-slate-200'" class="size-7" aria-hidden="true" />
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>
@@ -127,7 +120,9 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { StarIcon } from '@heroicons/vue/24/solid'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
+import { confirmDialog } from '../../confirm'
 import { buildCards, changed, num, type BlockCard, type ExerciseCard, type SetRow } from '../../components/workout/workoutPlan'
 import { formatDay } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
@@ -255,7 +250,13 @@ async function finish() {
 async function remove() {
   if (!workout.value) return
   const finished = !!workout.value.completed_at
-  if (!confirm(finished ? 'Delete this workout and its sets?' : 'Discard this workout and its logged sets?')) return
+  const ok = await confirmDialog({
+    title: finished ? 'Delete this workout?' : 'Discard this workout?',
+    message: finished ? 'The workout and its sets are deleted.' : 'The workout and the sets logged so far are deleted.',
+    confirmLabel: finished ? 'Delete' : 'Discard',
+    danger: true,
+  })
+  if (!ok) return
   saving.value = true
   try {
     await workouts.deleteWorkout(workout.value.id)

@@ -1,5 +1,5 @@
 <template>
-  <Dialog :open="open" :initial-focus="searchInput" class="relative z-50" @close="emit('close')">
+  <Dialog :open="open" :initial-focus="searchInput?.el" class="relative z-50" @close="emit('close')">
     <div class="fixed inset-0 bg-slate-900/40" aria-hidden="true" />
 
     <div class="fixed inset-0 flex items-start justify-center p-4 sm:pt-[8vh]">
@@ -7,14 +7,14 @@
         <div class="border-b border-slate-200 p-4">
           <div class="mb-3 flex items-center justify-between gap-4">
             <DialogTitle class="text-base font-semibold text-slate-900">{{ title }}</DialogTitle>
-            <button type="button" class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Close" @click="emit('close')">
+            <AppButton variant="ghost" size="sm" icon aria-label="Close" @click="emit('close')">
               <XMarkIcon class="size-5" aria-hidden="true" />
-            </button>
+            </AppButton>
           </div>
 
           <div class="relative">
             <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <input
+            <TextInput
               ref="searchInput"
               v-model="query"
               type="search"
@@ -23,7 +23,7 @@
               aria-expanded="true"
               aria-controls="exercise-picker-results"
               :aria-activedescendant="filtered[active] ? optionId(filtered[active].id) : undefined"
-              class="block h-10 w-full rounded-lg border border-slate-300 bg-white pr-3 pl-9 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              class="pl-9!"
               @keydown="onKeydown"
             />
           </div>
@@ -35,42 +35,33 @@
           </div>
 
           <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <button
+            <AppButton
               v-for="(label, type) in exerciseTypeLabels"
               :key="type"
-              type="button"
-              :aria-pressed="typeFilter.includes(type)"
-              :class="[
-                'rounded-full border px-3 py-0.5 text-xs font-medium',
-                typeFilter.includes(type)
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100',
-              ]"
+              variant="secondary"
+              size="xs"
+              :pressed="typeFilter.includes(type)"
               @click="toggleType(type)"
             >
               {{ label }}
-            </button>
+            </AppButton>
             <template v-if="ratings.size">
               <span class="ml-2 text-xs font-medium text-slate-600">Your rating</span>
-              <button
+              <AppButton
                 v-for="option in ratingOptions"
                 :key="option.value"
-                type="button"
-                :aria-pressed="ratingFilter.includes(option.value)"
-                :class="[
-                  'inline-flex items-center gap-0.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                  ratingFilter.includes(option.value)
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
-                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100',
-                ]"
+                variant="secondary"
+                size="xs"
+                class="gap-0.5"
+                :pressed="ratingFilter.includes(option.value)"
                 @click="toggleRating(option.value)"
               >
                 <StarIcon v-if="option.value" class="size-3" aria-hidden="true" />
                 {{ option.label }}
-              </button>
+              </AppButton>
             </template>
             <span class="ml-auto text-slate-500">{{ filtered.length }} {{ filtered.length === 1 ? 'exercise' : 'exercises' }}</span>
-            <button v-if="filtering" type="button" class="text-indigo-600 hover:underline" @click="clearFilters">Clear filters</button>
+            <AppButton v-if="filtering" variant="text" size="xs" @click="clearFilters">Clear filters</AppButton>
           </div>
         </div>
 
@@ -110,14 +101,9 @@
                 <span class="font-medium text-slate-900">{{ exercise.name }}</span>
                 <ExerciseTypeBadge :type="exercise.type" />
                 <RatingBadge v-if="ratings.get(exercise.id)" :rating="ratings.get(exercise.id)!" />
-                <span
-                  v-for="focus in exercise.focuses"
-                  :key="focus.id"
-                  :title="focus.name"
-                  class="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700"
-                >
+                <AppBadge v-for="focus in exercise.focuses" :key="focus.id" color="indigo" :title="focus.name">
                   {{ focus.alias }}
-                </span>
+                </AppBadge>
                 <span v-if="inBlockCount(exercise.id)" class="text-xs text-slate-400">
                   in block{{ inBlockCount(exercise.id) > 1 ? ` ×${inBlockCount(exercise.id)}` : '' }}
                 </span>
@@ -129,16 +115,16 @@
 
         <div class="border-t border-slate-200 p-4">
           <div v-if="selectedExercises.length" class="mb-3 flex flex-wrap gap-1">
-            <span
+            <AppBadge
               v-for="exercise in selectedExercises"
               :key="exercise.id"
-              class="inline-flex items-center gap-0.5 rounded-md bg-indigo-50 py-0.5 pr-1 pl-2 text-xs font-medium text-indigo-700"
+              color="indigo"
+              removable
+              :remove-label="`Remove ${exercise.name}`"
+              @remove="toggle(exercise.id)"
             >
               {{ exercise.name }}
-              <button type="button" :aria-label="`Remove ${exercise.name}`" class="rounded p-0.5 hover:bg-indigo-100" @click="toggle(exercise.id)">
-                <XMarkIcon class="size-3" aria-hidden="true" />
-              </button>
-            </span>
+            </AppBadge>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <p class="mr-auto text-xs text-slate-500">
@@ -166,6 +152,8 @@ import AppButton from '../button/AppButton.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
 import RatingBadge from '../exercise/RatingBadge.vue'
 import MultiSelect from '../form/MultiSelect.vue'
+import TextInput, { type TextInputExposed } from '../form/TextInput.vue'
+import AppBadge from '../ui/AppBadge.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Option } from '../../types'
 
@@ -182,7 +170,7 @@ const emit = defineEmits<{ close: []; add: [exercises: Exercise[]] }>()
 // The user's ratings by exercise id.
 const { exercises, ratings } = storeToRefs(useExercisesStore())
 
-const searchInput = ref<HTMLInputElement | null>(null)
+const searchInput = ref<TextInputExposed | null>(null)
 
 const query = ref('')
 const typeFilter = ref<ExerciseType[]>([])

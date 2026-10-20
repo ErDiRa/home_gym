@@ -7,15 +7,9 @@
 
     <!-- Mobile: top bar and slide-in drawer -->
     <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:hidden">
-      <button
-        type="button"
-        class="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-        aria-label="Open navigation"
-        :aria-expanded="drawerOpen"
-        @click="drawerOpen = true"
-      >
+      <AppButton variant="ghost" icon class="-ml-2" aria-label="Open navigation" :aria-expanded="drawerOpen" @click="drawerOpen = true">
         <Bars3Icon class="size-6" aria-hidden="true" />
-      </button>
+      </AppButton>
       <img src="../assets/logo.svg" alt="" class="size-7" />
       <span class="font-semibold text-slate-900">HomeGym</span>
     </header>
@@ -36,14 +30,16 @@
     >
       <div v-if="drawerOpen" class="fixed inset-y-0 left-0 z-50 w-64 max-w-[85vw] lg:hidden">
         <SideNav :navigation="navigation" />
-        <button
-          type="button"
-          class="absolute top-3 left-full ml-3 rounded-full bg-white/10 p-1.5 text-white hover:bg-white/20"
+        <AppButton
+          variant="inverse"
+          size="md"
+          icon
+          class="absolute top-3 left-full ml-3 rounded-full! bg-white/10"
           aria-label="Close navigation"
           @click="drawerOpen = false"
         >
           <XMarkIcon class="size-5" aria-hidden="true" />
-        </button>
+        </AppButton>
       </div>
     </Transition>
 
@@ -58,6 +54,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
+import AppButton from '../components/button/AppButton.vue'
 import SideNav from '../components/navigation/SideNav.vue'
 import { navigation } from '../navigation'
 

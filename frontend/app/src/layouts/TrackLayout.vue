@@ -8,23 +8,12 @@
           <span class="text-lg font-semibold tracking-tight">HomeGym</span>
         </RouterLink>
         <div class="flex items-center">
-          <RouterLink
-            :to="{ name: 'dashboard' }"
-            class="flex size-11 items-center justify-center rounded-xl text-slate-300 active:bg-slate-800"
-            aria-label="Open the dashboard"
-            title="Dashboard"
-          >
+          <AppButton :to="{ name: 'dashboard' }" variant="inverse" size="touch" icon aria-label="Open the dashboard" title="Dashboard">
             <Squares2X2Icon class="size-6" aria-hidden="true" />
-          </RouterLink>
-          <button
-            type="button"
-            class="flex size-11 items-center justify-center rounded-xl text-slate-300 active:bg-slate-800"
-            aria-label="Sign out"
-            title="Sign out"
-            @click="logout"
-          >
+          </AppButton>
+          <AppButton variant="inverse" size="touch" icon aria-label="Sign out" title="Sign out" @click="logout">
             <ArrowRightStartOnRectangleIcon class="size-6" aria-hidden="true" />
-          </button>
+          </AppButton>
         </div>
       </div>
     </header>
@@ -60,6 +49,7 @@
 import { useRoute } from 'vue-router'
 import { ArrowRightStartOnRectangleIcon, CalendarDaysIcon, ClockIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import { logout } from '../api'
+import AppButton from '../components/button/AppButton.vue'
 
 const route = useRoute()
 
