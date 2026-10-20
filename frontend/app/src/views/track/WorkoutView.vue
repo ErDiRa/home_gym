@@ -47,12 +47,20 @@
             @toggle="toggle(card, $event)"
           />
         </div>
+        <WodResult v-if="block.wod" v-model="block.wod" @toggle="toggleScore(block.wod)" />
       </section>
 
-      <section v-if="extras.length" class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm">
-        <p class="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-800">Other logged sets</p>
+      <section v-if="extras.length || extraResults.length" class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm">
+        <p class="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-800">
+          {{ extras.length ? 'Other logged sets' : 'Other logged scores' }}
+        </p>
         <div class="divide-y divide-slate-100">
           <ExerciseSets v-for="(card, i) in extras" :key="card.key" v-model="extras[i]" @toggle="toggle(card, $event)" />
+          <p v-for="r in extraResults" :key="r.id" class="py-3 text-sm text-slate-700">
+            <span class="font-semibold text-indigo-600">{{ blockLetter(r.block_position - 1) }}</span>
+            {{ scoreFormat(r.score_type)?.label }}: <span class="font-semibold">{{ scoreText(r) }}</span> · {{ r.rx ? 'Rx' : 'Scaled' }}
+            <span v-if="r.notes" class="text-slate-500"> · {{ r.notes }}</span>
+          </p>
         </div>
       </section>
 
@@ -104,7 +112,14 @@
     >
       <div class="mx-auto flex max-w-md items-center gap-3 px-4 py-3">
         <p class="flex-1 text-sm text-slate-600">
-          <span class="font-semibold text-slate-900">{{ loggedCount }}</span> of {{ plannedCount }} sets
+          <template v-if="plannedCount || !wods.length">
+            <span class="font-semibold text-slate-900">{{ loggedCount }}</span> of {{ plannedCount }} sets
+          </template>
+          <template v-if="plannedCount && wods.length"> · </template>
+          <template v-if="wods.length">
+            <span class="font-semibold text-slate-900">{{ scoredCount }}</span> of {{ wods.length }}
+            {{ wods.length === 1 ? 'score' : 'scores' }}
+          </template>
         </p>
         <AppButton size="xl" @click="openFinish">{{ workout.completed_at ? 'Notes' : 'Finish' }}</AppButton>
       </div>
@@ -122,14 +137,28 @@ import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
+import WodResult from '../../components/workout/WodResult.vue'
+import { blockLetter } from '../../components/training/trainingForm'
+import { scoreFormat, scoreText } from '../../components/training/wod'
 import { confirmDialog } from '../../confirm'
-import { buildCards, changed, num, type BlockCard, type ExerciseCard, type SetRow } from '../../components/workout/workoutPlan'
+import {
+  buildCards,
+  changed,
+  num,
+  scoreChanged,
+  scoreDraft,
+  scoreValues,
+  type BlockCard,
+  type ExerciseCard,
+  type SetRow,
+  type WodCard,
+} from '../../components/workout/workoutPlan'
 import { formatDay, formatTime } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWorkoutsStore } from '../../stores/workouts'
-import type { TrainingDetail, Workout } from '../../types'
+import type { TrainingDetail, Workout, WorkoutResult } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -143,6 +172,7 @@ const workout = ref<Workout | null>(null)
 const training = ref<TrainingDetail | null>(null)
 const blocks = ref<BlockCard[]>([])
 const extras = ref<ExerciseCard[]>([])
+const extraResults = ref<WorkoutResult[]>([])
 const loading = ref(true)
 const error = ref('')
 const saving = ref(false)
@@ -156,6 +186,8 @@ const session = computed(() => training.value?.sessions.find((s) => s.id === wor
 const allCards = computed(() => [...blocks.value.flatMap((b) => b.exercises), ...extras.value])
 const plannedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.length, 0))
 const loggedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.filter((r) => r.logged).length, 0))
+const wods = computed(() => blocks.value.flatMap((b) => (b.wod ? [b.wod] : [])))
+const scoredCount = computed(() => wods.value.filter((w) => w.result).length)
 // Each exercise once, in workout order.
 const rateable = computed(() => [...new Map(allCards.value.map((c) => [c.exerciseId, { id: c.exerciseId, name: c.name }])).values()])
 const ratingOf = (exerciseId: string) => ratingDrafts.get(exerciseId) ?? exercises.ratings.get(exerciseId)?.rating ?? 0
@@ -173,9 +205,10 @@ onMounted(async () => {
     notes.value = loaded.notes
     // The training may have been deleted since; then only the logged sets are shown.
     if (loaded.training_id) training.value = await trainings.getTraining(loaded.training_id).catch(() => null)
-    const cards = buildCards(session.value, loaded.sets, lookups.kindOf, lookups.defaultUnit('load'))
+    const cards = buildCards(session.value, loaded.sets, loaded.results, lookups.kindOf, lookups.defaultUnit('load'))
     blocks.value = cards.blocks
     extras.value = cards.extras
+    extraResults.value = cards.extraResults
     // A finished workout opens with its notes, for reading and correcting.
     finishing.value = !!loaded.completed_at
   } catch (e) {
@@ -222,6 +255,31 @@ async function toggle(card: ExerciseCard, row: SetRow) {
   }
 }
 
+// Logs the score of a WOD block, saves its changed values, or undoes it when logged and unchanged.
+async function toggleScore(wod: WodCard) {
+  if (!workout.value || wod.saving) return
+  wod.saving = true
+  try {
+    if (wod.result && !scoreChanged(wod)) {
+      await workouts.deleteResult(workout.value.id, wod.result.id)
+      wod.result = null
+      return
+    }
+    wod.result = await workouts.logResult(workout.value.id, {
+      block_position: wod.blockPosition,
+      score_type: wod.scoreType,
+      ...scoreValues(wod.scoreType, wod.draft),
+      rx: wod.draft.rx,
+      notes: wod.draft.notes,
+    })
+    wod.draft = scoreDraft(wod.result)
+  } catch (e) {
+    toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the score.')
+  } finally {
+    wod.saving = false
+  }
+}
+
 async function openFinish() {
   finishing.value = true
   await nextTick()
@@ -230,14 +288,20 @@ async function openFinish() {
 
 async function finish() {
   if (!workout.value) return
-  // Logging every set isn't required, but finishing with sets left open asks first.
+  // Logging every set and score isn't required, but finishing with some left open asks first.
   const open = plannedCount.value - loggedCount.value
-  if (!workout.value.completed_at && open > 0) {
+  const openScores = wods.value.length - scoredCount.value
+  if (!workout.value.completed_at && (open > 0 || openScores > 0)) {
+    const nothing = !loggedCount.value && !scoredCount.value
+    const parts = [
+      open ? `${open} of ${plannedCount.value} sets` : '',
+      openScores ? `${openScores} of ${wods.value.length} ${wods.value.length === 1 ? 'score' : 'scores'}` : '',
+    ].filter(Boolean)
     const ok = await confirmDialog({
-      title: loggedCount.value ? `${open} of ${plannedCount.value} sets not logged` : 'No sets logged',
-      message: loggedCount.value
-        ? 'You can still log them later from the history. Finish the workout anyway?'
-        : 'Only your notes and ratings are saved; sets can still be logged later from the history. Finish it anyway?',
+      title: nothing ? 'Nothing logged' : `${parts.join(' and ')} not logged`,
+      message: nothing
+        ? 'Only your notes and ratings are saved; sets and scores can still be logged later from the history. Finish it anyway?'
+        : 'You can still log them later from the history. Finish the workout anyway?',
       confirmLabel: 'Finish anyway',
       cancelLabel: 'Keep logging',
     })

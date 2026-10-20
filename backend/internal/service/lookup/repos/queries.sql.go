@@ -95,7 +95,7 @@ func (q *Queries) CreateRepUnit(ctx context.Context, arg CreateRepUnitParams) (C
 }
 
 const listBlockKinds = `-- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored
 FROM block_kinds
 ORDER BY position
 `
@@ -109,6 +109,7 @@ type ListBlockKindsRow struct {
 	SharedSets   bool   `json:"shared_sets"`
 	SharedReps   bool   `json:"shared_reps"`
 	SharedLoad   bool   `json:"shared_load"`
+	Scored       bool   `json:"scored"`
 }
 
 func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, error) {
@@ -129,6 +130,7 @@ func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, erro
 			&i.SharedSets,
 			&i.SharedReps,
 			&i.SharedLoad,
+			&i.Scored,
 		); err != nil {
 			return nil, err
 		}

@@ -72,6 +72,8 @@ type WorkoutService interface {
 	Delete(ctx context.Context, userID, id uuid.UUID) error
 	LogSet(ctx context.Context, userID, workoutID uuid.UUID, in workout.SetInput) (workoutrepos.WorkoutSet, error)
 	DeleteSet(ctx context.Context, userID, workoutID, setID uuid.UUID) error
+	LogResult(ctx context.Context, userID, workoutID uuid.UUID, in workout.ResultInput) (workoutrepos.WorkoutResult, error)
+	DeleteResult(ctx context.Context, userID, workoutID, resultID uuid.UUID) error
 }
 
 type AccountService interface {

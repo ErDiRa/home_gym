@@ -3,9 +3,10 @@
 // A training belongs to one user and runs over whole weeks from a Monday. It has its own
 // sessions (e.g. "Session 1"), which hold blocks, and blocks hold one or more exercises, plus a
 // schedule: the sessions planned for each week, up to 7, repeats allowed. A block has a kind
-// (single, superset, complex, see block_kinds) that decides how many exercises it takes and
-// whether sets, reps and load are set once on the block or per exercise. The same shape is sent
-// to and returned from the API.
+// (single, superset, complex, wod, see block_kinds) that decides how many exercises it takes,
+// whether sets, reps and load are set once on the block or per exercise, and whether the block
+// is done for one score (a WOD: for time, AMRAP...). The same shape is sent to and returned
+// from the API.
 //
 // The user's library holds session templates of the same shape; adding one to a training copies
 // it (the client sends the copy), so the two are independent afterwards. Every usecase acts on
@@ -106,11 +107,30 @@ type ExerciseInput struct {
 	Notes string `json:"notes"`
 }
 
+// Score is how a scored block (a WOD) is scored: the format (see the Score* constants) and its
+// time in seconds, a time cap or the duration depending on the format, plus the interval of an
+// EMOM. All nil on other blocks.
+type Score struct {
+	ScoreType       *string `json:"score_type"`
+	TimeSeconds     *int32  `json:"time_seconds"`
+	IntervalSeconds *int32  `json:"interval_seconds"`
+}
+
+// The formats of a scored block, as in the session_blocks.score_type CHECK.
+const (
+	ScoreForTime     = "for_time"     // as fast as possible; time = optional cap
+	ScoreAMRAP       = "amrap"        // as many rounds and reps as possible; time = duration
+	ScoreMaxReps     = "max_reps"     // as many reps as possible; time = optional duration
+	ScoreMaxCalories = "max_calories" // as many calories as possible; time = optional duration
+	ScoreEMOM        = "emom"         // every interval on the interval; time = duration
+)
+
 type BlockInput struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
-	Sets *int32 `json:"sets"` // nil unless the kind shares sets
+	Sets *int32 `json:"sets"` // nil unless the kind shares sets; the rounds of a WOD (optional)
 	Amount
+	Score
 	Notes     string          `json:"notes"`
 	Exercises []ExerciseInput `json:"exercises"`
 }
@@ -175,6 +195,7 @@ type Block struct {
 	Name string    `json:"name"`
 	Sets *int32    `json:"sets"`
 	AmountWithUnits
+	Score
 	Notes     string     `json:"notes"`
 	Exercises []Exercise `json:"exercises"`
 }

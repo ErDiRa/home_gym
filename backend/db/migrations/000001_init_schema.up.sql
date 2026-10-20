@@ -151,8 +151,9 @@ CREATE TABLE training_week_sessions (
 CREATE INDEX idx_training_week_sessions_session ON training_week_sessions (session_id);
 
 -- Kind of a training block. The rules that set a kind apart live in its row (how many
--- exercises it takes, whether reps and load are set once on the block for all exercises), so
--- a new kind is a new row. The rows are part of the schema: the app needs them.
+-- exercises it takes, whether reps and load are set once on the block for all exercises, whether
+-- the block is done for one score instead of set by set), so a new kind is a new row. The rows
+-- are part of the schema: the app needs them.
 CREATE TABLE block_kinds (
     code          TEXT PRIMARY KEY,
     name          TEXT NOT NULL,
@@ -162,15 +163,19 @@ CREATE TABLE block_kinds (
     max_exercises INT CHECK (max_exercises >= min_exercises), -- NULL = no limit
     shared_sets   BOOLEAN NOT NULL,
     shared_reps   BOOLEAN NOT NULL,
-    shared_load   BOOLEAN NOT NULL
+    shared_load   BOOLEAN NOT NULL,
+    -- A scored block (a WOD) is done as a whole for a score (see session_blocks.score_type)
+    -- instead of set by set; its shared sets are rounds and optional.
+    scored        BOOLEAN NOT NULL DEFAULT false
 );
 
-INSERT INTO block_kinds (code, name, description, position, min_exercises, max_exercises, shared_sets, shared_reps, shared_load) VALUES
-    ('single', 'Single', 'Exercises done one after another: all sets of one before the next, each with its own sets', 1, 1, NULL, false, false, false),
-    ('superset', 'Superset', 'Exercises done alternating: same sets, own reps and load', 2, 2, NULL, true, false, false),
-    ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true, true);
+INSERT INTO block_kinds (code, name, description, position, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored) VALUES
+    ('single', 'Single', 'Exercises done one after another: all sets of one before the next, each with its own sets', 1, 1, NULL, false, false, false, false),
+    ('superset', 'Superset', 'Exercises done alternating: same sets, own reps and load', 2, 2, NULL, true, false, false, false),
+    ('complex', 'Complex', 'Exercises done back-to-back with the same weight: same sets, reps and load', 3, 2, NULL, true, true, true, false),
+    ('wod', 'WOD', 'Workout of the day: the exercises done for one score (time, rounds, reps or calories)', 4, 1, NULL, true, false, false, true);
 
--- Units a planned amount is measured in: rep_units for reps (reps, seconds, metres...),
+-- Units a planned amount is measured in: rep_units for reps (reps, seconds, metres, calories...),
 -- load_units for load (kg, % 1RM, RPE...). Users can add new ones. min/max_value bound the
 -- values planned in the unit (NULL = unbounded).
 CREATE TABLE rep_units (
@@ -186,7 +191,7 @@ CREATE TABLE rep_units (
 CREATE UNIQUE INDEX idx_rep_units_name ON rep_units (lower(name)) WHERE deleted_at IS NULL;
 
 INSERT INTO rep_units (name, min_value, max_value) VALUES
-    ('reps', 1, NULL), ('s', 1, NULL), ('min', NULL, NULL), ('m', NULL, NULL);
+    ('reps', 1, NULL), ('s', 1, NULL), ('min', NULL, NULL), ('m', NULL, NULL), ('cal', 1, NULL);
 
 CREATE TABLE load_units (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -207,6 +212,13 @@ INSERT INTO load_units (name, min_value, max_value) VALUES
 -- optionally per side) and load (a value or a range in a load unit), and so do sets. Whether
 -- sets, reps and load sit on the block (for all its exercises) or on each exercise depends on
 -- the block's kind (shared_sets / shared_reps / shared_load); the other side stays empty.
+-- A scored block (a WOD) also has a score_type and its time (all NULL on other blocks):
+--   for_time      time_seconds = optional time cap      score: the time (or reps, if capped)
+--   amrap         time_seconds = duration (required)    score: rounds + reps
+--   max_reps      time_seconds = optional duration      score: reps
+--   max_calories  time_seconds = optional duration      score: calories
+--   emom          time_seconds = duration (required), interval_seconds = every (e.g. 60)
+--                                                       score: rounds (intervals) completed
 CREATE TABLE session_blocks (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
@@ -221,11 +233,16 @@ CREATE TABLE session_blocks (
     load_value NUMERIC(7, 2),
     load_max   NUMERIC(7, 2),
     load_unit  UUID REFERENCES load_units (id) ON DELETE RESTRICT,
+    score_type       TEXT CHECK (score_type IN ('for_time', 'amrap', 'max_reps', 'max_calories', 'emom')),
+    time_seconds     INT CHECK (time_seconds BETWEEN 1 AND 14400),
+    interval_seconds INT CHECK (interval_seconds BETWEEN 1 AND 14400),
     notes      TEXT NOT NULL DEFAULT '',
     CHECK ((reps_value IS NULL) = (reps_unit IS NULL)),
     CHECK (reps_max IS NULL OR (reps_value IS NOT NULL AND reps_max > reps_value)),
     CHECK ((load_value IS NULL) = (load_unit IS NULL)),
-    CHECK (load_max IS NULL OR (load_value IS NOT NULL AND load_max > load_value))
+    CHECK (load_max IS NULL OR (load_value IS NOT NULL AND load_max > load_value)),
+    CHECK (score_type IS NOT NULL OR (time_seconds IS NULL AND interval_seconds IS NULL)),
+    CHECK (interval_seconds IS NULL OR score_type = 'emom')
 );
 
 CREATE INDEX idx_session_blocks_session ON session_blocks (session_id, position);
@@ -316,3 +333,23 @@ CREATE TABLE workout_sets (
 );
 
 CREATE INDEX idx_workout_sets_exercise ON workout_sets (exercise_id);
+
+-- The score of a scored block (a WOD) of a workout, at most one per block. Like workout_sets it
+-- keeps the block's place in the session rather than pointing at it, and the format as planned
+-- (score_type), so it stays readable when the session changes. Which of time/rounds/reps/calories
+-- are set depends on the format (see session_blocks); rx is false when the WOD was scaled.
+CREATE TABLE workout_results (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workout_id     UUID NOT NULL REFERENCES workouts (id) ON DELETE CASCADE,
+    block_position INT NOT NULL CHECK (block_position >= 1),
+    score_type     TEXT NOT NULL CHECK (score_type IN ('for_time', 'amrap', 'max_reps', 'max_calories', 'emom')),
+    time_seconds   INT CHECK (time_seconds BETWEEN 1 AND 86400),
+    rounds         INT CHECK (rounds BETWEEN 0 AND 10000),
+    reps           INT CHECK (reps BETWEEN 0 AND 100000),
+    calories       INT CHECK (calories BETWEEN 0 AND 100000),
+    rx             BOOLEAN NOT NULL DEFAULT true,
+    notes          TEXT NOT NULL DEFAULT '',
+    completed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (time_seconds IS NOT NULL OR rounds IS NOT NULL OR reps IS NOT NULL OR calories IS NOT NULL),
+    UNIQUE (workout_id, block_position)
+);

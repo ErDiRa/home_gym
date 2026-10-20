@@ -2,6 +2,7 @@ import type {
   Amount,
   BlockKind,
   ExerciseType,
+  Score,
   TrainingBlock,
   TrainingDetail,
   TrainingInput,
@@ -9,11 +10,12 @@ import type {
   Unit,
 } from '../../types'
 import { useLookupsStore, type AmountPart } from '../../stores/lookups'
+import { scoreFormat, scoreProblem } from './wod'
 
 // Editable rows of the training and session forms. key keeps v-for stable while rows move, since
 // the same exercise may appear several times and new sessions and blocks have no id yet. Blocks and
 // exercises both keep sets, so switching kinds doesn't lose them; toInput sends the side the
-// kind uses.
+// kind uses. A WOD block keeps its rounds (optional) apart from the sets, and its score.
 export interface ExerciseRow extends Amount {
   key: number
   exercise_id: string
@@ -24,11 +26,12 @@ export interface ExerciseRow extends Amount {
   notes: string
 }
 
-export interface BlockRow extends Amount {
+export interface BlockRow extends Amount, Score {
   key: number
   kind: string
   name: string
   sets: number
+  rounds: number | null // of a scored kind (a WOD); null = not fixed
   notes: string
   exercises: ExerciseRow[]
 }
@@ -83,14 +86,18 @@ const pickAmount = (a: Amount): Amount => ({
 
 export const DEFAULT_SETS = 3
 
+export const emptyScore = (): Score => ({ score_type: null, time_seconds: null, interval_seconds: null })
+
 export const newBlock = (): BlockRow => ({
   key: nextKey(),
   kind: useLookupsStore().blockKinds[0]?.code ?? 'single',
   name: '',
   sets: DEFAULT_SETS,
+  rounds: null,
   notes: '',
   exercises: [],
   ...emptyAmount(),
+  ...emptyScore(),
 })
 
 export const newSession = (name: string): SessionRow => ({
@@ -129,8 +136,12 @@ function toBlockRows(blocks: TrainingBlock[]): BlockRow[] {
     kind: b.kind,
     name: b.name,
     sets: b.sets ?? b.exercises[0]?.sets ?? DEFAULT_SETS,
+    rounds: b.score_type ? b.sets : null,
     notes: b.notes,
     ...pickAmount(b),
+    score_type: b.score_type,
+    time_seconds: b.time_seconds,
+    interval_seconds: b.interval_seconds,
     exercises: b.exercises.map((e) => ({
       key: nextKey(),
       exercise_id: e.exercise_id,
@@ -152,21 +163,34 @@ function cleanAmount(a: Amount): Amount {
   return out
 }
 
+// The score of a block as sent: only for a scored kind, the interval only for an EMOM.
+function scoreInput(b: BlockRow, scored: boolean): Score {
+  if (!scored) return emptyScore()
+  return {
+    score_type: b.score_type,
+    time_seconds: b.time_seconds,
+    interval_seconds: scoreFormat(b.score_type)?.hasInterval ? b.interval_seconds : null,
+  }
+}
+
 // Builds a session of the request body, sending sets only on the side the block's kind uses
-// (the server clears reps and load on the unused side itself).
+// (the server clears reps and load on the unused side itself); a WOD's sets are its rounds.
 export function toSessionInput({ id, name, notes, blocks }: SessionRow): TrainingSessionInput {
   return {
     id,
     name,
     notes,
     blocks: blocks.map((b) => {
-      const sharedSets = useLookupsStore().kindOf(b.kind)?.shared_sets ?? true
+      const kind = useLookupsStore().kindOf(b.kind)
+      const sharedSets = kind?.shared_sets ?? true
+      const scored = kind?.scored ?? false
       return {
         kind: b.kind,
         name: b.name,
-        sets: sharedSets ? b.sets : null,
+        sets: scored ? b.rounds : sharedSets ? b.sets : null,
         notes: b.notes,
         ...cleanAmount(b),
+        ...scoreInput(b, scored),
         exercises: b.exercises.map((e) => ({
           exercise_id: e.exercise_id,
           sets: sharedSets ? null : e.sets,
@@ -233,7 +257,11 @@ export function blockProblem(b: BlockRow): string {
   if (!kind) return 'Choose a block kind.'
   const n = b.exercises.length
   if (n < kind.min_exercises || (kind.max_exercises !== null && n > kind.max_exercises)) return exerciseCountRule(kind)
-  if (kind.shared_sets) {
+  if (kind.scored) {
+    const problem = scoreProblem(b)
+    if (problem) return problem
+    if (b.rounds !== null && !validSets(b.rounds)) return 'Rounds must be 1-100.'
+  } else if (kind.shared_sets) {
     if (!validSets(b.sets)) return 'Sets must be 1-100.'
   } else {
     const e = b.exercises.find((e) => !validSets(e.sets))
@@ -248,7 +276,8 @@ export function blockProblem(b: BlockRow): string {
   for (const [part, shared] of parts) {
     const owners = shared ? [b] : b.exercises
     for (const a of owners) {
-      const problem = amountProblem(a, part)
+      // In a WOD an exercise may go without reps, e.g. max calories on the rower.
+      const problem = amountProblem(a, part, kind.scored && !shared)
       if (problem) return shared ? problem : `${(a as ExerciseRow).name}: ${problem}`
     }
   }
@@ -257,11 +286,11 @@ export function blockProblem(b: BlockRow): string {
 
 const validSets = (sets: number) => Number.isInteger(sets) && sets >= 1 && sets <= 100
 
-// Checks the reps (required) or load (optional) of an amount.
-function amountProblem(a: Amount, part: AmountPart): string {
+// Checks the reps (required unless optional) or load (optional) of an amount.
+function amountProblem(a: Amount, part: AmountPart, optional = false): string {
   const [value, max, unitId] =
     part === 'reps' ? [a.reps_value, a.reps_max, a.reps_unit] : [a.load_value, a.load_max, a.load_unit]
-  if (value === null) return part === 'reps' ? 'Reps are required.' : ''
+  if (value === null) return part === 'reps' && !optional ? 'Reps are required.' : ''
   const unit = useLookupsStore().unitsOf(part).find((u) => u.id === unitId)
   if (!unit) return `Choose a ${part} unit.`
   if (max !== null && max <= value) return `The upper end of the ${part} range must be higher than ${value}.`

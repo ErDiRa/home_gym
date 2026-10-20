@@ -38,6 +38,11 @@ sql:
             go_type:
               type: "int32"
               pointer: true
+          - db_type: "text"
+            nullable: true
+            go_type:
+              type: "string"
+              pointer: true
         out: "internal/service/account/repos"
   - engine: "postgresql"
     schema: "db/migrations"

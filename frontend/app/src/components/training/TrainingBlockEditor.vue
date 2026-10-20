@@ -20,7 +20,37 @@
       <MoveRemoveButtons :index="index" :count="count" :label="`block ${letter}`" @move="emit('move', $event)" @remove="emit('remove')" />
     </div>
 
-    <div v-if="kind?.shared_sets || kind?.shared_reps || kind?.shared_load" class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+    <!-- A WOD: how it is scored, its time (a cap or the duration), the EMOM's interval and rounds. -->
+    <div v-if="kind?.scored" class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+      <fieldset class="min-w-0">
+        <legend class="mb-1 text-xs font-medium text-slate-600">Score<span class="text-red-600" aria-hidden="true"> *</span></legend>
+        <SegmentedControl v-model="scoreType" :options="scoreOptions" :label="`Block ${letter} score`" size="xs" />
+      </fieldset>
+      <fieldset v-if="format" class="min-w-0">
+        <legend class="mb-1 text-xs font-medium text-slate-600">
+          {{ format.timeLabel }}<span v-if="format.timeRequired" class="text-red-600" aria-hidden="true"> *</span>
+        </legend>
+        <DurationInput v-model="block.time_seconds" :label="`Block ${letter} ${format.timeLabel.toLowerCase()}`" />
+      </fieldset>
+      <fieldset v-if="format?.hasInterval" class="min-w-0">
+        <legend class="mb-1 text-xs font-medium text-slate-600">Every</legend>
+        <DurationInput v-model="interval" :label="`Block ${letter} interval`" />
+      </fieldset>
+      <label v-if="format && !format.hasInterval" class="text-xs font-medium text-slate-600">
+        Rounds
+        <TextInput
+          v-model.number="block.rounds"
+          type="number"
+          min="1"
+          max="100"
+          placeholder="—"
+          :aria-label="`Block ${letter} rounds (optional)`"
+          size="sm"
+          class="mt-1 w-16!"
+        />
+      </label>
+    </div>
+    <div v-else-if="kind?.shared_sets || kind?.shared_reps || kind?.shared_load" class="mb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
       <label v-if="kind?.shared_sets" class="text-xs font-medium text-slate-600">
         Sets<span class="text-red-600" aria-hidden="true"> *</span>
         <TextInput
@@ -80,6 +110,7 @@
             v-model="block.exercises[i]"
             part="reps"
             :label="exerciseLabel(block.exercises.length, index, i)"
+            :optional="kind?.scored"
           />
           <AmountInput
             v-if="!kind?.shared_load"
@@ -125,9 +156,10 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
+import DurationInput from '../form/DurationInput.vue'
 import SegmentedControl from '../form/SegmentedControl.vue'
 import TextInput from '../form/TextInput.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
@@ -136,9 +168,10 @@ import AmountInput from './AmountInput.vue'
 import ExercisePickerDialog from './ExercisePickerDialog.vue'
 import MoveRemoveButtons from './MoveRemoveButtons.vue'
 import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
+import { DEFAULT_INTERVAL, scoreFormat, scoreFormats } from './wod'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
-import type { Exercise } from '../../types'
+import type { Exercise, ScoreType } from '../../types'
 
 const props = defineProps<{
   index: number
@@ -161,6 +194,27 @@ const full = computed(() => kind.value?.max_exercises != null && block.value.exe
 // How many more exercises the kind takes; null = no limit.
 const remaining = computed(() =>
   kind.value?.max_exercises == null ? null : Math.max(kind.value.max_exercises - block.value.exercises.length, 0),
+)
+
+const scoreOptions = scoreFormats.map((f) => ({ value: f.code, label: f.label, title: f.description }))
+const format = computed(() => scoreFormat(block.value.score_type))
+// The control's model is '' while no format is picked.
+const scoreType = computed({
+  get: () => block.value.score_type ?? '',
+  set: (v: ScoreType | '') => (block.value.score_type = v || null),
+})
+// An EMOM goes every minute unless set otherwise.
+const interval = computed({
+  get: () => block.value.interval_seconds ?? DEFAULT_INTERVAL,
+  set: (v: number | null) => (block.value.interval_seconds = v),
+})
+// A block turned into a WOD starts as "for time", the most common format.
+watch(
+  kind,
+  (k) => {
+    if (k?.scored && !block.value.score_type) block.value.score_type = 'for_time'
+  },
+  { immediate: true },
 )
 
 const pickerOpen = ref(false)

@@ -92,6 +92,8 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Post("/workouts/{id}/finish", h.FinishWorkout)
 			r.Put("/workouts/{id}/sets", h.LogSet)
 			r.Delete("/workouts/{id}/sets/{setID}", h.DeleteSet)
+			r.Put("/workouts/{id}/results", h.LogResult)
+			r.Delete("/workouts/{id}/results/{resultID}", h.DeleteResult)
 		})
 	})
 }

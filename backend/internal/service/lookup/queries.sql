@@ -18,7 +18,7 @@ INSERT INTO focuses (name, alias) VALUES ($1, $2)
 RETURNING id, name, alias;
 
 -- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored
 FROM block_kinds
 ORDER BY position;
 

@@ -30,7 +30,7 @@ ORDER BY position;
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
        sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
        sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       sb.notes
+       sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM session_blocks sb
 JOIN sessions s ON s.id = sb.session_id
 LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
@@ -136,7 +136,7 @@ WHERE id = $1 AND user_id = $2 AND training_id IS NULL AND deleted_at IS NULL;
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
        sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
        sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       sb.notes
+       sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM session_blocks sb
 LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
 LEFT JOIN load_units lu ON lu.id = sb.load_unit
@@ -173,11 +173,13 @@ WHERE id = $1 AND user_id = $2 AND training_id IS NULL AND deleted_at IS NULL;
 -- sqlc.narg marks the parameters that may be NULL (what the block's kind doesn't share).
 INSERT INTO session_blocks (
     session_id, position, kind, name, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+    score_type, time_seconds, interval_seconds, notes
 ) VALUES (
     sqlc.arg(session_id), sqlc.arg(position), sqlc.arg(kind), sqlc.arg(name), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
-    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(notes)
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit),
+    sqlc.narg(score_type), sqlc.narg(time_seconds), sqlc.narg(interval_seconds), sqlc.arg(notes)
 )
 RETURNING id;
 
@@ -195,7 +197,7 @@ FROM exercises e
 WHERE e.id = sqlc.arg(exercise_id) AND e.user_id = sqlc.arg(user_id) AND e.deleted_at IS NULL;
 
 -- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored
 FROM block_kinds
 ORDER BY position;
 

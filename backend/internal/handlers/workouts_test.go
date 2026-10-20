@@ -23,6 +23,7 @@ type fakeWorkouts struct {
 	userID, training uuid.UUID
 	monday, from, to time.Time
 	set              workout.SetInput
+	result           workout.ResultInput
 	slot             uuid.UUID
 	inProgress       bool // Start finds the slot already in progress
 }
@@ -45,6 +46,19 @@ func (f *fakeWorkouts) LogSet(_ context.Context, userID, workoutID uuid.UUID, in
 	return workoutrepos.WorkoutSet{ID: uuid.New(), WorkoutID: workoutID}, nil
 }
 
+func (f *fakeWorkouts) LogResult(_ context.Context, userID, workoutID uuid.UUID, in workout.ResultInput) (workoutrepos.WorkoutResult, error) {
+	f.userID, f.result = userID, in
+	if in.ScoreType == "tabata" {
+		return workoutrepos.WorkoutResult{}, service.Invalid("unknown score type")
+	}
+	return workoutrepos.WorkoutResult{ID: uuid.New(), WorkoutID: workoutID, BlockPosition: in.BlockPosition}, nil
+}
+
+func (f *fakeWorkouts) DeleteResult(_ context.Context, userID, _, _ uuid.UUID) error {
+	f.userID = userID
+	return service.NotFound("result not found", nil)
+}
+
 func serveWorkouts(fake *fakeWorkouts, method, path, body string) *httptest.ResponseRecorder {
 	h := New(Services{Workouts: fake}, nil, false)
 	r := chi.NewRouter()
@@ -52,6 +66,8 @@ func serveWorkouts(fake *fakeWorkouts, method, path, body string) *httptest.Resp
 	r.Get("/week", h.GetWeek)
 	r.Post("/workouts", h.StartWorkout)
 	r.Put("/workouts/{id}/sets", h.LogSet)
+	r.Put("/workouts/{id}/results", h.LogResult)
+	r.Delete("/workouts/{id}/results/{resultID}", h.DeleteResult)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
 	return rec
@@ -112,5 +128,30 @@ func TestLogSet(t *testing.T) {
 	rec = serveWorkouts(&fakeWorkouts{}, http.MethodPut, "/workouts/nope/sets", `{}`)
 	if rec.Code != http.StatusBadRequest || errorBody(t, rec) != "invalid workout id" {
 		t.Errorf("PUT with a bad id = %d", rec.Code)
+	}
+}
+
+func TestLogResult(t *testing.T) {
+	fake := &fakeWorkouts{}
+	rec := serveWorkouts(fake, http.MethodPut, "/workouts/"+uuid.NewString()+"/results",
+		`{"block_position":2,"score_type":"amrap","rounds":5,"reps":12,"rx":false,"notes":"ring rows"}`)
+	if rec.Code != http.StatusOK || fake.userID != testUser || fake.result.BlockPosition != 2 || *fake.result.Rounds != 5 || fake.result.Rx {
+		t.Errorf("PUT = %d %s, service got %+v", rec.Code, rec.Body, fake.result)
+	}
+
+	rec = serveWorkouts(&fakeWorkouts{}, http.MethodPut, "/workouts/"+uuid.NewString()+"/results", `{"block_position":1,"score_type":"tabata"}`)
+	if rec.Code != http.StatusBadRequest || errorBody(t, rec) != "unknown score type" {
+		t.Errorf("PUT of an unknown format = %d %s, want 400", rec.Code, rec.Body)
+	}
+}
+
+func TestDeleteResult(t *testing.T) {
+	rec := serveWorkouts(&fakeWorkouts{}, http.MethodDelete, "/workouts/"+uuid.NewString()+"/results/"+uuid.NewString(), "")
+	if rec.Code != http.StatusNotFound || errorBody(t, rec) != "result not found" {
+		t.Errorf("DELETE = %d %s, want 404", rec.Code, rec.Body)
+	}
+	rec = serveWorkouts(&fakeWorkouts{}, http.MethodDelete, "/workouts/"+uuid.NewString()+"/results/nope", "")
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("DELETE with a bad id = %d, want 400", rec.Code)
 	}
 }

@@ -69,6 +69,24 @@ func (q *Queries) DeleteWorkout(ctx context.Context, arg DeleteWorkoutParams) (i
 	return result.RowsAffected(), nil
 }
 
+const deleteWorkoutResult = `-- name: DeleteWorkoutResult :execrows
+DELETE FROM workout_results
+WHERE id = $1 AND workout_id = $2
+`
+
+type DeleteWorkoutResultParams struct {
+	ID        uuid.UUID `json:"id"`
+	WorkoutID uuid.UUID `json:"workout_id"`
+}
+
+func (q *Queries) DeleteWorkoutResult(ctx context.Context, arg DeleteWorkoutResultParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWorkoutResult, arg.ID, arg.WorkoutID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteWorkoutSet = `-- name: DeleteWorkoutSet :execrows
 DELETE FROM workout_sets
 WHERE id = $1 AND workout_id = $2
@@ -365,6 +383,45 @@ func (q *Queries) ListWeekPlan(ctx context.Context, arg ListWeekPlanParams) ([]L
 	return items, nil
 }
 
+const listWorkoutResults = `-- name: ListWorkoutResults :many
+SELECT id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at FROM workout_results
+WHERE workout_id = $1
+ORDER BY block_position
+`
+
+// The scores of a workout's WOD blocks, in the order of the session.
+func (q *Queries) ListWorkoutResults(ctx context.Context, workoutID uuid.UUID) ([]WorkoutResult, error) {
+	rows, err := q.db.Query(ctx, listWorkoutResults, workoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkoutResult{}
+	for rows.Next() {
+		var i WorkoutResult
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkoutID,
+			&i.BlockPosition,
+			&i.ScoreType,
+			&i.TimeSeconds,
+			&i.Rounds,
+			&i.Reps,
+			&i.Calories,
+			&i.Rx,
+			&i.Notes,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkoutSets = `-- name: ListWorkoutSets :many
 SELECT
     ws.id,
@@ -506,6 +563,67 @@ func (q *Queries) ListWorkouts(ctx context.Context, arg ListWorkoutsParams) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertWorkoutResult = `-- name: UpsertWorkoutResult :one
+INSERT INTO workout_results (
+    workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7, $8, $9
+)
+ON CONFLICT (workout_id, block_position)
+DO UPDATE SET score_type = EXCLUDED.score_type,
+              time_seconds = EXCLUDED.time_seconds,
+              rounds = EXCLUDED.rounds,
+              reps = EXCLUDED.reps,
+              calories = EXCLUDED.calories,
+              rx = EXCLUDED.rx,
+              notes = EXCLUDED.notes,
+              completed_at = now()
+RETURNING id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at
+`
+
+type UpsertWorkoutResultParams struct {
+	WorkoutID     uuid.UUID `json:"workout_id"`
+	BlockPosition int32     `json:"block_position"`
+	ScoreType     string    `json:"score_type"`
+	TimeSeconds   *int32    `json:"time_seconds"`
+	Rounds        *int32    `json:"rounds"`
+	Reps          *int32    `json:"reps"`
+	Calories      *int32    `json:"calories"`
+	Rx            bool      `json:"rx"`
+	Notes         string    `json:"notes"`
+}
+
+// Logs the score of a block, or corrects it when it was logged before.
+func (q *Queries) UpsertWorkoutResult(ctx context.Context, arg UpsertWorkoutResultParams) (WorkoutResult, error) {
+	row := q.db.QueryRow(ctx, upsertWorkoutResult,
+		arg.WorkoutID,
+		arg.BlockPosition,
+		arg.ScoreType,
+		arg.TimeSeconds,
+		arg.Rounds,
+		arg.Reps,
+		arg.Calories,
+		arg.Rx,
+		arg.Notes,
+	)
+	var i WorkoutResult
+	err := row.Scan(
+		&i.ID,
+		&i.WorkoutID,
+		&i.BlockPosition,
+		&i.ScoreType,
+		&i.TimeSeconds,
+		&i.Rounds,
+		&i.Reps,
+		&i.Calories,
+		&i.Rx,
+		&i.Notes,
+		&i.CompletedAt,
+	)
+	return i, err
 }
 
 const upsertWorkoutSet = `-- name: UpsertWorkoutSet :one

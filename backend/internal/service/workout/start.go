@@ -31,11 +31,11 @@ func (s *Service) Start(ctx context.Context, userID, weekSessionID uuid.UUID) (w
 		if err != nil {
 			return Workout{}, false, err
 		}
-		w, err := withSets(ctx, s.q, existing)
+		w, err := withLogs(ctx, s.q, existing)
 		return w, false, err
 	}
 	if err != nil {
 		return Workout{}, false, err
 	}
-	return fromRow(row, []repos.ListWorkoutSetsRow{}), true, nil
+	return fromRow(row, []repos.ListWorkoutSetsRow{}, []repos.WorkoutResult{}), true, nil
 }

@@ -11,6 +11,7 @@ import type {
   LibrarySessionDetail,
   LoggedSet,
   Option,
+  ResultInput,
   SetInput,
   Training,
   TrainingDetail,
@@ -19,6 +20,7 @@ import type {
   Unit,
   Week,
   Workout,
+  WorkoutResult,
   WorkoutSummary,
 } from './types'
 
@@ -113,6 +115,11 @@ export const startWorkout = (weekSessionId: string) => api.post<Workout>('/worko
 // Logs a set, or corrects it when the same block, position and set number was logged before.
 export const logSet = (workoutId: string, set: SetInput) => api.put<LoggedSet>(`/workouts/${workoutId}/sets`, set)
 export const deleteSet = (workoutId: string, setId: string) => api.delete(`/workouts/${workoutId}/sets/${setId}`)
+// Logs the score of a WOD block, or corrects it when the block's score was logged before.
+export const logResult = (workoutId: string, result: ResultInput) =>
+  api.put<WorkoutResult>(`/workouts/${workoutId}/results`, result)
+export const deleteResult = (workoutId: string, resultId: string) =>
+  api.delete(`/workouts/${workoutId}/results/${resultId}`)
 export const finishWorkout = (id: string, notes: string) => api.post<Workout>(`/workouts/${id}/finish`, { notes })
 export const deleteWorkout = (id: string) => api.delete(`/workouts/${id}`)
 

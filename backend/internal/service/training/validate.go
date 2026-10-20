@@ -89,7 +89,8 @@ func checkSchedule(in *Input) error {
 }
 
 // checkBlock trims and validates a block against its kind, clearing sets, reps and load on the
-// side (block or exercises) the kind doesn't use. It returns a message for the first problem.
+// side (block or exercises) the kind doesn't use, and the score unless the kind is scored. It
+// returns a message for the first problem.
 func checkBlock(b *BlockInput, lk lookups) string {
 	b.Name, b.Notes = strings.TrimSpace(b.Name), strings.TrimSpace(b.Notes)
 	kind, ok := lk.kinds[b.Kind]
@@ -104,10 +105,22 @@ func checkBlock(b *BlockInput, lk lookups) string {
 		return exerciseCountRule(kind)
 	}
 
+	if kind.Scored {
+		if msg := checkScore(&b.Score); msg != "" {
+			return msg
+		}
+	} else {
+		b.Score = Score{}
+	}
+
 	// What the kind shares is validated on the block; the rest is cleared there and validated
-	// per exercise below.
+	// per exercise below. The shared sets of a scored block are its rounds, which it may leave
+	// open (e.g. an AMRAP).
 	if kind.SharedSets {
-		if !validSets(b.Sets) {
+		if !validSets(b.Sets) && !(kind.Scored && b.Sets == nil) {
+			if kind.Scored {
+				return "rounds must be 1-100"
+			}
 			return "sets must be 1-100"
 		}
 	} else {
@@ -144,6 +157,9 @@ func checkBlock(b *BlockInput, lk lookups) string {
 		}
 		if kind.SharedReps {
 			e.clearReps()
+		} else if kind.Scored && e.RepsValue == nil && e.RepsMax == nil && e.RepsUnit == nil {
+			// In a WOD an exercise may go without a target, e.g. max calories on the rower.
+			e.clearReps()
 		} else if msg := checkReps(&e.Amount, lk); msg != "" {
 			return fmt.Sprintf("exercise %d: %s", k+1, msg)
 		}
@@ -155,6 +171,60 @@ func checkBlock(b *BlockInput, lk lookups) string {
 	}
 	return ""
 }
+
+// maxScoreTime bounds a scored block's time cap, duration and interval (4 hours, in seconds).
+const maxScoreTime = 4 * 60 * 60
+
+// checkScore validates the format of a scored block and its times, in place: the time is a cap
+// (for time) or a duration, required for an AMRAP and an EMOM; only an EMOM has an interval,
+// one minute unless set, and it must fit into the duration.
+func checkScore(sc *Score) string {
+	if sc.ScoreType == nil {
+		return "choose how the WOD is scored"
+	}
+	timeRequired := false
+	switch *sc.ScoreType {
+	case ScoreAMRAP, ScoreEMOM:
+		timeRequired = true
+	case ScoreForTime, ScoreMaxReps, ScoreMaxCalories:
+	default:
+		return "unknown score type"
+	}
+	if sc.TimeSeconds == nil {
+		if timeRequired {
+			return fmt.Sprintf("%s needs a duration", scoreName(*sc.ScoreType))
+		}
+	} else if *sc.TimeSeconds < 1 || *sc.TimeSeconds > maxScoreTime {
+		return "the time must be between 0:01 and 4:00:00"
+	}
+
+	if *sc.ScoreType != ScoreEMOM {
+		sc.IntervalSeconds = nil
+		return ""
+	}
+	if sc.IntervalSeconds == nil {
+		sc.IntervalSeconds = ptrTo[int32](60)
+	}
+	if *sc.IntervalSeconds < 1 || *sc.IntervalSeconds > *sc.TimeSeconds {
+		return "the interval must be at least a second and fit into the duration"
+	}
+	return ""
+}
+
+// scoreName names a score format in messages.
+func scoreName(scoreType string) string {
+	switch scoreType {
+	case ScoreAMRAP:
+		return "an AMRAP"
+	case ScoreEMOM:
+		return "an EMOM"
+	default:
+		return "the WOD"
+	}
+}
+
+// ptrTo returns a pointer to v.
+func ptrTo[T any](v T) *T { return &v }
 
 // validSets reports whether sets is set and within the column's CHECK (1-100).
 func validSets(sets *int32) bool { return sets != nil && *sets >= 1 && *sets <= 100 }

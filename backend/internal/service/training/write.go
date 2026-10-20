@@ -127,7 +127,8 @@ func insertBlocks(ctx context.Context, q Queries, userID, sessionID uuid.UUID, b
 		blockID, err := q.InsertSessionBlock(ctx, repos.InsertSessionBlockParams{
 			SessionID: sessionID, Position: int32(j + 1), Kind: b.Kind, Name: b.Name, Sets: b.Sets,
 			RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, PerSide: b.PerSide,
-			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, Notes: b.Notes,
+			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit,
+			ScoreType: b.ScoreType, TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds, Notes: b.Notes,
 		})
 		if err != nil {
 			return err
@@ -154,7 +155,7 @@ func insertBlocks(ctx context.Context, q Queries, userID, sessionID uuid.UUID, b
 func copyBlocks(blocks []Block) []BlockInput {
 	out := make([]BlockInput, 0, len(blocks))
 	for _, b := range blocks {
-		block := BlockInput{Kind: b.Kind, Name: b.Name, Sets: b.Sets, Amount: b.Amount, Notes: b.Notes}
+		block := BlockInput{Kind: b.Kind, Name: b.Name, Sets: b.Sets, Amount: b.Amount, Score: b.Score, Notes: b.Notes}
 		for _, e := range b.Exercises {
 			block.Exercises = append(block.Exercises, ExerciseInput{
 				ExerciseID: e.ExerciseID, Sets: e.Sets, Amount: e.Amount, Tempo: e.Tempo, Notes: e.Notes,

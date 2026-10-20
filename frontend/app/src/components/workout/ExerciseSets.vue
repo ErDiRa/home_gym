@@ -25,8 +25,9 @@
       <ExerciseVideoSheet :open="videosOpen" :name="card.name" :urls="videoUrls" @close="videosOpen = false" />
     </div>
 
-    <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. -->
-    <div class="mt-2 grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-x-2 gap-y-1.5">
+    <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. A WOD's
+         exercises have none (the block has one score), unless sets were logged there before. -->
+    <div v-if="!card.scored || card.rows.length" class="mt-2 grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-x-2 gap-y-1.5">
       <span class="text-xs font-medium text-slate-500">Set</span>
       <span class="text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
       <SelectField
@@ -78,7 +79,7 @@
         </AppButton>
       </template>
     </div>
-    <AppButton variant="text" size="touch" class="mt-1 -ml-3" @click="addSet">
+    <AppButton v-if="!card.scored" variant="text" size="touch" class="mt-1 -ml-3" @click="addSet">
       <PlusIcon class="size-4" aria-hidden="true" />
       Add set
     </AppButton>

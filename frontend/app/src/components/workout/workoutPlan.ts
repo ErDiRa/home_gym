@@ -1,9 +1,11 @@
-import type { BlockKind, LoggedSet, TrainingSession, WorkoutSet } from '../../types'
+import type { BlockKind, LoggedSet, ScoreType, TrainingSession, WorkoutResult, WorkoutSet } from '../../types'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
+import { emomRounds, wodSummary } from '../training/wod'
 
 // The workout screen as editable cards: the session's blocks and exercises in plan order, each
-// exercise with one row per planned set, filled with what was logged or else the plan. Logged
-// sets the plan doesn't have (the session changed, or it was deleted) are kept apart as extras.
+// exercise with one row per planned set, filled with what was logged or else the plan. A WOD block
+// has no set rows but one score for the whole block. Logged sets and scores the plan doesn't have
+// (the session changed, or it was deleted) are kept apart as extras.
 
 // One set: the values in the inputs, and the set as saved once logged.
 export interface SetRow {
@@ -28,16 +30,82 @@ export interface ExerciseCard {
   repsUnitName: string
   perSide: boolean
   loadUnit: string | null // the unit the load inputs are in
+  scored: boolean // in a WOD block: no set rows, the block has one score
   rows: SetRow[]
+}
+
+// The score of a WOD block as in the inputs; capped marks a "for time" not finished in the cap,
+// whose score is then the reps done.
+export interface ScoreDraft {
+  time_seconds: number | null
+  rounds: number | null
+  reps: number | null
+  calories: number | null
+  capped: boolean
+  rx: boolean
+  notes: string
+}
+
+export interface WodCard {
+  blockPosition: number
+  scoreType: ScoreType
+  intervals: number | null // of an EMOM, e.g. 10; null when unknown
+  draft: ScoreDraft
+  result: WorkoutResult | null // as saved once logged
+  saving: boolean
 }
 
 export interface BlockCard {
   key: string
   letter: string
   title: string // the kind and the block's name, e.g. "Superset · Accessories"
-  hint: string // how to go through it, e.g. "3 rounds: A1 → A2"
+  hint: string // how to go through it, e.g. "3 rounds: A1 → A2" or "AMRAP 12:00"
   notes: string
   exercises: ExerciseCard[]
+  wod: WodCard | null // set for a WOD block
+}
+
+// The inputs of a score: what was logged, else empty and Rx.
+export function scoreDraft(result: WorkoutResult | null): ScoreDraft {
+  return {
+    time_seconds: result?.time_seconds ?? null,
+    rounds: result?.rounds ?? null,
+    reps: result?.reps ?? null,
+    calories: result?.calories ?? null,
+    capped: result?.score_type === 'for_time' && result.time_seconds === null,
+    rx: result?.rx ?? true,
+    notes: result?.notes ?? '',
+  }
+}
+
+// The values of a draft that count for the format (the server drops the others).
+export function scoreValues(scoreType: ScoreType, d: ScoreDraft) {
+  const v = { time_seconds: null as number | null, rounds: null as number | null, reps: null as number | null, calories: null as number | null }
+  if (scoreType === 'for_time') {
+    if (d.capped) v.reps = num(d.reps)
+    else v.time_seconds = d.time_seconds
+  } else if (scoreType === 'amrap') {
+    v.rounds = num(d.rounds)
+    v.reps = num(d.reps)
+  } else if (scoreType === 'max_reps') v.reps = num(d.reps)
+  else if (scoreType === 'max_calories') v.calories = num(d.calories)
+  else v.rounds = num(d.rounds)
+  return v
+}
+
+// Whether a logged score was edited since it was saved.
+export function scoreChanged(wod: WodCard): boolean {
+  const r = wod.result
+  if (!r) return false
+  const v = scoreValues(wod.scoreType, wod.draft)
+  return (
+    r.time_seconds !== v.time_seconds ||
+    r.rounds !== v.rounds ||
+    r.reps !== v.reps ||
+    r.calories !== v.calories ||
+    r.rx !== wod.draft.rx ||
+    r.notes !== wod.draft.notes.trim()
+  )
 }
 
 // A value or a range, e.g. "8" or "8–10".
@@ -62,14 +130,16 @@ function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, loa
 }
 
 // Builds the cards of a workout from the session's plan (null when the session is gone) and the sets
-// logged so far. kindOf gives a block kind by code; defaultLoadUnit is where load starts when
-// the plan has none.
+// and scores logged so far. kindOf gives a block kind by code; defaultLoadUnit is where load
+// starts when the plan has none.
 export function buildCards(
   session: TrainingSession | null,
   sets: WorkoutSet[],
+  results: WorkoutResult[],
   kindOf: (code: string) => BlockKind | undefined,
   defaultLoadUnit: string | null,
-): { blocks: BlockCard[]; extras: ExerciseCard[] } {
+): { blocks: BlockCard[]; extras: ExerciseCard[]; extraResults: WorkoutResult[] } {
+  const resultByBlock = new Map(results.map((r) => [r.block_position, r]))
   const loggedByPlace = new Map<string, WorkoutSet[]>()
   for (const s of sets) {
     const key = placeKey(s.block_position, s.exercise_position)
@@ -77,6 +147,8 @@ export function buildCards(
   }
 
   const blocks = (session?.blocks ?? []).map((b, i): BlockCard => {
+    const kind = kindOf(b.kind)
+    const scored = !!kind?.scored && b.score_type !== null
     const exercises = b.exercises.map((e, j): ExerciseCard => {
       const key = placeKey(i + 1, j + 1)
       // The server clears what the block's kind shares on the exercises, so whichever side is
@@ -89,7 +161,12 @@ export function buildCards(
       const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? load.load_unit ?? defaultLoadUnit
       const plannedLoad = load.load_unit === loadUnit ? load.load_value : null
 
-      const text = [`${planned} × ${range(reps.reps_value ?? 0, reps.reps_max)} ${reps.reps_unit_name}${reps.per_side ? ' per side' : ''}`]
+      // A WOD's exercises are done in its rounds, so they show their reps without sets, if any.
+      const text: string[] = []
+      if (reps.reps_value !== null || !scored) {
+        const amount = `${range(reps.reps_value ?? 0, reps.reps_max)} ${reps.reps_unit_name}${reps.per_side ? ' per side' : ''}`
+        text.push(scored ? amount : `${planned} × ${amount}`)
+      }
       if (load.load_value !== null) text.push(`${range(load.load_value, load.load_max)} ${load.load_unit_name}`)
       return {
         key,
@@ -105,24 +182,40 @@ export function buildCards(
         repsUnitName: reps.reps_unit_name,
         perSide: reps.per_side,
         loadUnit,
-        rows: rowsFor(planned, logged, reps.reps_value, plannedLoad),
+        scored,
+        // Sets logged in a WOD block before it became one still show.
+        rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad),
       }
     })
-    const kind = kindOf(b.kind)
     const sets = b.sets ?? 0
+    const result = scored ? (resultByBlock.get(i + 1) ?? null) : null
+    if (scored) resultByBlock.delete(i + 1)
     return {
       key: `block-${i + 1}`,
       letter: blockLetter(i),
       title: [kind?.name ?? b.kind, b.name].filter(Boolean).join(' · '),
       // Exercises sharing sets are done in rounds, one after the other.
-      hint:
-        kind?.shared_sets && exercises.length > 1
+      hint: scored
+        ? wodSummary(b, b.sets)
+        : kind?.shared_sets && exercises.length > 1
           ? `${sets} ${sets === 1 ? 'round' : 'rounds'}: ${exercises.map((e) => e.label).join(' → ')}`
           : '',
       notes: b.notes,
       exercises,
+      wod: scored
+        ? {
+            blockPosition: i + 1,
+            scoreType: b.score_type!,
+            intervals: emomRounds(b),
+            draft: scoreDraft(result),
+            result,
+            saving: false,
+          }
+        : null,
     }
   })
+  // A score logged for a block that is no longer a WOD, or no longer there, is kept apart too.
+  const extraResults = [...resultByBlock.values()]
 
   // Whatever is left was logged at a place the plan no longer has.
   const extras: ExerciseCard[] = []
@@ -143,11 +236,12 @@ export function buildCards(
       repsUnitName: first.reps_unit_name,
       perSide: first.per_side,
       loadUnit: logged.find((s) => s.load_unit)?.load_unit ?? defaultLoadUnit,
+      scored: false,
       rows: rowsFor(0, logged, null, null),
     })
   }
   extras.sort((a, b) => a.blockPosition - b.blockPosition || a.position - b.position)
-  return { blocks, extras }
+  return { blocks, extras, extraResults }
 }
 
 // One line of a session card's summary: an exercise with its label, and where it sits in a

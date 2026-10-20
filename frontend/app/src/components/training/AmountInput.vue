@@ -1,7 +1,7 @@
 <template>
   <fieldset class="min-w-0">
     <legend class="mb-1 text-xs font-medium text-slate-600">
-      {{ part === 'reps' ? 'Reps' : 'Load' }}<span v-if="part === 'reps'" class="text-red-600" aria-hidden="true"> *</span>
+      {{ part === 'reps' ? 'Reps' : 'Load' }}<span v-if="part === 'reps' && !optional" class="text-red-600" aria-hidden="true"> *</span>
       <span v-if="hint" class="font-normal text-slate-400"> · {{ hint }}</span>
     </legend>
     <div class="flex flex-wrap items-center gap-1">
@@ -10,7 +10,7 @@
         type="number"
         min="0"
         step="any"
-        :placeholder="part === 'reps' ? '8' : '—'"
+        :placeholder="part === 'reps' && !optional ? '8' : '—'"
         :aria-label="`${label} ${part}`"
         size="sm"
         class="w-16!"
@@ -43,8 +43,9 @@ import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 import type { Amount } from '../../types'
 
 // Edits the reps or the load of an amount in place: a value, an optional upper end (a range
-// such as 8-10) and a unit; reps can also be per side.
-const props = defineProps<{ part: AmountPart; label: string; hint?: string }>()
+// such as 8-10) and a unit; reps can also be per side. Reps are required unless optional (the
+// exercises of a WOD).
+const props = defineProps<{ part: AmountPart; label: string; hint?: string; optional?: boolean }>()
 const amount = defineModel<Amount>({ required: true })
 const lookups = useLookupsStore()
 

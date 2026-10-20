@@ -53,9 +53,10 @@ export interface ExerciseDetail extends ExerciseInput {
 // live in the library; adding one to a training copies it. The *Input types are what the forms
 // send, the others what the server returns.
 
-// The kind of a training block (single, superset, complex...). Its rules come from the server,
-// so new kinds need no code: how many exercises it takes, and whether sets, reps and load are
-// set once on the block for all exercises (shared) or per exercise.
+// The kind of a training block (single, superset, complex, WOD...). Its rules come from the
+// server, so new kinds need no code: how many exercises it takes, whether sets, reps and load are
+// set once on the block for all exercises (shared) or per exercise, and whether the block is
+// done for one score (scored, a WOD) instead of set by set.
 export interface BlockKind {
   code: string
   name: string
@@ -65,6 +66,18 @@ export interface BlockKind {
   shared_sets: boolean
   shared_reps: boolean
   shared_load: boolean
+  scored: boolean // its shared sets are rounds, and optional
+}
+
+// How a WOD block is scored (see components/training/wod.ts).
+export type ScoreType = 'for_time' | 'amrap' | 'max_reps' | 'max_calories' | 'emom'
+
+// The format of a scored block and its time in seconds: a cap (for time) or the duration, plus
+// the interval of an EMOM. All null on other blocks.
+export interface Score {
+  score_type: ScoreType | null
+  time_seconds: number | null
+  interval_seconds: number | null
 }
 
 // A unit planned reps (reps, s, m...) or load (kg, % 1RM, RPE...) are measured in. min/max bound
@@ -107,8 +120,8 @@ export interface TrainingExercise extends TrainingExerciseInput, AmountUnitNames
 }
 
 // A block's sets and amount are only used when its kind shares them; otherwise each exercise
-// has its own.
-export interface TrainingBlockInput extends Amount {
+// has its own. The sets of a WOD block are its rounds (null = not fixed).
+export interface TrainingBlockInput extends Amount, Score {
   kind: string
   name: string
   sets: number | null
@@ -142,7 +155,7 @@ export interface TrainingInput {
   schedule: SlotInput[][] // one list per week, up to 7 sessions each
 }
 
-export interface TrainingBlock extends Amount, AmountUnitNames {
+export interface TrainingBlock extends Amount, AmountUnitNames, Score {
   id: string
   kind: string
   name: string
@@ -258,6 +271,31 @@ export interface Workout {
   completed_at: string | null
   notes: string
   sets: WorkoutSet[]
+  results: WorkoutResult[]
+}
+
+// The score of a WOD block as done; the block's place in the session (from 1) identifies it.
+// score_type is the format as planned and decides which values are set:
+//   for_time      time_seconds, or reps when the time cap was hit
+//   amrap         rounds, plus the reps of the unfinished round
+//   max_reps      reps
+//   max_calories  calories
+//   emom          rounds (intervals) completed
+export interface ResultInput {
+  block_position: number
+  score_type: ScoreType
+  time_seconds: number | null
+  rounds: number | null
+  reps: number | null
+  calories: number | null
+  rx: boolean // false when scaled
+  notes: string
+}
+
+export interface WorkoutResult extends ResultInput {
+  id: string
+  workout_id: string
+  completed_at: string
 }
 
 // A finished workout as listed.

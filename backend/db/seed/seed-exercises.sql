@@ -23,7 +23,14 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     ('Walking Lunge', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Alternating forward lunges while walking.', 'https://www.youtube.com/watch?v=DlhojghkaQ0', ARRAY['Functional fitness'], 'strength'),
     ('Box Pistol Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Single-leg squat down to a box.', 'https://www.youtube.com/watch?v=kc4YfSHjbYE', ARRAY['Functional fitness', 'Knee health'], 'strength'),
     ('Push-up', ARRAY['Shoulder', 'Elbow'], ARRAY['Chest', 'Triceps'], 'Bodyweight push-up, hands elevated to make it easier.', 'https://www.youtube.com/watch?v=IODxDxX7oi4', ARRAY['Functional fitness'], 'strength'),
-    ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/watch?v=_SsRDWz3U6g', ARRAY['Functional fitness', 'Shoulder health'], 'strength')
+    ('Ring Row', ARRAY['Shoulder', 'Elbow'], ARRAY['Back', 'Biceps'], 'Inverted row on gymnastic rings.', 'https://www.youtube.com/watch?v=_SsRDWz3U6g', ARRAY['Functional fitness', 'Shoulder health'], 'strength'),
+    -- CrossFit metcon movements for the WOD seeds (no video links)
+    ('Thruster', ARRAY['Knee', 'Hip', 'Shoulder'], ARRAY['Quadriceps', 'Glutes', 'Deltoids'], 'Front squat straight into a push press, barbell or dumbbells.', '', ARRAY['Functional fitness'], 'strength'),
+    ('Burpee', ARRAY['Shoulder', 'Hip', 'Knee'], ARRAY['Chest', 'Quadriceps', 'Core'], 'Chest to the floor, jump up with a clap overhead.', '', ARRAY['Functional fitness'], 'strength'),
+    ('Air Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Bodyweight squat below parallel.', '', ARRAY['Functional fitness'], 'strength'),
+    ('Box Jump', ARRAY['Ankle', 'Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes', 'Calves'], 'Two-footed jump onto a box, standing tall at the top.', '', ARRAY['Functional fitness'], 'strength'),
+    ('Wall Ball', ARRAY['Knee', 'Hip', 'Shoulder'], ARRAY['Quadriceps', 'Glutes', 'Deltoids'], 'Squat and throw a medicine ball to a target on the wall.', '', ARRAY['Functional fitness'], 'strength'),
+    ('Row Erg', ARRAY['Knee', 'Hip', 'Elbow'], ARRAY['Back', 'Quadriceps', 'Hamstrings'], 'Rowing machine, scored in calories or metres.', '', ARRAY['Functional fitness'], 'strength')
 ), new_exercises AS (
     INSERT INTO exercises (user_id, name, description, type)
     SELECT u.id, v.name, v.description, v.type

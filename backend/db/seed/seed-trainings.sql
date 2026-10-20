@@ -6,6 +6,8 @@
 --                       repeated), all block kinds, ranges, kg / % 1RM / RPE / RIR loads; the
 --                       first session of this week done today
 --   CrossFit warm-ups   active too, alongside: a warm-up per CrossFit day, 4-5 a week
+--   CrossFit WODs       active too: scored WOD blocks of every format, last week's workouts
+--                       with their scores (Rx and scaled)
 --   Strength – Phase 1  the previous 4 weeks, with finished workouts and their sets
 --   Home functional     the next phase, inactive: kettlebell work, seconds, per-side reps
 -- The user also rates some exercises (1-5), for the rating filter in the exercise picker.
@@ -68,10 +70,12 @@ BEGIN
     FOR src IN SELECT * FROM session_blocks WHERE session_id = template ORDER BY position LOOP
         INSERT INTO session_blocks (
             session_id, position, kind, name, sets, notes,
-            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit
+            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+            score_type, time_seconds, interval_seconds
         ) VALUES (
             new_session, src.position, src.kind, src.name, src.sets, src.notes,
-            src.reps_value, src.reps_max, src.reps_unit, src.per_side, src.load_value, src.load_max, src.load_unit
+            src.reps_value, src.reps_max, src.reps_unit, src.per_side, src.load_value, src.load_max, src.load_unit,
+            src.score_type, src.time_seconds, src.interval_seconds
         ) RETURNING id INTO block;
         INSERT INTO session_exercises (
             block_id, exercise_id, position, sets, tempo, notes,
@@ -116,7 +120,20 @@ CREATE FUNCTION pg_temp.block(
     RETURNING id
 $$;
 
+-- A scored WOD block: its format and time in seconds (a cap or the duration), the interval of an
+-- EMOM, and optionally rounds (the block's sets).
+CREATE FUNCTION pg_temp.wod(
+    session uuid, pos int, score_type text, time_seconds int DEFAULT NULL, name text DEFAULT '',
+    rounds int DEFAULT NULL, interval_seconds int DEFAULT NULL, notes text DEFAULT ''
+) RETURNS uuid LANGUAGE sql AS $$
+    INSERT INTO session_blocks (session_id, position, kind, name, sets, notes, score_type, time_seconds, interval_seconds)
+    VALUES (session, pos, 'wod', name, rounds, notes, score_type, time_seconds, interval_seconds)
+    RETURNING id
+$$;
+
 -- Sets are only set for the exercises of a single block; reps and load stay empty in a complex.
+-- In a WOD the reps may stay empty too (e.g. max calories).
+
 CREATE FUNCTION pg_temp.exercise(
     block uuid, pos int, exercise text, sets int DEFAULT NULL,
     reps numeric DEFAULT NULL, reps_max numeric DEFAULT NULL, reps_unit text DEFAULT 'reps', per_side boolean DEFAULT false,
@@ -141,6 +158,16 @@ RETURNS uuid LANGUAGE sql AS $$
     FROM training_week_sessions ws JOIN sessions s ON s.id = ws.session_id
     WHERE ws.id = slot
     RETURNING id
+$$;
+
+-- Logs the score of a WOD block of a workout; the values that count depend on the format.
+CREATE FUNCTION pg_temp.result(
+    workout uuid, block int, score_type text, time_seconds int DEFAULT NULL, rounds int DEFAULT NULL,
+    reps int DEFAULT NULL, calories int DEFAULT NULL, rx boolean DEFAULT true, notes text DEFAULT ''
+) RETURNS void LANGUAGE sql AS $$
+    INSERT INTO workout_results (workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at)
+    SELECT workout, block, score_type, time_seconds, rounds, reps, calories, rx, notes, w.completed_at
+    FROM workouts w WHERE w.id = workout
 $$;
 
 -- Logs sets 1..sets of an exercise at its place in the session, all with the same reps and load.
@@ -175,6 +202,8 @@ DECLARE
     kb_2 uuid;
     warm_squat uuid;
     warm_pull uuid;
+    wod_1 uuid;
+    wod_2 uuid;
     week int;
     session int;
 BEGIN
@@ -275,6 +304,54 @@ BEGIN
     PERFORM pg_temp.exercise(b, 1, 'Ring Row', reps => 10);
     PERFORM pg_temp.exercise(b, 2, 'Push-up', reps => 8);
     PERFORM pg_temp.exercise(b, 3, 'Kettlebell Swing', reps => 10, load => 5, load_unit => 'RPE');
+
+    -- WODs: strength work followed by a scored block, and conditioning sessions.
+    u := pg_temp.template('WOD – thrusters and burpees', notes => 'Scale the thruster load to keep moving.');
+    wod_1 := u;
+    b := pg_temp.block(u, 1, 'single', NULL, name => 'Strength');
+    PERFORM pg_temp.exercise(b, 1, 'Squat', sets => 5, reps => 3, load => 75, load_unit => '% 1RM');
+    b := pg_temp.wod(u, 2, 'for_time', 10 * 60, name => '21-15-9', notes => '21-15-9 reps of each, cap 10 min');
+    PERFORM pg_temp.exercise(b, 1, 'Thruster', load => 43);
+    PERFORM pg_temp.exercise(b, 2, 'Burpee');
+    b := pg_temp.wod(u, 3, 'max_calories', 3 * 60, name => 'Finisher');
+    PERFORM pg_temp.exercise(b, 1, 'Row Erg');
+
+    u := pg_temp.template('WOD – AMRAP and EMOM');
+    wod_2 := u;
+    b := pg_temp.wod(u, 1, 'emom', 10 * 60, interval_seconds => 60, name => 'Skill EMOM');
+    PERFORM pg_temp.exercise(b, 1, 'Pull-up', reps => 5);
+    PERFORM pg_temp.exercise(b, 2, 'Box Jump', reps => 8);
+    b := pg_temp.wod(u, 2, 'amrap', 12 * 60, name => 'Cindy-ish');
+    PERFORM pg_temp.exercise(b, 1, 'Pull-up', reps => 5);
+    PERFORM pg_temp.exercise(b, 2, 'Push-up', reps => 10);
+    PERFORM pg_temp.exercise(b, 3, 'Air Squat', reps => 15);
+    b := pg_temp.wod(u, 3, 'for_time', NULL, rounds => 3, name => 'Chipper');
+    PERFORM pg_temp.exercise(b, 1, 'Row Erg', reps => 15, reps_unit => 'cal');
+    PERFORM pg_temp.exercise(b, 2, 'Wall Ball', reps => 20, load => 9);
+    b := pg_temp.wod(u, 4, 'max_reps', 2 * 60, name => 'Burpee test');
+    PERFORM pg_temp.exercise(b, 1, 'Burpee');
+
+    -- Active alongside: the WODs, three a week; last week's done with their scores.
+    t := pg_temp.training('CrossFit WODs', 'Class programming, logged with the score of every WOD.', true,
+        pg_temp.this_monday() - 7, 4);
+    s1 := pg_temp.copy_session(wod_1, t, 1, 'Thrusters and burpees');
+    s2 := pg_temp.copy_session(wod_2, t, 2, 'AMRAP and EMOM');
+    FOR week IN 1..4 LOOP
+        PERFORM pg_temp.plan(t, week, ARRAY[s1, s2, s1]);
+    END LOOP;
+    w := pg_temp.workout(pg_temp.slot(t, 1, 1), (pg_temp.this_monday() - 7)::timestamptz + interval '18 hours', 'Legs gone after the thrusters.');
+    PERFORM pg_temp.sets(w, 1, 1, 'Squat', 5, 3, load => 100);
+    PERFORM pg_temp.result(w, 2, 'for_time', time_seconds => 8 * 60 + 42);
+    PERFORM pg_temp.result(w, 3, 'max_calories', calories => 48);
+    w := pg_temp.workout(pg_temp.slot(t, 1, 2), (pg_temp.this_monday() - 5)::timestamptz + interval '18 hours');
+    PERFORM pg_temp.result(w, 1, 'emom', rounds => 9, notes => 'Missed the last minute of box jumps');
+    PERFORM pg_temp.result(w, 2, 'amrap', rounds => 14, reps => 7, rx => false, notes => 'Banded pull-ups');
+    PERFORM pg_temp.result(w, 3, 'for_time', time_seconds => 11 * 60 + 5);
+    PERFORM pg_temp.result(w, 4, 'max_reps', reps => 31);
+    w := pg_temp.workout(pg_temp.slot(t, 1, 3), (pg_temp.this_monday() - 3)::timestamptz + interval '18 hours');
+    PERFORM pg_temp.sets(w, 1, 1, 'Squat', 5, 3, load => 102.5);
+    PERFORM pg_temp.result(w, 2, 'for_time', reps => 81, notes => 'Capped at 10:00, 9 burpees short');
+    PERFORM pg_temp.result(w, 3, 'max_calories', calories => 51);
 
     -- Active alongside the strength block: warm-ups for the CrossFit days of the week.
     t := pg_temp.training('CrossFit warm-ups', 'One per CrossFit day, planned when the week''s programming is out.', true,

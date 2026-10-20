@@ -76,6 +76,7 @@ func groupBlocks(blocks []repos.ListTrainingBlocksRow, exercises []repos.ListTra
 	for _, b := range blocks {
 		blocksBySession[b.SessionID] = append(blocksBySession[b.SessionID], Block{
 			ID: b.ID, Kind: b.Kind, Name: b.Name, Sets: b.Sets, Notes: b.Notes,
+			Score: Score{ScoreType: b.ScoreType, TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds},
 			AmountWithUnits: AmountWithUnits{
 				Amount: Amount{
 					RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, PerSide: b.PerSide,

@@ -157,3 +157,38 @@ func (h *Handler) DeleteSet(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// LogResult stores the score of a WOD block as it was done, or corrects one logged before.
+func (h *Handler) LogResult(w http.ResponseWriter, r *http.Request) {
+	userID, id, ok := userAndID(w, r, "workout")
+	if !ok {
+		return
+	}
+	var in workout.ResultInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	result, err := h.workouts.LogResult(r.Context(), userID, id, in)
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// DeleteResult removes the score of a WOD block from a workout.
+func (h *Handler) DeleteResult(w http.ResponseWriter, r *http.Request) {
+	userID, id, ok := userAndID(w, r, "workout")
+	if !ok {
+		return
+	}
+	resultID, ok := uuidParam(w, r, "resultID", "result")
+	if !ok {
+		return
+	}
+	if err := h.workouts.DeleteResult(r.Context(), userID, id, resultID); err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

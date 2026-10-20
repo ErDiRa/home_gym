@@ -22,7 +22,7 @@ func (s *Service) Finish(ctx context.Context, userID, id uuid.UUID, notes string
 	if err != nil {
 		return Workout{}, mapError(err)
 	}
-	return withSets(ctx, s.q, w)
+	return withLogs(ctx, s.q, w)
 }
 
 // Delete soft-deletes one of the user's workouts: discards the one in progress, or removes a

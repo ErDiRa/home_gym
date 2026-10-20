@@ -173,3 +173,88 @@ func TestValidate(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckBlockScore(t *testing.T) {
+	reps, kg := uuid.New(), uuid.New()
+	lk := lookups{
+		kinds: map[string]repos.ListBlockKindsRow{
+			"single": {Code: "single", Name: "Single", MinExercises: 1},
+			"wod":    {Code: "wod", Name: "WOD", MinExercises: 1, SharedSets: true, Scored: true},
+		},
+		repUnits:  map[uuid.UUID]unit{reps: {name: "reps"}},
+		loadUnits: map[uuid.UUID]unit{kg: {name: "kg"}},
+	}
+	exercises := []ExerciseInput{
+		{ExerciseID: uuid.New(), Amount: Amount{RepsValue: ptr(15.0), RepsUnit: &reps, LoadValue: ptr(43.0), LoadUnit: &kg}},
+		{ExerciseID: uuid.New(), Amount: Amount{RepsValue: ptr(10.0), RepsUnit: &reps}},
+	}
+	wod := func(sets *int32, sc Score) BlockInput {
+		return BlockInput{Kind: "wod", Sets: sets, Score: sc, Exercises: exercises}
+	}
+	score := func(scoreType string, time, interval *int32) Score {
+		return Score{ScoreType: &scoreType, TimeSeconds: time, IntervalSeconds: interval}
+	}
+
+	tests := []struct {
+		name    string
+		block   BlockInput
+		wantErr string
+	}{
+		{"for time with rounds and cap", wod(ptr[int32](5), score(ScoreForTime, ptr[int32](900), nil)), ""},
+		{"for time without cap", wod(nil, score(ScoreForTime, nil, nil)), ""},
+		{"amrap", wod(nil, score(ScoreAMRAP, ptr[int32](720), nil)), ""},
+		{"amrap needs a duration", wod(nil, score(ScoreAMRAP, nil, nil)), "an AMRAP needs a duration"},
+		{"max reps", wod(nil, score(ScoreMaxReps, ptr[int32](300), nil)), ""},
+		{"max calories", wod(nil, score(ScoreMaxCalories, ptr[int32](180), nil)), ""},
+		{"emom", wod(nil, score(ScoreEMOM, ptr[int32](720), ptr[int32](120))), ""},
+		{"emom needs a duration", wod(nil, score(ScoreEMOM, nil, nil)), "an EMOM needs a duration"},
+		{"emom interval longer than the duration", wod(nil, score(ScoreEMOM, ptr[int32](60), ptr[int32](120))), "fit into the duration"},
+		{"no score type", wod(nil, Score{}), "choose how"},
+		{"unknown score type", wod(nil, score("tabata", nil, nil)), "unknown score type"},
+		{"time too long", wod(nil, score(ScoreForTime, ptr[int32](5*60*60), nil)), "between"},
+		{"rounds out of range", wod(ptr[int32](0), score(ScoreForTime, nil, nil)), "rounds must be 1-100"},
+		{"exercise without a target", BlockInput{Kind: "wod", Score: score(ScoreMaxCalories, ptr[int32](180), nil), Exercises: []ExerciseInput{{ExerciseID: uuid.New()}}}, ""},
+		{"exercise reps without a unit", BlockInput{Kind: "wod", Score: score(ScoreForTime, nil, nil), Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Amount: Amount{RepsValue: ptr(15.0)}}}}, "value and a unit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := checkBlock(&tt.block, lk)
+			if tt.wantErr == "" && got != "" {
+				t.Fatalf("checkBlock() = %q, want no error", got)
+			}
+			if tt.wantErr != "" && !strings.Contains(got, tt.wantErr) {
+				t.Fatalf("checkBlock() = %q, want it to contain %q", got, tt.wantErr)
+			}
+		})
+	}
+
+	t.Run("emom interval defaults to a minute", func(t *testing.T) {
+		b := wod(nil, score(ScoreEMOM, ptr[int32](600), nil))
+		if msg := checkBlock(&b, lk); msg != "" {
+			t.Fatal(msg)
+		}
+		if b.IntervalSeconds == nil || *b.IntervalSeconds != 60 {
+			t.Fatalf("interval = %v, want 60", b.IntervalSeconds)
+		}
+	})
+	t.Run("interval is cleared unless emom", func(t *testing.T) {
+		b := wod(nil, score(ScoreAMRAP, ptr[int32](600), ptr[int32](60)))
+		if msg := checkBlock(&b, lk); msg != "" {
+			t.Fatal(msg)
+		}
+		if b.IntervalSeconds != nil {
+			t.Fatalf("interval = %v, want nil", *b.IntervalSeconds)
+		}
+	})
+	t.Run("score is cleared on unscored kinds", func(t *testing.T) {
+		b := BlockInput{Kind: "single", Score: score(ScoreAMRAP, ptr[int32](600), nil), Exercises: []ExerciseInput{
+			{ExerciseID: uuid.New(), Sets: ptr[int32](3), Amount: Amount{RepsValue: ptr(5.0), RepsUnit: &reps}},
+		}}
+		if msg := checkBlock(&b, lk); msg != "" {
+			t.Fatal(msg)
+		}
+		if b.Score != (Score{}) {
+			t.Fatalf("score = %+v, want it cleared", b.Score)
+		}
+	})
+}

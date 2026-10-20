@@ -24,18 +24,20 @@ type fakeQueries struct {
 	inSlot    *repos.Workout // what GetSlotWorkoutInProgress finds
 	done      []repos.ListWorkoutsRow
 	sets      []repos.ListWorkoutSetsRow
+	results   []repos.WorkoutResult
 	repUnits  []repos.ListRepUnitsRow
 	loadUnits []repos.ListLoadUnitsRow
 
 	createErr   error
 	foreignExer bool  // UpsertWorkoutSet finds no exercise
-	deleteRows  int64 // rows DeleteWorkout and DeleteWorkoutSet affect
+	deleteRows  int64 // rows DeleteWorkout, DeleteWorkoutSet and DeleteWorkoutResult affect
 
-	created  []repos.CreateWorkoutParams
-	finished []repos.FinishWorkoutParams
-	upserts  []repos.UpsertWorkoutSetParams
-	listed   []repos.ListWorkoutsParams
-	planned  []repos.ListWeekPlanParams
+	created       []repos.CreateWorkoutParams
+	finished      []repos.FinishWorkoutParams
+	upserts       []repos.UpsertWorkoutSetParams
+	resultUpserts []repos.UpsertWorkoutResultParams
+	listed        []repos.ListWorkoutsParams
+	planned       []repos.ListWeekPlanParams
 }
 
 // newFake returns a fake with a "reps" unit (from 1) and an "RPE" load unit (1-10).
@@ -123,6 +125,22 @@ func (f *fakeQueries) UpsertWorkoutSet(_ context.Context, arg repos.UpsertWorkou
 }
 
 func (f *fakeQueries) DeleteWorkoutSet(context.Context, repos.DeleteWorkoutSetParams) (int64, error) {
+	return f.deleteRows, nil
+}
+
+func (f *fakeQueries) ListWorkoutResults(context.Context, uuid.UUID) ([]repos.WorkoutResult, error) {
+	if f.results == nil {
+		return []repos.WorkoutResult{}, nil
+	}
+	return f.results, nil
+}
+
+func (f *fakeQueries) UpsertWorkoutResult(_ context.Context, arg repos.UpsertWorkoutResultParams) (repos.WorkoutResult, error) {
+	f.resultUpserts = append(f.resultUpserts, arg)
+	return repos.WorkoutResult{ID: uuid.New(), WorkoutID: arg.WorkoutID, BlockPosition: arg.BlockPosition, ScoreType: arg.ScoreType}, nil
+}
+
+func (f *fakeQueries) DeleteWorkoutResult(context.Context, repos.DeleteWorkoutResultParams) (int64, error) {
 	return f.deleteRows, nil
 }
 

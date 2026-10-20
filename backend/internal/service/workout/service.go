@@ -2,7 +2,7 @@
 //
 // A training plans the sessions of each of its weeks instead of fixed days. A workout is one
 // session done: the user starts it from a planned slot of the week whenever there is time, logs
-// every set as they go and finishes it. Several trainings can be active side by side (e.g.
+// every set as they go (and one score per WOD block) and finishes it. Several trainings can be active side by side (e.g.
 // strength, warm-ups and mobility); the week view shows one of them at a time: its planned
 // sessions of the week next to the finished workouts, which mark their slots done.
 package workout
@@ -36,6 +36,9 @@ type Queries interface {
 	ListWorkoutSets(ctx context.Context, workoutID uuid.UUID) ([]repos.ListWorkoutSetsRow, error)
 	UpsertWorkoutSet(ctx context.Context, arg repos.UpsertWorkoutSetParams) (repos.WorkoutSet, error)
 	DeleteWorkoutSet(ctx context.Context, arg repos.DeleteWorkoutSetParams) (int64, error)
+	ListWorkoutResults(ctx context.Context, workoutID uuid.UUID) ([]repos.WorkoutResult, error)
+	UpsertWorkoutResult(ctx context.Context, arg repos.UpsertWorkoutResultParams) (repos.WorkoutResult, error)
+	DeleteWorkoutResult(ctx context.Context, arg repos.DeleteWorkoutResultParams) (int64, error)
 	ListRepUnits(ctx context.Context) ([]repos.ListRepUnitsRow, error)
 	ListLoadUnits(ctx context.Context) ([]repos.ListLoadUnitsRow, error)
 }
@@ -48,7 +51,8 @@ type Service struct {
 // New builds the service on Postgres.
 func New(pool *pgxpool.Pool) *Service { return &Service{q: repos.New(pool)} }
 
-// Workout is a session done, with the sets logged so far, in the order of the session.
+// Workout is a session done, with the sets and WOD scores logged so far, in the order of the
+// session.
 type Workout struct {
 	ID            uuid.UUID                  `json:"id"`
 	TrainingID    *uuid.UUID                 `json:"training_id"`     // nil once the training is deleted
@@ -59,23 +63,29 @@ type Workout struct {
 	CompletedAt   pgtype.Timestamptz         `json:"completed_at"` // null while in progress
 	Notes         string                     `json:"notes"`
 	Sets          []repos.ListWorkoutSetsRow `json:"sets"`
+	Results       []repos.WorkoutResult      `json:"results"`
 }
 
-// fromRow turns a workout row and its sets into a Workout.
-func fromRow(w repos.Workout, sets []repos.ListWorkoutSetsRow) Workout {
+// fromRow turns a workout row, its sets and its scores into a Workout.
+func fromRow(w repos.Workout, sets []repos.ListWorkoutSetsRow, results []repos.WorkoutResult) Workout {
 	return Workout{
 		ID: w.ID, TrainingID: w.TrainingID, WeekSessionID: w.WeekSessionID, SessionID: w.SessionID,
-		SessionName: w.SessionName, StartedAt: w.StartedAt, CompletedAt: w.CompletedAt, Notes: w.Notes, Sets: sets,
+		SessionName: w.SessionName, StartedAt: w.StartedAt, CompletedAt: w.CompletedAt, Notes: w.Notes,
+		Sets: sets, Results: results,
 	}
 }
 
-// withSets reads the sets of a workout row into a Workout.
-func withSets(ctx context.Context, q Queries, w repos.Workout) (Workout, error) {
+// withLogs reads the sets and scores of a workout row into a Workout.
+func withLogs(ctx context.Context, q Queries, w repos.Workout) (Workout, error) {
 	sets, err := q.ListWorkoutSets(ctx, w.ID)
 	if err != nil {
 		return Workout{}, err
 	}
-	return fromRow(w, sets), nil
+	results, err := q.ListWorkoutResults(ctx, w.ID)
+	if err != nil {
+		return Workout{}, err
+	}
+	return fromRow(w, sets, results), nil
 }
 
 // mapError turns a failed query into the error the caller sees. Errors that are already a

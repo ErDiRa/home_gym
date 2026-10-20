@@ -257,29 +257,34 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) (u
 const insertSessionBlock = `-- name: InsertSessionBlock :one
 INSERT INTO session_blocks (
     session_id, position, kind, name, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, notes
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+    score_type, time_seconds, interval_seconds, notes
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9,
-    $10, $11, $12, $13
+    $10, $11, $12,
+    $13, $14, $15, $16
 )
 RETURNING id
 `
 
 type InsertSessionBlockParams struct {
-	SessionID uuid.UUID  `json:"session_id"`
-	Position  int32      `json:"position"`
-	Kind      string     `json:"kind"`
-	Name      string     `json:"name"`
-	Sets      *int32     `json:"sets"`
-	RepsValue *float64   `json:"reps_value"`
-	RepsMax   *float64   `json:"reps_max"`
-	RepsUnit  *uuid.UUID `json:"reps_unit"`
-	PerSide   bool       `json:"per_side"`
-	LoadValue *float64   `json:"load_value"`
-	LoadMax   *float64   `json:"load_max"`
-	LoadUnit  *uuid.UUID `json:"load_unit"`
-	Notes     string     `json:"notes"`
+	SessionID       uuid.UUID  `json:"session_id"`
+	Position        int32      `json:"position"`
+	Kind            string     `json:"kind"`
+	Name            string     `json:"name"`
+	Sets            *int32     `json:"sets"`
+	RepsValue       *float64   `json:"reps_value"`
+	RepsMax         *float64   `json:"reps_max"`
+	RepsUnit        *uuid.UUID `json:"reps_unit"`
+	PerSide         bool       `json:"per_side"`
+	LoadValue       *float64   `json:"load_value"`
+	LoadMax         *float64   `json:"load_max"`
+	LoadUnit        *uuid.UUID `json:"load_unit"`
+	ScoreType       *string    `json:"score_type"`
+	TimeSeconds     *int32     `json:"time_seconds"`
+	IntervalSeconds *int32     `json:"interval_seconds"`
+	Notes           string     `json:"notes"`
 }
 
 // sqlc.narg marks the parameters that may be NULL (what the block's kind doesn't share).
@@ -297,6 +302,9 @@ func (q *Queries) InsertSessionBlock(ctx context.Context, arg InsertSessionBlock
 		arg.LoadValue,
 		arg.LoadMax,
 		arg.LoadUnit,
+		arg.ScoreType,
+		arg.TimeSeconds,
+		arg.IntervalSeconds,
 		arg.Notes,
 	)
 	var id uuid.UUID
@@ -381,7 +389,7 @@ func (q *Queries) InsertWeekSession(ctx context.Context, arg InsertWeekSessionPa
 }
 
 const listBlockKinds = `-- name: ListBlockKinds :many
-SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load
+SELECT code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored
 FROM block_kinds
 ORDER BY position
 `
@@ -395,6 +403,7 @@ type ListBlockKindsRow struct {
 	SharedSets   bool   `json:"shared_sets"`
 	SharedReps   bool   `json:"shared_reps"`
 	SharedLoad   bool   `json:"shared_load"`
+	Scored       bool   `json:"scored"`
 }
 
 func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, error) {
@@ -415,6 +424,7 @@ func (q *Queries) ListBlockKinds(ctx context.Context) ([]ListBlockKindsRow, erro
 			&i.SharedSets,
 			&i.SharedReps,
 			&i.SharedLoad,
+			&i.Scored,
 		); err != nil {
 			return nil, err
 		}
@@ -560,7 +570,7 @@ const listSessionBlocks = `-- name: ListSessionBlocks :many
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
        sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
        sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       sb.notes
+       sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM session_blocks sb
 LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
 LEFT JOIN load_units lu ON lu.id = sb.load_unit
@@ -569,21 +579,24 @@ ORDER BY sb.position
 `
 
 type ListSessionBlocksRow struct {
-	ID           uuid.UUID  `json:"id"`
-	SessionID    uuid.UUID  `json:"session_id"`
-	Kind         string     `json:"kind"`
-	Name         string     `json:"name"`
-	Sets         *int32     `json:"sets"`
-	RepsValue    *float64   `json:"reps_value"`
-	RepsMax      *float64   `json:"reps_max"`
-	RepsUnit     *uuid.UUID `json:"reps_unit"`
-	RepsUnitName string     `json:"reps_unit_name"`
-	PerSide      bool       `json:"per_side"`
-	LoadValue    *float64   `json:"load_value"`
-	LoadMax      *float64   `json:"load_max"`
-	LoadUnit     *uuid.UUID `json:"load_unit"`
-	LoadUnitName string     `json:"load_unit_name"`
-	Notes        string     `json:"notes"`
+	ID              uuid.UUID  `json:"id"`
+	SessionID       uuid.UUID  `json:"session_id"`
+	Kind            string     `json:"kind"`
+	Name            string     `json:"name"`
+	Sets            *int32     `json:"sets"`
+	RepsValue       *float64   `json:"reps_value"`
+	RepsMax         *float64   `json:"reps_max"`
+	RepsUnit        *uuid.UUID `json:"reps_unit"`
+	RepsUnitName    string     `json:"reps_unit_name"`
+	PerSide         bool       `json:"per_side"`
+	LoadValue       *float64   `json:"load_value"`
+	LoadMax         *float64   `json:"load_max"`
+	LoadUnit        *uuid.UUID `json:"load_unit"`
+	LoadUnitName    string     `json:"load_unit_name"`
+	ScoreType       *string    `json:"score_type"`
+	TimeSeconds     *int32     `json:"time_seconds"`
+	IntervalSeconds *int32     `json:"interval_seconds"`
+	Notes           string     `json:"notes"`
 }
 
 func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([]ListSessionBlocksRow, error) {
@@ -610,6 +623,9 @@ func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([
 			&i.LoadMax,
 			&i.LoadUnit,
 			&i.LoadUnitName,
+			&i.ScoreType,
+			&i.TimeSeconds,
+			&i.IntervalSeconds,
 			&i.Notes,
 		); err != nil {
 			return nil, err
@@ -696,7 +712,7 @@ const listTrainingBlocks = `-- name: ListTrainingBlocks :many
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
        sb.reps_value, sb.reps_max, sb.reps_unit, COALESCE(ru.name, '')::text AS reps_unit_name, sb.per_side,
        sb.load_value, sb.load_max, sb.load_unit, COALESCE(lu.name, '')::text AS load_unit_name,
-       sb.notes
+       sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM session_blocks sb
 JOIN sessions s ON s.id = sb.session_id
 LEFT JOIN rep_units ru ON ru.id = sb.reps_unit
@@ -706,21 +722,24 @@ ORDER BY sb.session_id, sb.position
 `
 
 type ListTrainingBlocksRow struct {
-	ID           uuid.UUID  `json:"id"`
-	SessionID    uuid.UUID  `json:"session_id"`
-	Kind         string     `json:"kind"`
-	Name         string     `json:"name"`
-	Sets         *int32     `json:"sets"`
-	RepsValue    *float64   `json:"reps_value"`
-	RepsMax      *float64   `json:"reps_max"`
-	RepsUnit     *uuid.UUID `json:"reps_unit"`
-	RepsUnitName string     `json:"reps_unit_name"`
-	PerSide      bool       `json:"per_side"`
-	LoadValue    *float64   `json:"load_value"`
-	LoadMax      *float64   `json:"load_max"`
-	LoadUnit     *uuid.UUID `json:"load_unit"`
-	LoadUnitName string     `json:"load_unit_name"`
-	Notes        string     `json:"notes"`
+	ID              uuid.UUID  `json:"id"`
+	SessionID       uuid.UUID  `json:"session_id"`
+	Kind            string     `json:"kind"`
+	Name            string     `json:"name"`
+	Sets            *int32     `json:"sets"`
+	RepsValue       *float64   `json:"reps_value"`
+	RepsMax         *float64   `json:"reps_max"`
+	RepsUnit        *uuid.UUID `json:"reps_unit"`
+	RepsUnitName    string     `json:"reps_unit_name"`
+	PerSide         bool       `json:"per_side"`
+	LoadValue       *float64   `json:"load_value"`
+	LoadMax         *float64   `json:"load_max"`
+	LoadUnit        *uuid.UUID `json:"load_unit"`
+	LoadUnitName    string     `json:"load_unit_name"`
+	ScoreType       *string    `json:"score_type"`
+	TimeSeconds     *int32     `json:"time_seconds"`
+	IntervalSeconds *int32     `json:"interval_seconds"`
+	Notes           string     `json:"notes"`
 }
 
 func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingBlocksRow, error) {
@@ -747,6 +766,9 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 			&i.LoadMax,
 			&i.LoadUnit,
 			&i.LoadUnitName,
+			&i.ScoreType,
+			&i.TimeSeconds,
+			&i.IntervalSeconds,
 			&i.Notes,
 		); err != nil {
 			return nil, err

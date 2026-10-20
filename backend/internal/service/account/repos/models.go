@@ -19,6 +19,7 @@ type BlockKind struct {
 	SharedSets   bool   `json:"shared_sets"`
 	SharedReps   bool   `json:"shared_reps"`
 	SharedLoad   bool   `json:"shared_load"`
+	Scored       bool   `json:"scored"`
 }
 
 type Exercise struct {
@@ -122,20 +123,23 @@ type Session struct {
 }
 
 type SessionBlock struct {
-	ID        uuid.UUID  `json:"id"`
-	SessionID uuid.UUID  `json:"session_id"`
-	Position  int32      `json:"position"`
-	Kind      string     `json:"kind"`
-	Name      string     `json:"name"`
-	Sets      *int32     `json:"sets"`
-	RepsValue *float64   `json:"reps_value"`
-	RepsMax   *float64   `json:"reps_max"`
-	RepsUnit  *uuid.UUID `json:"reps_unit"`
-	PerSide   bool       `json:"per_side"`
-	LoadValue *float64   `json:"load_value"`
-	LoadMax   *float64   `json:"load_max"`
-	LoadUnit  *uuid.UUID `json:"load_unit"`
-	Notes     string     `json:"notes"`
+	ID              uuid.UUID  `json:"id"`
+	SessionID       uuid.UUID  `json:"session_id"`
+	Position        int32      `json:"position"`
+	Kind            string     `json:"kind"`
+	Name            string     `json:"name"`
+	Sets            *int32     `json:"sets"`
+	RepsValue       *float64   `json:"reps_value"`
+	RepsMax         *float64   `json:"reps_max"`
+	RepsUnit        *uuid.UUID `json:"reps_unit"`
+	PerSide         bool       `json:"per_side"`
+	LoadValue       *float64   `json:"load_value"`
+	LoadMax         *float64   `json:"load_max"`
+	LoadUnit        *uuid.UUID `json:"load_unit"`
+	ScoreType       *string    `json:"score_type"`
+	TimeSeconds     *int32     `json:"time_seconds"`
+	IntervalSeconds *int32     `json:"interval_seconds"`
+	Notes           string     `json:"notes"`
 }
 
 type SessionExercise struct {
@@ -199,6 +203,20 @@ type Workout struct {
 	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
 	Notes         string             `json:"notes"`
 	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type WorkoutResult struct {
+	ID            uuid.UUID          `json:"id"`
+	WorkoutID     uuid.UUID          `json:"workout_id"`
+	BlockPosition int32              `json:"block_position"`
+	ScoreType     string             `json:"score_type"`
+	TimeSeconds   *int32             `json:"time_seconds"`
+	Rounds        *int32             `json:"rounds"`
+	Reps          *int32             `json:"reps"`
+	Calories      *int32             `json:"calories"`
+	Rx            bool               `json:"rx"`
+	Notes         string             `json:"notes"`
+	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
 }
 
 type WorkoutSet struct {
