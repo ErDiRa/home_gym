@@ -28,33 +28,59 @@
         class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm"
         :aria-label="`Block ${block.letter}`"
       >
-        <header class="flex items-center gap-2 border-b border-slate-100 pb-2">
+        <!-- Tapping the header collapses the block; its progress stays visible. -->
+        <button
+          type="button"
+          class="flex min-h-11 w-full items-center gap-2 text-left"
+          :class="collapsed.has(block.key) ? 'pb-3' : 'border-b border-slate-100 pb-2'"
+          :aria-expanded="!collapsed.has(block.key)"
+          @click="toggleCollapsed(block.key)"
+        >
           <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-sm font-bold text-white">
             {{ block.letter }}
           </span>
-          <div class="min-w-0">
-            <p class="truncate text-sm font-semibold text-slate-800">{{ block.title }}</p>
-            <p v-if="block.hint || block.notes" class="text-xs text-slate-500">
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-semibold text-slate-800">{{ block.title }}</span>
+            <span v-if="block.hint || block.notes" class="block text-xs text-slate-500">
               {{ [block.hint, block.notes].filter(Boolean).join(' · ') }}
-            </p>
-          </div>
-        </header>
-        <div class="divide-y divide-slate-100">
-          <ExerciseSets
-            v-for="(card, i) in block.exercises"
-            :key="card.key"
-            v-model="block.exercises[i]"
-            @toggle="toggle(card, $event)"
+            </span>
+          </span>
+          <span class="shrink-0 text-xs text-slate-500">{{ blockProgress(block) }}</span>
+          <ChevronDownIcon
+            class="size-5 shrink-0 text-slate-400 transition-transform"
+            :class="{ '-rotate-90': collapsed.has(block.key) }"
+            aria-hidden="true"
           />
+        </button>
+        <div v-show="!collapsed.has(block.key)">
+          <div class="divide-y divide-slate-100">
+            <ExerciseSets
+              v-for="(card, i) in block.exercises"
+              :key="card.key"
+              v-model="block.exercises[i]"
+              @toggle="toggle(card, $event)"
+            />
+          </div>
+          <WodResult v-if="block.wod" v-model="block.wod" @toggle="toggleScore(block.wod)" />
         </div>
-        <WodResult v-if="block.wod" v-model="block.wod" @toggle="toggleScore(block.wod)" />
       </section>
 
       <section v-if="extras.length || extraResults.length" class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm">
-        <p class="border-b border-slate-100 pb-2 text-sm font-semibold text-slate-800">
-          {{ extras.length ? 'Other logged sets' : 'Other logged scores' }}
-        </p>
-        <div class="divide-y divide-slate-100">
+        <button
+          type="button"
+          class="flex min-h-11 w-full items-center gap-2 text-left text-sm font-semibold text-slate-800"
+          :class="collapsed.has('extras') ? 'pb-3' : 'border-b border-slate-100 pb-2'"
+          :aria-expanded="!collapsed.has('extras')"
+          @click="toggleCollapsed('extras')"
+        >
+          <span class="flex-1">{{ extras.length ? 'Other logged sets' : 'Other logged scores' }}</span>
+          <ChevronDownIcon
+            class="size-5 shrink-0 text-slate-400 transition-transform"
+            :class="{ '-rotate-90': collapsed.has('extras') }"
+            aria-hidden="true"
+          />
+        </button>
+        <div v-show="!collapsed.has('extras')" class="divide-y divide-slate-100">
           <ExerciseSets v-for="(card, i) in extras" :key="card.key" v-model="extras[i]" @toggle="toggle(card, $event)" />
           <p v-for="r in extraResults" :key="r.id" class="py-3 text-sm text-slate-700">
             <span class="font-semibold text-indigo-600">{{ blockLetter(r.block_position - 1) }}</span>
@@ -64,9 +90,15 @@
         </div>
       </section>
 
+      <WhoopCard v-if="workout.completed_at && whoop.status?.connected" :workout-id="workout.id" :done-at="workout.completed_at" />
+
       <!-- Finishing: notes on how it went and, optionally, a rating per exercise. -->
       <section v-if="finishing" ref="finishSection" class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 class="font-semibold text-slate-900">{{ workout.completed_at ? 'Notes and ratings' : 'Finish workout' }}</h2>
+        <label class="mt-3 block text-sm font-medium text-slate-800">
+          Done on
+          <TextInput v-model="doneOn" type="date" size="touch" :max="today()" required class="mt-1" />
+        </label>
         <label class="mt-3 block text-sm font-medium text-slate-800">
           How did it go?
           <TextInput v-model="notes" multiline size="touch" rows="3" maxlength="2000" class="mt-1" />
@@ -122,12 +154,13 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, ChevronDownIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
+import WhoopCard from '../../components/workout/WhoopCard.vue'
 import WodResult from '../../components/workout/WodResult.vue'
 import { blockLetter } from '../../components/training/trainingForm'
 import { scoreFormat, scoreText } from '../../components/training/wod'
@@ -144,10 +177,11 @@ import {
   type SetRow,
   type WodCard,
 } from '../../components/workout/workoutPlan'
-import { formatDay, formatTime } from '../../dates'
+import { formatDay, formatTime, toIso, today } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useTrainingsStore } from '../../stores/trainings'
+import { useWhoopStore } from '../../stores/whoop'
 import { useWorkoutsStore } from '../../stores/workouts'
 import type { TrainingDetail, Workout, WorkoutResult } from '../../types'
 
@@ -157,6 +191,7 @@ const workouts = useWorkoutsStore()
 const trainings = useTrainingsStore()
 const exercises = useExercisesStore()
 const lookups = useLookupsStore()
+const whoop = useWhoopStore()
 const id = route.params.id as string
 
 const workout = ref<Workout | null>(null)
@@ -170,6 +205,11 @@ const saving = ref(false)
 const finishing = ref(false)
 const finishSection = ref<HTMLElement | null>(null)
 const notes = ref('')
+// The day the workout was done: today by default, or its date once finished; changeable for a
+// workout logged on another day.
+const doneOn = ref(today())
+// The sections collapsed by the user: block keys, and 'extras' for the other logged sets.
+const collapsed = reactive(new Set<string>())
 // Ratings picked while finishing, by exercise id; saved with the workout.
 const ratingDrafts = reactive(new Map<string, number>())
 
@@ -191,9 +231,12 @@ onMounted(async () => {
       lookups.loadTrainingLookups(),
       exercises.loadExercises(),
       exercises.loadRatings(),
+      // Without WHOOP (not configured or failing) the workout just shows no WHOOP card.
+      whoop.loadStatus().catch(() => {}),
     ])
     workout.value = loaded
     notes.value = loaded.notes
+    if (loaded.completed_at) doneOn.value = toIso(new Date(loaded.completed_at))
     // The training may have been deleted since; then only the logged sets are shown.
     if (loaded.training_id) training.value = await trainings.getTraining(loaded.training_id).catch(() => null)
     const cards = buildCards(session.value, loaded.sets, loaded.results, lookups.kindOf, lookups.defaultUnit('load'))
@@ -271,6 +314,17 @@ async function toggleScore(wod: WodCard) {
   }
 }
 
+function toggleCollapsed(key: string) {
+  if (!collapsed.delete(key)) collapsed.add(key)
+}
+
+// How much of a block is logged, e.g. "4/9 sets" or "Score logged", shown in its header.
+function blockProgress(block: BlockCard): string {
+  const rows = block.exercises.flatMap((c) => c.rows)
+  if (block.wod && !rows.length) return block.wod.result ? 'Score logged' : 'No score'
+  return `${rows.filter((r) => r.logged).length}/${rows.length} sets`
+}
+
 async function openFinish() {
   finishing.value = true
   await nextTick()
@@ -301,7 +355,7 @@ async function finish() {
   saving.value = true
   try {
     const done = !workout.value.completed_at
-    workout.value = await workouts.finishWorkout(workout.value.id, notes.value)
+    workout.value = await workouts.finishWorkout(workout.value.id, notes.value, completedAt(workout.value))
     // Only ratings that differ from the saved ones are sent.
     const ratings = [...ratingDrafts].filter(([exerciseId, r]) => exercises.ratings.get(exerciseId)?.rating !== r)
     await Promise.all(ratings.map(([exerciseId, r]) => exercises.rateExercise(exerciseId, r, exercises.ratings.get(exerciseId)?.notes ?? '')))
@@ -313,6 +367,16 @@ async function finish() {
   } finally {
     saving.value = false
   }
+}
+
+// The completion time to send when the day was changed: that day at the time it was finished
+// (or now). Undefined keeps the workout's date.
+function completedAt(w: Workout): string | undefined {
+  const at = w.completed_at ? new Date(w.completed_at) : new Date()
+  if (!doneOn.value || doneOn.value === toIso(at)) return undefined
+  const [y, m, d] = doneOn.value.split('-').map(Number)
+  at.setFullYear(y, m - 1, d)
+  return at.toISOString()
 }
 
 async function remove() {

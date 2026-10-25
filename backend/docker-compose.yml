@@ -41,6 +41,10 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       LOG_FORMAT: ${LOG_FORMAT:-text}
+      # WHOOP app from developer.whoop.com (optional; unset = no WHOOP)
+      WHOOP_CLIENT_ID: ${WHOOP_CLIENT_ID:-}
+      WHOOP_CLIENT_SECRET: ${WHOOP_CLIENT_SECRET:-}
+      WHOOP_REDIRECT_URL: ${WHOOP_REDIRECT_URL:-http://localhost:5173/api/whoop/callback}
     ports:
       - "8080:8080"
     volumes:

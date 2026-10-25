@@ -216,6 +216,14 @@ type User struct {
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type WhoopConnection struct {
+	UserID       uuid.UUID          `json:"user_id"`
+	AccessToken  string             `json:"access_token"`
+	RefreshToken string             `json:"refresh_token"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	ConnectedAt  pgtype.Timestamptz `json:"connected_at"`
+}
+
 type Workout struct {
 	ID            uuid.UUID          `json:"id"`
 	UserID        uuid.UUID          `json:"user_id"`
@@ -256,4 +264,22 @@ type WorkoutSet struct {
 	LoadValue        *float64           `json:"load_value"`
 	LoadUnit         *uuid.UUID         `json:"load_unit"`
 	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+}
+
+type WorkoutWhoopDatum struct {
+	WorkoutID      uuid.UUID          `json:"workout_id"`
+	WhoopWorkoutID uuid.UUID          `json:"whoop_workout_id"`
+	SportName      string             `json:"sport_name"`
+	StartAt        pgtype.Timestamptz `json:"start_at"`
+	EndAt          pgtype.Timestamptz `json:"end_at"`
+	ScoreState     string             `json:"score_state"`
+	Strain         *float64           `json:"strain"`
+	AvgHr          *int32             `json:"avg_hr"`
+	MaxHr          *int32             `json:"max_hr"`
+	Kilojoule      *float64           `json:"kilojoule"`
+	ZoneMs         []int32            `json:"zone_ms"`
+	RecoveryScore  *int32             `json:"recovery_score"`
+	RestingHr      *int32             `json:"resting_hr"`
+	HrvMs          *float64           `json:"hrv_ms"`
+	FetchedAt      pgtype.Timestamptz `json:"fetched_at"`
 }

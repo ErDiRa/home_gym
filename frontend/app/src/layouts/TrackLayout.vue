@@ -11,6 +11,9 @@
           <AppButton :to="{ name: 'dashboard' }" variant="inverse" size="touch" icon aria-label="Open the dashboard" title="Dashboard">
             <Squares2X2Icon class="size-6" aria-hidden="true" />
           </AppButton>
+          <AppButton :to="{ name: 'track-settings' }" variant="inverse" size="touch" icon aria-label="Settings" title="Settings">
+            <Cog6ToothIcon class="size-6" aria-hidden="true" />
+          </AppButton>
           <AppButton variant="inverse" size="touch" icon aria-label="Sign out" title="Sign out" @click="logout">
             <ArrowRightStartOnRectangleIcon class="size-6" aria-hidden="true" />
           </AppButton>
@@ -47,7 +50,7 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { ArrowRightStartOnRectangleIcon, CalendarDaysIcon, ClockIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
+import { ArrowRightStartOnRectangleIcon, CalendarDaysIcon, ClockIcon, Cog6ToothIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import { logout } from '../api'
 import AppButton from '../components/button/AppButton.vue'
 

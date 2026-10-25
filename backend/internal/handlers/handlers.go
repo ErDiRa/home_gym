@@ -17,6 +17,7 @@ type Handler struct {
 	lookups   LookupService
 	feedback  FeedbackService
 	workouts  WorkoutService
+	whoop     WhoopService
 	accounts  AccountService
 	tokens    *auth.TokenManager
 
@@ -33,6 +34,7 @@ func New(s Services, tokens *auth.TokenManager, secureCookies bool) *Handler {
 		lookups:   s.Lookups,
 		feedback:  s.Feedback,
 		workouts:  s.Workouts,
+		whoop:     s.Whoop,
 		accounts:  s.Accounts,
 		tokens:    tokens, secureCookies: secureCookies,
 	}
@@ -103,6 +105,17 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Delete("/workouts/{id}/sets/{setID}", h.DeleteSet)
 			r.Put("/workouts/{id}/results", h.LogResult)
 			r.Delete("/workouts/{id}/results/{resultID}", h.DeleteResult)
+
+			// WHOOP: connect once (connect sends the browser to WHOOP, which returns it to the
+			// callback), then link an activity of the workout's day to a finished workout.
+			r.Get("/whoop", h.WhoopStatus)
+			r.Delete("/whoop", h.DisconnectWhoop)
+			r.Get("/whoop/connect", h.ConnectWhoop)
+			r.Get("/whoop/callback", h.WhoopCallback)
+			r.Get("/workouts/{id}/whoop/candidates", h.ListWhoopCandidates)
+			r.Get("/workouts/{id}/whoop", h.GetWorkoutWhoop)
+			r.Put("/workouts/{id}/whoop", h.LinkWhoop)
+			r.Delete("/workouts/{id}/whoop", h.UnlinkWhoop)
 		})
 	})
 }

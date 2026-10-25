@@ -86,3 +86,10 @@ sql:
       go:
         <<: *go
         out: "internal/service/workout/repos"
+  - engine: "postgresql"
+    schema: "db/migrations"
+    queries: "internal/service/whoop/queries.sql"
+    gen:
+      go:
+        <<: *go
+        out: "internal/service/whoop/repos"

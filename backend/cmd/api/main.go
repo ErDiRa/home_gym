@@ -25,6 +25,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/feedback"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
 	"github.com/erdira/homegym/backend/internal/service/training"
+	"github.com/erdira/homegym/backend/internal/service/whoop"
 	"github.com/erdira/homegym/backend/internal/service/workout"
 	"github.com/erdira/homegym/backend/internal/web"
 )
@@ -91,7 +92,12 @@ func run() error {
 		Lookups:   lookup.New(dbpool),
 		Feedback:  feedback.New(dbpool),
 		Workouts:  workout.New(dbpool),
-		Accounts:  account.New(dbpool),
+		Whoop: whoop.New(dbpool, whoop.Config{
+			ClientID:     os.Getenv("WHOOP_CLIENT_ID"),
+			ClientSecret: os.Getenv("WHOOP_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("WHOOP_REDIRECT_URL"),
+		}),
+		Accounts: account.New(dbpool),
 	}
 	handlers.New(services, tokens, os.Getenv("COOKIE_SECURE") == "true").Routes(r)
 	// In production the built frontend is served next to the API (same origin, so the auth

@@ -77,6 +77,7 @@ const router = createRouter({
         { path: 'workouts/:id', name: 'workout', component: () => import('./views/track/WorkoutView.vue') },
         { path: 'cycles/:id', name: 'track-cycle', component: () => import('./views/track/CycleView.vue') },
         { path: 'history', name: 'history', component: () => import('./views/track/HistoryView.vue') },
+        { path: 'settings', name: 'track-settings', component: () => import('./views/track/SettingsView.vue') },
       ],
     },
     {

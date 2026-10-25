@@ -49,10 +49,15 @@ SELECT * FROM workouts
 WHERE week_session_id = $1 AND user_id = $2 AND completed_at IS NULL AND deleted_at IS NULL;
 
 -- name: FinishWorkout :one
--- Finishing again keeps the first completion time and only replaces the notes.
+-- Finishing again keeps the first completion time and only replaces the notes, unless a
+-- completion time is given (the workout was done on another day): then the start moves along,
+-- keeping the duration.
 UPDATE workouts
-SET completed_at = COALESCE(completed_at, now()), notes = $3
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+SET completed_at = COALESCE(sqlc.narg(completed_at)::timestamptz, completed_at, now()),
+    started_at = started_at
+        + (COALESCE(sqlc.narg(completed_at)::timestamptz, completed_at, now()) - COALESCE(completed_at, now())),
+    notes = sqlc.arg(notes)
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND deleted_at IS NULL
 RETURNING *;
 
 -- name: DeleteWorkout :execrows

@@ -89,10 +89,12 @@ func (h *Handler) GetWorkout(w http.ResponseWriter, r *http.Request) {
 }
 
 type finishWorkoutRequest struct {
-	Notes string `json:"notes"`
+	Notes       string     `json:"notes"`
+	CompletedAt *time.Time `json:"completed_at"` // optional: when it was done, if not now
 }
 
-// FinishWorkout completes a workout with notes (or only updates the notes of a finished one).
+// FinishWorkout completes a workout with notes (or only updates the notes of a finished one),
+// optionally dated to when it was done.
 func (h *Handler) FinishWorkout(w http.ResponseWriter, r *http.Request) {
 	userID, id, ok := userAndID(w, r, "workout")
 	if !ok {
@@ -102,7 +104,7 @@ func (h *Handler) FinishWorkout(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	wo, err := h.workouts.Finish(r.Context(), userID, id, req.Notes)
+	wo, err := h.workouts.Finish(r.Context(), userID, id, req.Notes, req.CompletedAt)
 	if err != nil {
 		serviceError(w, r, err)
 		return

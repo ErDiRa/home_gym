@@ -107,20 +107,31 @@ func (q *Queries) DeleteWorkoutSet(ctx context.Context, arg DeleteWorkoutSetPara
 
 const finishWorkout = `-- name: FinishWorkout :one
 UPDATE workouts
-SET completed_at = COALESCE(completed_at, now()), notes = $3
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+SET completed_at = COALESCE($1::timestamptz, completed_at, now()),
+    started_at = started_at
+        + (COALESCE($1::timestamptz, completed_at, now()) - COALESCE(completed_at, now())),
+    notes = $2
+WHERE id = $3 AND user_id = $4 AND deleted_at IS NULL
 RETURNING id, user_id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, deleted_at
 `
 
 type FinishWorkoutParams struct {
-	ID     uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-	Notes  string    `json:"notes"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	Notes       string             `json:"notes"`
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
 }
 
-// Finishing again keeps the first completion time and only replaces the notes.
+// Finishing again keeps the first completion time and only replaces the notes, unless a
+// completion time is given (the workout was done on another day): then the start moves along,
+// keeping the duration.
 func (q *Queries) FinishWorkout(ctx context.Context, arg FinishWorkoutParams) (Workout, error) {
-	row := q.db.QueryRow(ctx, finishWorkout, arg.ID, arg.UserID, arg.Notes)
+	row := q.db.QueryRow(ctx, finishWorkout,
+		arg.CompletedAt,
+		arg.Notes,
+		arg.ID,
+		arg.UserID,
+	)
 	var i Workout
 	err := row.Scan(
 		&i.ID,

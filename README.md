@@ -60,6 +60,11 @@ The backend works out of the box with dev defaults. To override them, copy `back
 | `CORS_ALLOWED_ORIGINS`    | Allowed frontend origins                                     |
 | `LOG_LEVEL`, `LOG_FORMAT` | `debug`/`info`/`warn`/`error`, `text`/`json`                 |
 | `STATIC_DIR`              | Serve the built frontend from this directory (set in the image) |
+| `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET`, `WHOOP_REDIRECT_URL` | Optional WHOOP app, see below |
+
+### WHOOP
+
+Finished workouts can show the strain, heart rate, energy and heart-rate zones of a WHOOP activity plus that day's recovery. To turn it on, create an app in the [WHOOP Developer Dashboard](https://developer.whoop.com) with the scopes `read:workout`, `read:recovery` and `offline`. Register the redirect URL `http://localhost:5173/api/whoop/callback` (dev) or `https://<DOMAIN>/api/whoop/callback` (production; `deploy/docker-compose.yml` sets it), and set `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`. Then connect under Tracker → Settings, and on a finished workout tap **Retrieve WHOOP data** to pick that day's activity.
 
 ## Production
 

@@ -24,6 +24,9 @@ import type {
   TrainingSessionInput,
   Unit,
   Week,
+  WhoopCandidate,
+  WhoopData,
+  WhoopStatus,
   Workout,
   WorkoutResult,
   WorkoutSummary,
@@ -136,8 +139,22 @@ export const logResult = (workoutId: string, result: ResultInput) =>
   api.put<WorkoutResult>(`/workouts/${workoutId}/results`, result)
 export const deleteResult = (workoutId: string, resultId: string) =>
   api.delete(`/workouts/${workoutId}/results/${resultId}`)
-export const finishWorkout = (id: string, notes: string) => api.post<Workout>(`/workouts/${id}/finish`, { notes })
+// completedAt (RFC 3339) dates the workout to another day than today; omitted keeps its date.
+export const finishWorkout = (id: string, notes: string, completedAt?: string) =>
+  api.post<Workout>(`/workouts/${id}/finish`, { notes, completed_at: completedAt })
 export const deleteWorkout = (id: string) => api.delete(`/workouts/${id}`)
+
+// WHOOP: connecting is a full-page visit (WHOOP's login), which returns to /track/settings.
+export const getWhoopStatus = () => api.get<WhoopStatus>('/whoop')
+export const connectWhoop = () => window.location.assign('/api/whoop/connect')
+export const disconnectWhoop = () => api.delete('/whoop')
+// The WHOOP activities in [from, to), the workout's local day.
+export const listWhoopCandidates = (workoutId: string, from: Date, to: Date) =>
+  api.get<WhoopCandidate[]>(`/workouts/${workoutId}/whoop/candidates?${period(from, to)}`)
+export const getWorkoutWhoop = (workoutId: string) => api.get<WhoopData | null>(`/workouts/${workoutId}/whoop`)
+export const linkWhoop = (workoutId: string, whoopWorkoutId: string) =>
+  api.put<WhoopData>(`/workouts/${workoutId}/whoop`, { whoop_workout_id: whoopWorkoutId })
+export const unlinkWhoop = (workoutId: string) => api.delete(`/workouts/${workoutId}/whoop`)
 
 export async function login(email: string, password: string, remember: boolean) {
   state.user = await api.post<User>('/auth/login', { email, password, remember })

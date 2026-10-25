@@ -17,6 +17,8 @@ import (
 	lookuprepos "github.com/erdira/homegym/backend/internal/service/lookup/repos"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	trainingrepos "github.com/erdira/homegym/backend/internal/service/training/repos"
+	"github.com/erdira/homegym/backend/internal/service/whoop"
+	whooprepos "github.com/erdira/homegym/backend/internal/service/whoop/repos"
 	"github.com/erdira/homegym/backend/internal/service/workout"
 	workoutrepos "github.com/erdira/homegym/backend/internal/service/workout/repos"
 )
@@ -81,12 +83,25 @@ type WorkoutService interface {
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]workoutrepos.ListWorkoutsRow, error)
 	Start(ctx context.Context, userID, weekSessionID uuid.UUID) (w workout.Workout, created bool, err error)
 	Get(ctx context.Context, userID, id uuid.UUID) (workout.Workout, error)
-	Finish(ctx context.Context, userID, id uuid.UUID, notes string) (workout.Workout, error)
+	Finish(ctx context.Context, userID, id uuid.UUID, notes string, completedAt *time.Time) (workout.Workout, error)
 	Delete(ctx context.Context, userID, id uuid.UUID) error
 	LogSet(ctx context.Context, userID, workoutID uuid.UUID, in workout.SetInput) (workoutrepos.WorkoutSet, error)
 	DeleteSet(ctx context.Context, userID, workoutID, setID uuid.UUID) error
 	LogResult(ctx context.Context, userID, workoutID uuid.UUID, in workout.ResultInput) (workoutrepos.WorkoutResult, error)
 	DeleteResult(ctx context.Context, userID, workoutID, resultID uuid.UUID) error
+}
+
+// WhoopService connects the user's WHOOP account and links WHOOP activities to workouts.
+type WhoopService interface {
+	Configured() bool
+	AuthURL(state string) string
+	Connect(ctx context.Context, userID uuid.UUID, code string) error
+	Connected(ctx context.Context, userID uuid.UUID) (bool, error)
+	Disconnect(ctx context.Context, userID uuid.UUID) error
+	Candidates(ctx context.Context, userID, workoutID uuid.UUID, from, to time.Time) ([]whoop.Candidate, error)
+	Get(ctx context.Context, userID, workoutID uuid.UUID) (*whooprepos.WorkoutWhoopDatum, error)
+	Link(ctx context.Context, userID, workoutID, whoopID uuid.UUID) (whooprepos.WorkoutWhoopDatum, error)
+	Unlink(ctx context.Context, userID, workoutID uuid.UUID) error
 }
 
 type AccountService interface {
@@ -103,6 +118,7 @@ type Services struct {
 	Lookups   LookupService
 	Feedback  FeedbackService
 	Workouts  WorkoutService
+	Whoop     WhoopService
 	Accounts  AccountService
 }
 
@@ -114,5 +130,6 @@ var (
 	_ LookupService   = (*lookup.Service)(nil)
 	_ FeedbackService = (*feedback.Service)(nil)
 	_ WorkoutService  = (*workout.Service)(nil)
+	_ WhoopService    = (*whoop.Service)(nil)
 	_ AccountService  = (*account.Service)(nil)
 )

@@ -435,3 +435,40 @@ export interface Week {
   done: WorkoutSummary[]
   cycle: WeekCycle | null // of the chosen training; null when it isn't part of one
 }
+
+// Whether WHOOP can be connected (the server has a WHOOP app configured) and whether it is.
+export interface WhoopStatus {
+  configured: boolean
+  connected: boolean
+}
+
+// A WHOOP activity of the workout's day, to pick the one to link; strain and heart rate are
+// null until WHOOP has scored it.
+export interface WhoopCandidate {
+  id: string
+  sport_name: string
+  start: string
+  end: string
+  strain: number | null
+  avg_hr: number | null
+}
+
+// The WHOOP activity linked to a workout, with the recovery of that day. The numbers are null
+// while WHOOP hasn't scored it (score_state PENDING_SCORE); linking again fetches them.
+export interface WhoopData {
+  workout_id: string
+  whoop_workout_id: string
+  sport_name: string
+  start_at: string
+  end_at: string
+  score_state: string
+  strain: number | null
+  avg_hr: number | null
+  max_hr: number | null
+  kilojoule: number | null
+  zone_ms: number[] | null // zones 0 to 5
+  recovery_score: number | null
+  resting_hr: number | null
+  hrv_ms: number | null
+  fetched_at: string
+}
