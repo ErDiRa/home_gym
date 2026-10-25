@@ -2,6 +2,11 @@ import { toast } from 'vue-sonner'
 import { state, type User } from './session'
 import type {
   BlockKind,
+  Cycle,
+  CycleImportInput,
+  CycleInput,
+  CycleSummary,
+  ImportedCycle,
   Exercise,
   ExerciseDetail,
   ExerciseInput,
@@ -90,6 +95,17 @@ export const updateTraining = (id: string, input: TrainingInput) => api.put<Trai
 export const deleteTraining = (id: string) => api.delete(`/trainings/${id}`)
 // Copies a training (inactive) as the next phase.
 export const duplicateTraining = (id: string) => api.post<Training>(`/trainings/${id}/duplicate`)
+
+export const listCycles = () => api.get<CycleSummary[]>('/cycles')
+export const getCycle = (id: string) => api.get<Cycle>(`/cycles/${id}`)
+export const createCycle = (input: CycleInput) => api.post<Cycle>('/cycles', input)
+export const updateCycle = (id: string, input: CycleInput) => api.put<Cycle>(`/cycles/${id}`, input)
+// Its trainings are deleted too with withTrainings, else they stay and just leave the cycle.
+export const deleteCycle = (id: string, withTrainings: boolean) =>
+  api.delete(`/cycles/${id}?trainings=${withTrainings ? 'delete' : 'keep'}`)
+
+// Creates a cycle with all its trainings, or nothing if any part is invalid.
+export const importCycle = (input: CycleImportInput) => api.post<ImportedCycle>('/cycles/import', input)
 
 // The session library: templates that trainings copy.
 export const listSessions = () => api.get<LibrarySession[]>('/sessions')

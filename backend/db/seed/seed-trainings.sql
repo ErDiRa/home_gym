@@ -10,6 +10,8 @@
 --                       with their scores (Rx and scaled)
 --   Strength – Phase 1  the previous 4 weeks, with finished workouts and their sets
 --   Home functional     the next phase, inactive: kettlebell work, seconds, per-side reps
+--   Strength base       a cycle of 8 weeks around both strength phases (now in its second half),
+--                       with two goals; the other trainings are in no cycle
 -- The user also rates some exercises (1-5), for the rating filter in the exercise picker.
 
 -- Helpers, dropped with the database session. Units and exercises are looked up by name.
@@ -204,6 +206,7 @@ DECLARE
     warm_pull uuid;
     wod_1 uuid;
     wod_2 uuid;
+    c uuid; -- the cycle
     week int;
     session int;
 BEGIN
@@ -412,4 +415,14 @@ BEGIN
             PERFORM pg_temp.plan(t, week, ARRAY[s1, s2]);
         END IF;
     END LOOP;
+
+    -- A cycle around the two strength phases, with one goal reached and one still open.
+    INSERT INTO cycles (user_id, name, description, start_date, weeks)
+    VALUES (pg_temp.me(), 'Strength base', 'Technique first, then heavy compounds.', pg_temp.this_monday() - 28, 8)
+    RETURNING id INTO c;
+    INSERT INTO cycle_goals (cycle_id, position, title, target, status) VALUES
+        (c, 1, 'Solid squat technique', 'Squat 3×8 at 87.5 kg, checked on video', 'achieved'),
+        (c, 2, 'Get stronger in the compounds', 'Squat 5×5 at 105 kg', 'open');
+    UPDATE trainings SET cycle_id = c
+    WHERE user_id = pg_temp.me() AND name IN ('Strength – Phase 1', 'Strength – Phase 2');
 END $$;

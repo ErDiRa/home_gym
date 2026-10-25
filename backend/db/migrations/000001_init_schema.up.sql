@@ -96,13 +96,50 @@ CREATE TABLE exercise_focuses (
     PRIMARY KEY (exercise_id, focus_id)
 );
 
+-- A user's cycle: a planned period of whole weeks from a Monday (like a training) with goals,
+-- e.g. "Mobility, 8 weeks: better hips, better elbow extension". It groups trainings (each in at
+-- most one cycle, see trainings.cycle_id); trainings without a cycle work on their own. Its
+-- period is set on the cycle, not derived from its trainings, so a cycle can be planned before its
+-- trainings arrive (e.g. a weekly CrossFit plan imported week by week).
+CREATE TABLE cycles (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    start_date  DATE NOT NULL CONSTRAINT cycles_start_monday CHECK (extract(isodow FROM start_date) = 1),
+    weeks       INT NOT NULL CHECK (weeks BETWEEN 1 AND 52),
+    end_date    DATE NOT NULL GENERATED ALWAYS AS (start_date + weeks * 7 - 1) STORED,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_cycles_user ON cycles (user_id) WHERE deleted_at IS NULL;
+
+-- The goals of a cycle, in order: a short title ("Better hips"), optionally something measurable
+-- to check at the end (target, e.g. "Deep squat hold 2 min"), and how it went. Rewritten when the
+-- cycle is saved, like a training's blocks.
+CREATE TABLE cycle_goals (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cycle_id   UUID NOT NULL REFERENCES cycles (id) ON DELETE CASCADE,
+    position   INT NOT NULL,
+    title      TEXT NOT NULL,
+    target     TEXT NOT NULL DEFAULT '',
+    status     TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'achieved', 'missed')),
+    notes      TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX idx_cycle_goals_cycle ON cycle_goals (cycle_id, position);
+
 -- A user's training plan. A user can have several (e.g. one per phase, or strength, warm-ups and
 -- mobility side by side); the active ones are those the tracker offers, each independently. It runs over whole weeks (e.g. a 4-week block) from a
 -- Monday, so its weeks are calendar weeks; end_date is the last Sunday. Each week plans its own
--- sessions (training_week_sessions), done on any days of the week.
+-- sessions (training_week_sessions), done on any days of the week. It may belong to a cycle; it
+-- may run partly or wholly outside the cycle's weeks (the cycle can be moved afterwards).
 CREATE TABLE trainings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    cycle_id    UUID REFERENCES cycles (id) ON DELETE SET NULL, -- NULL = not part of a cycle
     name        TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     active      BOOLEAN NOT NULL DEFAULT false,
@@ -115,6 +152,7 @@ CREATE TABLE trainings (
 );
 
 CREATE INDEX idx_trainings_user ON trainings (user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_trainings_cycle ON trainings (cycle_id) WHERE deleted_at IS NULL;
 
 -- A session (e.g. "Session 1") is made of blocks (e.g. "Warm-up", "Superset"), and a block of
 -- one or more exercises. Without a training_id it is a template in the user's library; with one

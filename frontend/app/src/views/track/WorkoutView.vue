@@ -76,21 +76,12 @@
         <ul class="mt-1 divide-y divide-slate-100">
           <li v-for="e in rateable" :key="e.id" class="py-2">
             <p class="text-sm text-slate-700">{{ e.name }}</p>
-            <div class="mt-1 flex" role="radiogroup" :aria-label="`Rating for ${e.name}`">
-              <AppButton
-                v-for="star in 5"
-                :key="star"
-                variant="ghost"
-                size="touch"
-                icon
-                role="radio"
-                :aria-checked="ratingOf(e.id) === star"
-                :aria-label="`${star} of 5`"
-                @click="ratingDrafts.set(e.id, star)"
-              >
-                <StarIcon :class="star <= ratingOf(e.id) ? 'text-amber-400' : 'text-slate-200'" class="size-7" aria-hidden="true" />
-              </AppButton>
-            </div>
+            <StarRating
+              :model-value="ratingOf(e.id)"
+              :label="`Rating for ${e.name}`"
+              class="mt-1"
+              @update:model-value="ratingDrafts.set(e.id, $event)"
+            />
           </li>
         </ul>
 
@@ -132,9 +123,9 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ArrowLeftIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import { StarIcon } from '@heroicons/vue/24/solid'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import StarRating from '../../components/exercise/StarRating.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WodResult from '../../components/workout/WodResult.vue'

@@ -1,7 +1,9 @@
 -- name: ListTrainings :many
--- A user's trainings with their size, the active one first, then the newest.
+-- A user's trainings with their size and cycle, the active one first, then the newest.
 SELECT
     t.id,
+    t.cycle_id,
+    c.name AS cycle_name,
     t.name,
     t.description,
     t.active,
@@ -12,12 +14,13 @@ SELECT
     (SELECT count(*) FROM sessions s WHERE s.training_id = t.id)::bigint AS session_count,
     (SELECT count(*) FROM training_week_sessions ws WHERE ws.training_id = t.id)::bigint AS planned_count
 FROM trainings t
+LEFT JOIN cycles c ON c.id = t.cycle_id AND c.deleted_at IS NULL
 WHERE t.user_id = $1 AND t.deleted_at IS NULL
 ORDER BY t.active DESC, t.start_date DESC, t.name;
 
 -- name: GetTraining :one
 -- Only the user's own trainings: another user's is not found.
-SELECT id, name, description, active, start_date, end_date, weeks, created_at, updated_at
+SELECT id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 FROM trainings
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
@@ -59,16 +62,19 @@ WHERE training_id = $1
 ORDER BY week, position;
 
 -- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active, start_date, weeks)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at;
+-- The cycle is checked to be the user's before (UserOwnsCycle).
+INSERT INTO trainings (user_id, cycle_id, name, description, active, start_date, weeks)
+VALUES (sqlc.arg(user_id), sqlc.narg(cycle_id), sqlc.arg(name), sqlc.arg(description), sqlc.arg(active),
+        sqlc.arg(start_date), sqlc.arg(weeks))
+RETURNING id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at;
 
 -- name: UpdateTraining :one
 -- Another user's training updates nothing (no row).
 UPDATE trainings
-SET name = $3, description = $4, active = $5, start_date = $6, weeks = $7, updated_at = now()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at;
+SET cycle_id = sqlc.narg(cycle_id), name = sqlc.arg(name), description = sqlc.arg(description),
+    active = sqlc.arg(active), start_date = sqlc.arg(start_date), weeks = sqlc.arg(weeks), updated_at = now()
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND deleted_at IS NULL
+RETURNING id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at;
 
 -- name: DeleteTraining :execrows
 UPDATE trainings SET deleted_at = now(), updated_at = now()
@@ -212,3 +218,19 @@ ORDER BY created_at, name;
 SELECT id, name, min_value, max_value FROM load_units
 WHERE deleted_at IS NULL
 ORDER BY created_at, name;
+
+-- name: UserOwnsCycle :one
+-- Whether the cycle is one of the user's live cycles, before a training is put into it.
+SELECT EXISTS (
+    SELECT 1 FROM cycles WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+);
+
+-- name: CreateCycle :one
+-- For a cycle import (the cycle service has the same query for a new cycle).
+INSERT INTO cycles (user_id, name, description, start_date, weeks)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, description, start_date, end_date, weeks, created_at, updated_at;
+
+-- name: InsertCycleGoal :exec
+INSERT INTO cycle_goals (cycle_id, position, title, target, status, notes)
+VALUES ($1, $2, $3, $4, $5, $6);

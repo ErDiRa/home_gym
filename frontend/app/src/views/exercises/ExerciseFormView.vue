@@ -143,6 +143,22 @@
 				:options="muscleGroups"
 			/>
 
+			<!-- The user's own rating: how helpful the exercise is for them. Only for a saved one. -->
+			<fieldset v-if="exerciseId">
+				<legend class="text-sm font-medium text-slate-800">Your rating</legend>
+				<p class="text-xs text-slate-500">How helpful is it for you? Only you see it.</p>
+				<StarRating v-model="rating" label="Your rating" size="sm" class="mt-1 -ml-1" />
+				<TextInput
+					v-model="ratingNotes"
+					multiline
+					rows="2"
+					maxlength="2000"
+					placeholder="Rating note, e.g. Knees feel good"
+					class="mt-2"
+					aria-label="Rating note"
+				/>
+			</fieldset>
+
 			<!-- Sticks to the bottom of the screen so saving doesn't need scrolling down. -->
 			<div
 				class="sticky bottom-0 z-10 flex justify-end gap-3 border-t border-slate-200 bg-slate-50/95 py-4 backdrop-blur"
@@ -170,6 +186,7 @@
 	import { toast } from 'vue-sonner';
 	import { ApiError } from '../../api';
 	import AppButton from '../../components/button/AppButton.vue';
+	import StarRating from '../../components/exercise/StarRating.vue';
 	import MultiSelect from '../../components/form/MultiSelect.vue';
 	import SegmentedControl from '../../components/form/SegmentedControl.vue';
 	import TextInput, { type TextInputExposed } from '../../components/form/TextInput.vue';
@@ -215,6 +232,9 @@
 		focus_ids: [] as string[]
 	});
 	const saving = ref(false);
+	// The user's rating of the exercise (0 = not rated) and its note, saved with the exercise.
+	const rating = ref(0);
+	const ratingNotes = ref('');
 	const newFocus = ref('');
 	const newAlias = ref('');
 	const addingFocusOpen = ref(false);
@@ -253,8 +273,12 @@
 		try {
 			const [exercise] = await Promise.all([
 				exerciseId ? exercisesStore.getExercise(exerciseId) : undefined,
-				lookups.loadExerciseLookups()
+				lookups.loadExerciseLookups(),
+				exerciseId ? exercisesStore.loadRatings() : undefined
 			]);
+			const saved = exerciseId ? exercisesStore.ratings.get(exerciseId) : undefined;
+			rating.value = saved?.rating ?? 0;
+			ratingNotes.value = saved?.notes ?? '';
 			if (exercise) {
 				// The form holds everything but the id, which comes from the route.
 				const { id: _id, ...fields } = exercise;
@@ -313,6 +337,12 @@
 			if (exerciseId) {
 				// Stay on the page so further changes can follow.
 				await exercisesStore.updateExercise(exerciseId, input);
+				// A rating is saved when one is set and it or its note changed.
+				const saved = exercisesStore.ratings.get(exerciseId);
+				const notes = ratingNotes.value.trim();
+				if (rating.value && (rating.value !== saved?.rating || notes !== (saved?.notes ?? ''))) {
+					await exercisesStore.rateExercise(exerciseId, rating.value, notes);
+				}
 				toast.success('Exercise saved.');
 			} else {
 				await exercisesStore.createExercise(input);

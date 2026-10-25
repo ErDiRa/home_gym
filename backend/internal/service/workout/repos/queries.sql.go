@@ -166,6 +166,39 @@ func (q *Queries) GetSlotWorkoutInProgress(ctx context.Context, arg GetSlotWorko
 	return i, err
 }
 
+const getWeekCycle = `-- name: GetWeekCycle :one
+SELECT id, name, start_date, end_date, weeks
+FROM cycles
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+`
+
+type GetWeekCycleParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+type GetWeekCycleRow struct {
+	ID        uuid.UUID   `json:"id"`
+	Name      string      `json:"name"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+	Weeks     int32       `json:"weeks"`
+}
+
+// The cycle of the chosen training, if it is the user's and live.
+func (q *Queries) GetWeekCycle(ctx context.Context, arg GetWeekCycleParams) (GetWeekCycleRow, error) {
+	row := q.db.QueryRow(ctx, getWeekCycle, arg.ID, arg.UserID)
+	var i GetWeekCycleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Weeks,
+	)
+	return i, err
+}
+
 const getWeekSession = `-- name: GetWeekSession :one
 SELECT ws.id, ws.training_id, ws.session_id, s.name
 FROM training_week_sessions ws
@@ -228,10 +261,11 @@ func (q *Queries) GetWorkout(ctx context.Context, arg GetWorkoutParams) (Workout
 }
 
 const listActiveTrainings = `-- name: ListActiveTrainings :many
-SELECT id, name, start_date, end_date, weeks
-FROM trainings
-WHERE user_id = $1 AND active AND deleted_at IS NULL
-ORDER BY lower(name), start_date
+SELECT t.id, t.name, t.start_date, t.end_date, t.weeks, t.cycle_id, c.name AS cycle_name
+FROM trainings t
+LEFT JOIN cycles c ON c.id = t.cycle_id AND c.deleted_at IS NULL
+WHERE t.user_id = $1 AND t.active AND t.deleted_at IS NULL
+ORDER BY lower(t.name), t.start_date
 `
 
 type ListActiveTrainingsRow struct {
@@ -240,9 +274,11 @@ type ListActiveTrainingsRow struct {
 	StartDate pgtype.Date `json:"start_date"`
 	EndDate   pgtype.Date `json:"end_date"`
 	Weeks     int32       `json:"weeks"`
+	CycleID   *uuid.UUID  `json:"cycle_id"`
+	CycleName *string     `json:"cycle_name"`
 }
 
-// The trainings the tracker offers: the user's active ones, by name.
+// The trainings the tracker offers: the user's active ones with their cycle, by name.
 func (q *Queries) ListActiveTrainings(ctx context.Context, userID uuid.UUID) ([]ListActiveTrainingsRow, error) {
 	rows, err := q.db.Query(ctx, listActiveTrainings, userID)
 	if err != nil {
@@ -258,6 +294,8 @@ func (q *Queries) ListActiveTrainings(ctx context.Context, userID uuid.UUID) ([]
 			&i.StartDate,
 			&i.EndDate,
 			&i.Weeks,
+			&i.CycleID,
+			&i.CycleName,
 		); err != nil {
 			return nil, err
 		}
@@ -333,6 +371,38 @@ func (q *Queries) ListRepUnits(ctx context.Context) ([]ListRepUnitsRow, error) {
 			&i.MinValue,
 			&i.MaxValue,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWeekCycleGoals = `-- name: ListWeekCycleGoals :many
+SELECT title, target, status FROM cycle_goals
+WHERE cycle_id = $1
+ORDER BY position
+`
+
+type ListWeekCycleGoalsRow struct {
+	Title  string `json:"title"`
+	Target string `json:"target"`
+	Status string `json:"status"`
+}
+
+func (q *Queries) ListWeekCycleGoals(ctx context.Context, cycleID uuid.UUID) ([]ListWeekCycleGoalsRow, error) {
+	rows, err := q.db.Query(ctx, listWeekCycleGoals, cycleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWeekCycleGoalsRow{}
+	for rows.Next() {
+		var i ListWeekCycleGoalsRow
+		if err := rows.Scan(&i.Title, &i.Target, &i.Status); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

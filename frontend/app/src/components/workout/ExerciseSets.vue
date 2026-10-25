@@ -11,6 +11,20 @@
           {{ card.notes }}
         </p>
       </div>
+      <!-- The user's own rating of the exercise, set any time: filled with the stars once rated. -->
+      <AppButton
+        variant="ghost"
+        size="touch"
+        class="-mt-2 gap-0.5! px-2!"
+        :class="{ '-mr-2': !videoUrls.length }"
+        :aria-label="rating ? `Rated ${rating} of 5, change the rating of ${card.name}` : `Rate ${card.name}`"
+        @click="ratingOpen = true"
+      >
+        <SolidStarIcon v-if="rating" class="size-5 text-amber-400" aria-hidden="true" />
+        <StarIcon v-else class="size-5 text-slate-400" aria-hidden="true" />
+        <span v-if="rating" class="text-sm font-semibold text-slate-700">{{ rating }}</span>
+      </AppButton>
+      <ExerciseRatingSheet :open="ratingOpen" :exercise-id="card.exerciseId" :name="card.name" @close="ratingOpen = false" />
       <AppButton
         v-if="videoUrls.length"
         variant="ghost"
@@ -88,10 +102,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowPathIcon, CheckIcon, PlusIcon, VideoCameraIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, CheckIcon, PlusIcon, StarIcon, VideoCameraIcon } from '@heroicons/vue/24/outline'
+import { StarIcon as SolidStarIcon } from '@heroicons/vue/24/solid'
 import AppButton from '../button/AppButton.vue'
 import SelectField from '../form/SelectField.vue'
 import TextInput from '../form/TextInput.vue'
+import ExerciseRatingSheet from './ExerciseRatingSheet.vue'
 import ExerciseVideoSheet from './ExerciseVideoSheet.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
@@ -108,6 +124,10 @@ const videoUrls = computed(() =>
   (exercises.exercises.find((e) => e.id === card.value.exerciseId)?.video_urls ?? []).filter((u) => /^https?:\/\//i.test(u)),
 )
 const videosOpen = ref(false)
+
+// The user's rating of the exercise (0 = not rated), rated in a sheet.
+const rating = computed(() => exercises.ratings.get(card.value.exerciseId)?.rating ?? 0)
+const ratingOpen = ref(false)
 
 function buttonLabel(row: SetRow) {
   if (!row.logged) return `Log set ${row.number}`

@@ -16,6 +16,7 @@ import (
 type fakeQueries struct {
 	err     error
 	upserts []repos.UpsertExerciseFeedbackParams
+	listed  []uuid.UUID // whose ratings were listed
 }
 
 func (f *fakeQueries) UpsertExerciseFeedback(_ context.Context, arg repos.UpsertExerciseFeedbackParams) (repos.ExerciseFeedback, error) {
@@ -26,7 +27,8 @@ func (f *fakeQueries) UpsertExerciseFeedback(_ context.Context, arg repos.Upsert
 	return repos.ExerciseFeedback{ID: uuid.New(), UserID: arg.UserID, ExerciseID: arg.ExerciseID, Rating: arg.Rating, Notes: arg.Notes}, nil
 }
 
-func (f *fakeQueries) ListExerciseRatings(context.Context, uuid.UUID) ([]repos.ListExerciseRatingsRow, error) {
+func (f *fakeQueries) ListExerciseRatings(_ context.Context, userID uuid.UUID) ([]repos.ListExerciseRatingsRow, error) {
+	f.listed = append(f.listed, userID)
 	return []repos.ListExerciseRatingsRow{}, nil
 }
 
@@ -60,6 +62,18 @@ func TestRateRejects(t *testing.T) {
 	f := &fakeQueries{err: pgx.ErrNoRows}
 	_, err := (&Service{q: f}).Rate(context.Background(), uuid.New(), uuid.New(), RatingInput{Rating: 3})
 	wantError(t, err, service.KindNotFound, "exercise not found")
+}
+
+// Users only ever see their own ratings: the list asks for the signed-in user's.
+func TestRatingsAreTheUsers(t *testing.T) {
+	f := &fakeQueries{}
+	user := uuid.New()
+	if _, err := (&Service{q: f}).Ratings(context.Background(), user); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.listed) != 1 || f.listed[0] != user {
+		t.Errorf("listed the ratings of %v, want only %v", f.listed, user)
+	}
 }
 
 // wantError fails the test unless err is a *service.Error of kind with message msg.

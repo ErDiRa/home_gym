@@ -1,9 +1,21 @@
 -- name: ListActiveTrainings :many
--- The trainings the tracker offers: the user's active ones, by name.
+-- The trainings the tracker offers: the user's active ones with their cycle, by name.
+SELECT t.id, t.name, t.start_date, t.end_date, t.weeks, t.cycle_id, c.name AS cycle_name
+FROM trainings t
+LEFT JOIN cycles c ON c.id = t.cycle_id AND c.deleted_at IS NULL
+WHERE t.user_id = $1 AND t.active AND t.deleted_at IS NULL
+ORDER BY lower(t.name), t.start_date;
+
+-- name: GetWeekCycle :one
+-- The cycle of the chosen training, if it is the user's and live.
 SELECT id, name, start_date, end_date, weeks
-FROM trainings
-WHERE user_id = $1 AND active AND deleted_at IS NULL
-ORDER BY lower(name), start_date;
+FROM cycles
+WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
+
+-- name: ListWeekCycleGoals :many
+SELECT title, target, status FROM cycle_goals
+WHERE cycle_id = $1
+ORDER BY position;
 
 -- name: ListWeekPlan :many
 -- The sessions planned for one week of a training, in order.

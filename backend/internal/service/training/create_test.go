@@ -127,3 +127,31 @@ func TestCreateUnknownExercise(t *testing.T) {
 		t.Errorf("calls end with %q, want rollback", f.calls[len(f.calls)-1])
 	}
 }
+
+func TestCreateInCycle(t *testing.T) {
+	f, reps, _ := newFake()
+	cycleID, userID := uuid.New(), uuid.New()
+	f.ownedCycles[cycleID] = true
+	in := twoSessionInput(reps)
+	in.CycleID = &cycleID
+
+	if _, err := newTestService(f).Create(context.Background(), userID, in); err != nil {
+		t.Fatal(err)
+	}
+	if f.created[0].CycleID == nil || *f.created[0].CycleID != cycleID {
+		t.Errorf("created in cycle %v, want %v", f.created[0].CycleID, cycleID)
+	}
+}
+
+// Another user's (or a deleted) cycle is unknown, and nothing is written.
+func TestCreateInForeignCycle(t *testing.T) {
+	f, reps, _ := newFake()
+	in := twoSessionInput(reps)
+	in.CycleID = ptr(uuid.New())
+
+	_, err := newTestService(f).Create(context.Background(), uuid.New(), in)
+	wantError(t, err, service.KindInvalid, "unknown cycle")
+	if f.called("CreateTraining") || f.calls[len(f.calls)-1] != "rollback" {
+		t.Errorf("calls = %v", f.calls)
+	}
+}

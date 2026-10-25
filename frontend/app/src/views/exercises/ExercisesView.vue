@@ -7,18 +7,24 @@
         <AppButton :to="{ name: 'exercise-new' }">New exercise</AppButton>
       </div>
     </div>
-    <TextInput
-      v-model="query"
-      type="search"
-      placeholder="Search exercises..."
-      class="mb-4"
-    />
+    <div class="mb-4 flex flex-wrap gap-3">
+      <TextInput v-model="query" type="search" placeholder="Search exercises..." class="min-w-60 flex-1" />
+      <SelectField
+        v-model="ratingFilter"
+        :options="ratingOptions"
+        :searchable="false"
+        aria-label="Filter by your rating"
+        class="w-52"
+      />
+    </div>
 
     <p v-if="error" class="text-center text-red-600">{{ error }}</p>
     <AgGridVue
       v-else
       class="min-h-0 flex-1"
-      :row-data="exercises"
+      :row-data="shown"
+      :get-row-id="(p: GetRowIdParams<Exercise>) => p.data.id"
+      @grid-ready="(e: GridReadyEvent) => (gridApi = e.api)"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
       :quick-filter-text="query"
@@ -32,15 +38,25 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
-import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
+import {
+  AllCommunityModule,
+  ModuleRegistry,
+  type ColDef,
+  type GridApi,
+  type GridReadyEvent,
+  type GetRowIdParams,
+  type RowClickedEvent,
+} from 'ag-grid-community'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
 import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
+import RatingCell from '../../components/grid/RatingCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
@@ -50,9 +66,36 @@ ModuleRegistry.registerModules([AllCommunityModule])
 
 const router = useRouter()
 const store = useExercisesStore()
-const { exercises, loading } = storeToRefs(store)
+const { exercises, loading, ratings } = storeToRefs(store)
 const query = ref('')
 const error = ref('')
+const gridApi = shallowRef<GridApi | null>(null)
+
+// The user's own rating of an exercise, 0 when not rated.
+const ratingOf = (id: string) => ratings.value.get(id)?.rating ?? 0
+
+// Filters the list by the user's rating: how helpful they found an exercise.
+const ratingOptions = [
+  { id: 'all', name: 'All ratings' },
+  { id: 'none', name: 'Not rated' },
+  { id: '5', name: '5 stars' },
+  { id: '4', name: '4 stars or more' },
+  { id: '3', name: '3 stars or more' },
+  { id: 'low', name: '2 stars or fewer' },
+]
+const ratingFilter = ref<string | null>('all')
+const matches: Record<string, (r: number) => boolean> = {
+  all: () => true,
+  none: (r) => r === 0,
+  '5': (r) => r === 5,
+  '4': (r) => r >= 4,
+  '3': (r) => r >= 3,
+  low: (r) => r > 0 && r <= 2,
+}
+const shown = computed(() => {
+  const match = matches[ratingFilter.value ?? 'all'] ?? matches.all
+  return exercises.value.filter((e) => match(ratingOf(e.id)))
+})
 
 // Joints and muscle groups are arrays: show them comma-separated and make them searchable.
 const listColumn: ColDef<Exercise> = {
@@ -86,6 +129,16 @@ const columnDefs: ColDef<Exercise>[] = [
     // Sorted by the first focus, which the server returns alphabetically.
     comparator: (a: Focus[], b: Focus[]) => (a[0]?.name ?? '').localeCompare(b[0]?.name ?? ''),
   },
+  {
+    colId: 'rating',
+    headerName: 'Your rating',
+    flex: 1,
+    minWidth: 140,
+    cellRenderer: RatingCell,
+    // Sorts by the rating; the filter above the grid filters by it.
+    valueGetter: (p) => (p.data ? ratingOf(p.data.id) : 0),
+    filter: false,
+  },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   {
     field: 'video_urls',
@@ -104,12 +157,17 @@ function openExercise(event: RowClickedEvent<Exercise>) {
 }
 
 async function load() {
+  // Without the ratings the list still shows, just unrated.
+  const ratingsLoaded = store.loadRatings().catch(() => toast.error('Could not load your ratings.'))
   try {
     await store.loadExercises()
   } catch {
     error.value = 'Could not load exercises.'
     toast.error(error.value)
   }
+  await ratingsLoaded
+  // The rating column's sort values are cached by the grid.
+  gridApi.value?.refreshCells({ columns: ['rating'], force: true })
 }
 
 onMounted(load)

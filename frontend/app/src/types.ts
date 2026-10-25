@@ -146,6 +146,7 @@ export interface SlotInput {
 
 // What the training form sends; every list is in order.
 export interface TrainingInput {
+  cycle_id: string | null // one of the user's cycles; null = none
   name: string
   description: string
   active: boolean
@@ -180,6 +181,7 @@ export interface Slot {
 // A whole training as the edit form and the tracker load it.
 export interface TrainingDetail {
   id: string
+  cycle_id: string | null
   name: string
   description: string
   active: boolean
@@ -193,6 +195,8 @@ export interface TrainingDetail {
 // A row of the trainings list.
 export interface Training {
   id: string
+  cycle_id: string | null
+  cycle_name: string | null
   name: string
   description: string
   active: boolean
@@ -202,6 +206,93 @@ export interface Training {
   updated_at: string
   session_count: number
   planned_count: number // planned sessions over all weeks
+}
+
+// A cycle's goal: what it should achieve, optionally a target to check at the end, and how it
+// went. Goals are rewritten on save, in order; ids only key them in lists.
+export type GoalStatus = 'open' | 'achieved' | 'missed'
+
+export const goalStatusLabels: Record<GoalStatus, string> = {
+  open: 'Open',
+  achieved: 'Achieved',
+  missed: 'Missed',
+}
+
+export interface CycleGoalInput {
+  id?: string | null
+  title: string
+  target: string
+  status: GoalStatus
+  notes: string
+}
+
+export interface CycleGoal extends CycleGoalInput {
+  id: string
+  position: number // from 1
+}
+
+// A cycle: a planned period of whole weeks from a Monday with goals, grouping trainings (each in
+// at most one cycle; they may run outside its weeks).
+export interface CycleInput {
+  name: string
+  description: string
+  start_date: string // YYYY-MM-DD, a Monday
+  weeks: number // 1-52
+  goals: CycleGoalInput[] // at most 20
+}
+
+// A training of a cycle, as the cycle lists it.
+export interface CycleTraining {
+  id: string
+  name: string
+  active: boolean
+  start_date: string
+  end_date: string
+  weeks: number
+}
+
+export interface Cycle {
+  id: string
+  name: string
+  description: string
+  start_date: string
+  end_date: string // the last Sunday
+  weeks: number
+  created_at: string
+  updated_at: string
+  goals: CycleGoal[]
+  trainings: CycleTraining[] // in the order they run
+}
+
+// A whole cycle with its trainings, imported at once (all or nothing); the trainings go into the
+// new cycle, whatever their cycle_id.
+export interface CycleImportInput {
+  cycle: CycleInput
+  trainings: TrainingInput[]
+}
+
+// What a cycle import created: the cycle and its trainings, in the order of the file.
+export interface ImportedCycle {
+  id: string
+  name: string
+  description: string
+  start_date: string
+  end_date: string
+  weeks: number
+  trainings: CycleTraining[]
+}
+
+// A row of the cycles list.
+export interface CycleSummary {
+  id: string
+  name: string
+  description: string
+  start_date: string
+  end_date: string
+  weeks: number
+  updated_at: string
+  goal_count: number
+  training_count: number
 }
 
 // A session template of the library, as listed.
@@ -318,15 +409,29 @@ export interface ActiveTraining {
   start_date: string
   end_date: string
   weeks: number
+  cycle_id: string | null
+  cycle_name: string | null
+}
+
+// The cycle of the training shown in the tracker, with the week of the cycle.
+export interface WeekCycle {
+  id: string
+  name: string
+  start_date: string
+  end_date: string
+  weeks: number
+  week_number: number | null // of the cycle, from 1; null outside its weeks
+  goals: { title: string; target: string; status: GoalStatus }[]
 }
 
 // A week as the tracker shows it: the active trainings to switch between, the sessions the
 // chosen one plans for the week, the workouts finished (the ones started from a slot mark it
 // done) and the workout in progress, of any training.
 export interface Week {
-  trainings: ActiveTraining[] // by name
+  trainings: ActiveTraining[] // by name; of a cycle, only the ones running this week
   training: ActiveTraining | null // the chosen one; null when none is active
   week_number: number | null // of the training, from 1; null outside its weeks
   planned: { id: string; session_id: string; name: string }[] // the week's slots, in order
   done: WorkoutSummary[]
+  cycle: WeekCycle | null // of the chosen training; null when it isn't part of one
 }

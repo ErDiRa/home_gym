@@ -25,6 +25,8 @@ import (
 // Queries is the part of repos.Queries this service uses; *repos.Queries satisfies it.
 type Queries interface {
 	ListActiveTrainings(ctx context.Context, userID uuid.UUID) ([]repos.ListActiveTrainingsRow, error)
+	GetWeekCycle(ctx context.Context, arg repos.GetWeekCycleParams) (repos.GetWeekCycleRow, error)
+	ListWeekCycleGoals(ctx context.Context, cycleID uuid.UUID) ([]repos.ListWeekCycleGoalsRow, error)
 	ListWeekPlan(ctx context.Context, arg repos.ListWeekPlanParams) ([]repos.ListWeekPlanRow, error)
 	GetWeekSession(ctx context.Context, arg repos.GetWeekSessionParams) (repos.GetWeekSessionRow, error)
 	CreateWorkout(ctx context.Context, arg repos.CreateWorkoutParams) (repos.Workout, error)

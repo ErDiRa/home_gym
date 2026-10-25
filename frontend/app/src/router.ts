@@ -19,7 +19,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'home', redirect: () => ({ name: isPhone() ? 'track' : 'dashboard' }) },
     {
-      // Planning (desktop first): exercises, the session library and trainings; later analytics and the wiki.
+      // Planning (desktop first): exercises, the session library, cycles and trainings; later analytics and the wiki.
       path: '/dashboard',
       component: () => import('./layouts/DashboardLayout.vue'),
       meta: { requiresAuth: true },
@@ -47,6 +47,9 @@ const router = createRouter({
           name: 'session-edit',
           component: () => import('./views/sessions/SessionFormView.vue'),
         },
+        { path: 'cycles', name: 'cycles', component: () => import('./views/cycles/CyclesView.vue') },
+        { path: 'cycles/new', name: 'cycle-new', component: () => import('./views/cycles/CycleFormView.vue') },
+        { path: 'cycles/:id', name: 'cycle-edit', component: () => import('./views/cycles/CycleFormView.vue') },
         {
           path: 'trainings',
           name: 'trainings',
@@ -72,6 +75,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'track', component: () => import('./views/track/TrackHomeView.vue') },
         { path: 'workouts/:id', name: 'workout', component: () => import('./views/track/WorkoutView.vue') },
+        { path: 'cycles/:id', name: 'track-cycle', component: () => import('./views/track/CycleView.vue') },
         { path: 'history', name: 'history', component: () => import('./views/track/HistoryView.vue') },
       ],
     },

@@ -31,7 +31,12 @@
         Import JSON
       </AppButton>
     </div>
-    <ImportTrainingDialog v-if="!trainingId" v-model:open="importOpen" @imported="applyImport" />
+    <ImportTrainingDialog
+      v-if="!trainingId"
+      v-model:open="importOpen"
+      @imported="applyImport"
+      @cycle-imported="openImportedCycle"
+    />
     <p class="mt-1 mb-6 text-sm text-slate-500"><span class="text-red-600">*</span> Required</p>
 
     <form class="space-y-4" @submit.prevent="submit">
@@ -76,6 +81,17 @@
           done on any days of their week.
         </p>
       </fieldset>
+      <div>
+        <SelectField
+          v-model="cycleField"
+          :options="cycleOptions"
+          label="Cycle"
+          placeholder="No cycle"
+          class="max-w-md"
+        />
+        <p v-if="cycleHint" class="mt-1 text-xs text-slate-500">{{ cycleHint }}</p>
+        <p v-if="outsideCycle" class="mt-1 text-xs text-amber-700">{{ outsideCycle }}</p>
+      </div>
       <AppCheckbox
         v-model="active"
         description="Shown in the tracker. Several trainings can be active, e.g. strength, warm-ups and mobility side by side."
@@ -153,11 +169,13 @@ import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import AppCheckbox from '../../components/form/AppCheckbox.vue'
 import SegmentedControl from '../../components/form/SegmentedControl.vue'
+import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ActionMenu from '../../components/ui/ActionMenu.vue'
 import ImportTrainingDialog from '../../components/training/ImportTrainingDialog.vue'
 import SessionEditor from '../../components/training/SessionEditor.vue'
 import type { ImportedTraining } from '../../components/training/trainingImport'
+import type { ImportedCycle } from '../../types'
 import WeekPlanner from '../../components/training/WeekPlanner.vue'
 import {
   MAX_SLOTS,
@@ -173,7 +191,8 @@ import {
   type WeekRow,
 } from '../../components/training/trainingForm'
 import { confirmDialog } from '../../confirm'
-import { addDays, formatDate, isMonday, nextMonday } from '../../dates'
+import { addDays, formatDate, formatPeriod, isMonday, nextMonday } from '../../dates'
+import { useCyclesStore } from '../../stores/cycles'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useSessionsStore } from '../../stores/sessions'
@@ -185,6 +204,7 @@ const trainingsStore = useTrainingsStore()
 const exercisesStore = useExercisesStore()
 const lookups = useLookupsStore()
 const library = useSessionsStore()
+const cyclesStore = useCyclesStore()
 // Set when editing an existing training (route /trainings/:id), absent when creating one.
 const trainingId = route.params.id as string | undefined
 
@@ -193,6 +213,10 @@ const durationWeeks = [4, 6, 8, 12]
 
 const name = ref('')
 const description = ref('')
+// The cycle the training belongs to; a new one starts in the cycle it was created from (?cycle=).
+const cycleId = ref<string | null>(trainingId ? null : ((route.query.cycle as string | undefined) ?? null))
+// Set by an import naming a cycle that doesn't exist.
+const cycleHint = ref('')
 // New trainings are usually the next phase, so they start active, next Monday, for 4 weeks,
 // with one session planned once a week.
 const active = ref(!trainingId)
@@ -207,6 +231,23 @@ const weekCount = computed(() => weeks.value.length)
 const endDate = computed(() => (startDate.value && weekCount.value ? addDays(startDate.value, weekCount.value * 7 - 1) : ''))
 const saving = ref(false)
 const copying = ref(false)
+
+// The select holds '' for "No cycle", as its options need an id.
+const cycleOptions = computed(() => [{ id: '', name: 'No cycle' }, ...cyclesStore.cycles.map((c) => ({ id: c.id, name: c.name }))])
+const cycleField = computed({
+  get: () => cycleId.value ?? '',
+  set: (id: string | null) => {
+    cycleId.value = id || null
+    cycleHint.value = ''
+  },
+})
+// A training may run outside its cycle's weeks (the cycle can still be moved), so this only warns.
+const outsideCycle = computed(() => {
+  const cycle = cyclesStore.cycles.find((c) => c.id === cycleId.value)
+  if (!cycle || !startDate.value || !endDate.value) return ''
+  if (startDate.value >= cycle.start_date && endDate.value <= cycle.end_date) return ''
+  return `Runs outside the cycle's weeks (${formatPeriod(cycle.start_date, cycle.end_date)}).`
+})
 const importOpen = ref(false)
 
 // Any date picks the Monday of its week, as trainings run over whole weeks.
@@ -265,8 +306,10 @@ onMounted(async () => {
       exercisesStore.loadRatings(),
       lookups.loadTrainingLookups(),
       library.loadSessions(),
+      cyclesStore.loadCycles(),
     ])
     if (training) {
+      cycleId.value = training.cycle_id
       active.value = training.active
       startDate.value = training.start_date
       name.value = training.name
@@ -298,7 +341,20 @@ async function applyImport(imported: ImportedTraining) {
   startDate.value = imported.startDate
   sessions.value = imported.sessions
   weeks.value = imported.weeks
+  // A cycle named in the file is preselected; without one, the cycle it was opened from stays.
+  if (imported.cycle) {
+    const cycle = cyclesStore.cycles.find((c) => c.name.trim().toLowerCase() === imported.cycle!.toLowerCase())
+    cycleId.value = cycle?.id ?? null
+    cycleHint.value = cycle ? '' : `No cycle called "${imported.cycle}". Pick one or leave it empty.`
+  }
   toast.success('Imported. Check the training, then create it.')
+}
+
+// A whole cycle was imported (nothing to do in this form): show it.
+async function openImportedCycle(cycle: ImportedCycle) {
+  const n = cycle.trainings.length
+  toast.success(`Imported ${cycle.name} with ${n} ${n === 1 ? 'training' : 'trainings'}.`)
+  await router.push({ name: 'cycle-edit', params: { id: cycle.id } })
 }
 
 // Copies a template of the library into the training, as a new session of its own.
@@ -337,6 +393,7 @@ async function submit() {
   if (problem.value) return
   const input = toInput(
     {
+      cycle_id: cycleId.value,
       name: name.value,
       description: description.value,
       active: active.value,
@@ -392,8 +449,10 @@ async function remove() {
   }
 }
 
+// Back to where the form was opened from: its cycle's page (?cycle=) or the trainings.
 function goBack() {
-  return router.push({ name: 'trainings' })
+  const fromCycle = route.query.cycle as string | undefined
+  return router.push(fromCycle ? { name: 'cycle-edit', params: { id: fromCycle } } : { name: 'trainings' })
 }
 
 // Copies the saved training (unsaved changes on the page are not included).

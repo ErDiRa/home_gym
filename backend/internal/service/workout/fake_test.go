@@ -18,6 +18,8 @@ func ptr[T any](v T) *T { return &v }
 // where there are none) and records the writes.
 type fakeQueries struct {
 	trainings []repos.ListActiveTrainingsRow
+	cycle     *repos.GetWeekCycleRow // what GetWeekCycle finds
+	goals     []repos.ListWeekCycleGoalsRow
 	plan      []repos.ListWeekPlanRow
 	slot      *repos.GetWeekSessionRow
 	workout   *repos.Workout // what GetWorkout and FinishWorkout find
@@ -59,6 +61,16 @@ func found[T any](v *T) (T, error) {
 
 func (f *fakeQueries) ListActiveTrainings(context.Context, uuid.UUID) ([]repos.ListActiveTrainingsRow, error) {
 	return f.trainings, nil
+}
+
+func (f *fakeQueries) GetWeekCycle(_ context.Context, arg repos.GetWeekCycleParams) (repos.GetWeekCycleRow, error) {
+	c, err := found(f.cycle)
+	c.ID = arg.ID
+	return c, err
+}
+
+func (f *fakeQueries) ListWeekCycleGoals(context.Context, uuid.UUID) ([]repos.ListWeekCycleGoalsRow, error) {
+	return f.goals, nil
 }
 
 func (f *fakeQueries) ListWeekPlan(_ context.Context, arg repos.ListWeekPlanParams) ([]repos.ListWeekPlanRow, error) {

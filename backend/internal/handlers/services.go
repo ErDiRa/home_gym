@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/erdira/homegym/backend/internal/service/account"
+	"github.com/erdira/homegym/backend/internal/service/cycle"
+	cyclerepos "github.com/erdira/homegym/backend/internal/service/cycle/repos"
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	exerciserepos "github.com/erdira/homegym/backend/internal/service/exercise/repos"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
@@ -36,6 +38,17 @@ type TrainingService interface {
 	CreateSession(ctx context.Context, userID uuid.UUID, in training.SessionInput) (training.LibrarySession, error)
 	UpdateSession(ctx context.Context, userID, id uuid.UUID, in training.SessionInput) (training.LibrarySession, error)
 	DeleteSession(ctx context.Context, userID, id uuid.UUID) error
+	ImportCycle(ctx context.Context, userID uuid.UUID, in training.CycleImportInput) (training.ImportedCycle, error)
+}
+
+// CycleService manages the user's cycles; importing a whole cycle with its trainings is the
+// TrainingService's (ImportCycle).
+type CycleService interface {
+	List(ctx context.Context, userID uuid.UUID) ([]cyclerepos.ListCyclesRow, error)
+	Get(ctx context.Context, userID, id uuid.UUID) (cycle.Cycle, error)
+	Create(ctx context.Context, userID uuid.UUID, in cycle.Input) (cycle.Cycle, error)
+	Update(ctx context.Context, userID, id uuid.UUID, in cycle.Input) (cycle.Cycle, error)
+	Delete(ctx context.Context, userID, id uuid.UUID, withTrainings bool) error
 }
 
 type ExerciseService interface {
@@ -85,6 +98,7 @@ type AccountService interface {
 // Services are the services the handlers use.
 type Services struct {
 	Trainings TrainingService
+	Cycles    CycleService
 	Exercises ExerciseService
 	Lookups   LookupService
 	Feedback  FeedbackService
@@ -95,6 +109,7 @@ type Services struct {
 // The services in internal/service implement the interfaces.
 var (
 	_ TrainingService = (*training.Service)(nil)
+	_ CycleService    = (*cycle.Service)(nil)
 	_ ExerciseService = (*exercise.Service)(nil)
 	_ LookupService   = (*lookup.Service)(nil)
 	_ FeedbackService = (*feedback.Service)(nil)

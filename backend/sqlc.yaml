@@ -46,6 +46,13 @@ sql:
         out: "internal/service/account/repos"
   - engine: "postgresql"
     schema: "db/migrations"
+    queries: "internal/service/cycle/queries.sql"
+    gen:
+      go:
+        <<: *go
+        out: "internal/service/cycle/repos"
+  - engine: "postgresql"
+    schema: "db/migrations"
     queries: "internal/service/exercise/queries.sql"
     gen:
       go:

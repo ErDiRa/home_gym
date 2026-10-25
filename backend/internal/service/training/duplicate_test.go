@@ -77,3 +77,19 @@ func TestDuplicateMissing(t *testing.T) {
 		t.Error("created a copy anyway")
 	}
 }
+
+// The copy stays in the source's cycle, e.g. as the next week of a plan.
+func TestDuplicateKeepsCycle(t *testing.T) {
+	f, _, _ := newFake()
+	cycleID := uuid.New()
+	f.training = repos.GetTrainingRow{ID: uuid.New(), Name: "Week 1", Weeks: 1, CycleID: &cycleID,
+		StartDate: pgtype.Date{Time: time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), Valid: true},
+		EndDate:   pgtype.Date{Time: time.Date(2026, 3, 8, 0, 0, 0, 0, time.UTC), Valid: true}}
+
+	if _, err := newTestService(f).Duplicate(context.Background(), uuid.New(), f.training.ID); err != nil {
+		t.Fatal(err)
+	}
+	if f.created[0].CycleID == nil || *f.created[0].CycleID != cycleID {
+		t.Errorf("copy in cycle %v, want %v", f.created[0].CycleID, cycleID)
+	}
+}

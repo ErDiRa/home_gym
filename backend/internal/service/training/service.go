@@ -8,6 +8,10 @@
 // is done for one score (a WOD: for time, AMRAP...). The same shape is sent to and returned
 // from the API.
 //
+// A training may belong to one of the user's cycles (see the cycle package). Importing a whole
+// cycle with its trainings is a usecase of this service, as it writes the trainings, all in one
+// transaction (cycle_import.go).
+//
 // The user's library holds session templates of the same shape; adding one to a training copies
 // it (the client sends the copy), so the two are independent afterwards. Every usecase acts on
 // the given user's data only; another user's looks missing.
@@ -58,6 +62,9 @@ type Queries interface {
 	ListBlockKinds(ctx context.Context) ([]repos.ListBlockKindsRow, error)
 	ListRepUnits(ctx context.Context) ([]repos.ListRepUnitsRow, error)
 	ListLoadUnits(ctx context.Context) ([]repos.ListLoadUnitsRow, error)
+	UserOwnsCycle(ctx context.Context, arg repos.UserOwnsCycleParams) (bool, error)
+	CreateCycle(ctx context.Context, arg repos.CreateCycleParams) (repos.CreateCycleRow, error)
+	InsertCycleGoal(ctx context.Context, arg repos.InsertCycleGoalParams) error
 }
 
 // TxFunc runs fn in a transaction, committing if it returns nil and rolling back otherwise.
@@ -161,6 +168,7 @@ const (
 
 // Input is a whole training for Create and Update, the tree at once.
 type Input struct {
+	CycleID     *uuid.UUID     `json:"cycle_id"` // one of the user's cycles; nil = none
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Active      bool           `json:"active"`

@@ -31,6 +31,18 @@ export function isMonday(date: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && parse(date).getDay() === 1
 }
 
+// The week of a period starting on a Monday that a date falls in, from 1; null outside its weeks.
+export function weekOf(start: string, weeks: number, date: string): number | null {
+  const days = daysBetween(start, date)
+  const week = Math.floor(days / 7) + 1
+  return days >= 0 && week <= weeks ? week : null
+}
+
+// The Monday of a date's week.
+export function mondayOf(date: string): string {
+  return addDays(date, -((parse(date).getDay() + 6) % 7)) // getDay: 0 = Sunday
+}
+
 // The coming Monday, or today when it is one: when a new training block usually starts.
 export function nextMonday(): string {
   const today = new Date()

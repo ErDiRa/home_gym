@@ -64,7 +64,13 @@ func serviceError(w http.ResponseWriter, r *http.Request, err error) {
 // decodeJSON decodes the request body (max 1 MiB) into dst. On failure it has already written
 // the 400 response, so callers just return.
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	return decodeJSONLimit(w, r, dst, 1<<20)
+}
+
+// decodeJSONLimit is decodeJSON for a body of up to limit bytes, for the few routes that take a
+// larger one (a whole cycle with its trainings).
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, dst any, limit int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		clientError(w, r, http.StatusBadRequest, "invalid JSON body", err)
 		return false

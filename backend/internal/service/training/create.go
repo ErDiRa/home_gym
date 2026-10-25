@@ -9,7 +9,7 @@ import (
 )
 
 // Create validates a new training and saves it for the user with its whole tree in one
-// transaction.
+// transaction. Its cycle, if any, must be one of the user's.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (repos.CreateTrainingRow, error) {
 	lk, err := loadLookups(ctx, s.q)
 	if err != nil {
@@ -20,9 +20,12 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in Input) (repos
 	}
 	var training repos.CreateTrainingRow
 	err = s.inTx(ctx, func(q Queries) error {
+		if err := checkCycle(ctx, q, userID, in.CycleID); err != nil {
+			return err
+		}
 		var err error
 		training, err = q.CreateTraining(ctx, repos.CreateTrainingParams{
-			UserID: userID, Name: in.Name, Description: in.Description, Active: in.Active,
+			UserID: userID, CycleID: in.CycleID, Name: in.Name, Description: in.Description, Active: in.Active,
 			StartDate: in.start, Weeks: in.Weeks,
 		})
 		if err != nil {

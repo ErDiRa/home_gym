@@ -217,6 +217,14 @@ export function toInput(
   }
 }
 
+// A loaded training as the request body that saves it unchanged, e.g. to move it into another
+// cycle. Needs the training lookups loaded (the block kinds decide which side keeps the sets).
+export function inputOf(training: TrainingDetail): TrainingInput {
+  const { sessions, weeks } = toRows(training)
+  const { cycle_id, name, description, active, start_date } = training
+  return toInput({ cycle_id, name, description, active, start_date, weeks: training.weeks }, sessions, weeks)
+}
+
 // Why a session can't be saved yet, if anything; mirrors the server's checks.
 export function sessionProblem(s: SessionRow): string {
   if (!s.name.trim()) return 'Every session needs a name.'

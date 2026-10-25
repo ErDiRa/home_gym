@@ -12,6 +12,7 @@ import (
 // result or error as JSON.
 type Handler struct {
 	trainings TrainingService
+	cycles    CycleService
 	exercises ExerciseService
 	lookups   LookupService
 	feedback  FeedbackService
@@ -27,6 +28,7 @@ type Handler struct {
 func New(s Services, tokens *auth.TokenManager, secureCookies bool) *Handler {
 	return &Handler{
 		trainings: s.Trainings,
+		cycles:    s.Cycles,
 		exercises: s.Exercises,
 		lookups:   s.Lookups,
 		feedback:  s.Feedback,
@@ -76,6 +78,13 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Get("/sessions/{id}", h.GetSession)
 			r.Put("/sessions/{id}", h.UpdateSession)
 			r.Delete("/sessions/{id}", h.DeleteSession)
+
+			r.Get("/cycles", h.ListCycles)
+			r.Post("/cycles", h.CreateCycle)
+			r.Post("/cycles/import", h.ImportCycle) // before /cycles/{id}
+			r.Get("/cycles/{id}", h.GetCycle)
+			r.Put("/cycles/{id}", h.UpdateCycle)
+			r.Delete("/cycles/{id}", h.DeleteCycle)
 
 			r.Get("/trainings", h.ListTrainings)
 			r.Post("/trainings", h.CreateTraining)

@@ -97,3 +97,39 @@ func TestUpdateMissingTraining(t *testing.T) {
 	_, err := newTestService(f).Update(context.Background(), uuid.New(), uuid.New(), twoSessionInput(reps))
 	wantError(t, err, service.KindNotFound, "training not found")
 }
+
+func TestUpdateIntoCycle(t *testing.T) {
+	f, reps, _ := newFake()
+	cycleID := uuid.New()
+	f.ownedCycles[cycleID] = true
+	in := twoSessionInput(reps)
+	in.CycleID = &cycleID
+
+	if _, err := newTestService(f).Update(context.Background(), uuid.New(), uuid.New(), in); err != nil {
+		t.Fatal(err)
+	}
+	if f.updated[0].CycleID == nil || *f.updated[0].CycleID != cycleID {
+		t.Errorf("updated into cycle %v, want %v", f.updated[0].CycleID, cycleID)
+	}
+
+	// Sending no cycle takes the training out of it.
+	f2, reps2, _ := newFake()
+	if _, err := newTestService(f2).Update(context.Background(), uuid.New(), uuid.New(), twoSessionInput(reps2)); err != nil {
+		t.Fatal(err)
+	}
+	if f2.updated[0].CycleID != nil || f2.called("UserOwnsCycle") {
+		t.Errorf("cycle = %v, calls = %v", f2.updated[0].CycleID, f2.calls)
+	}
+}
+
+func TestUpdateIntoForeignCycle(t *testing.T) {
+	f, reps, _ := newFake()
+	in := twoSessionInput(reps)
+	in.CycleID = ptr(uuid.New())
+
+	_, err := newTestService(f).Update(context.Background(), uuid.New(), uuid.New(), in)
+	wantError(t, err, service.KindInvalid, "unknown cycle")
+	if f.called("UpdateTraining") {
+		t.Errorf("calls = %v", f.calls)
+	}
+}

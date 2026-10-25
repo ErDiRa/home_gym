@@ -39,6 +39,7 @@ type fakeQueries struct {
 	updateErr     error
 	deleteRows    int64
 	insertExerErr error
+	ownedCycles   map[uuid.UUID]bool // cycle ids UserOwnsCycle finds
 
 	// Recorded writes.
 	gotTraining       []repos.GetTrainingParams
@@ -55,6 +56,8 @@ type fakeQueries struct {
 	insertedExercises []repos.InsertSessionExerciseParams
 	updatedTemplates  []repos.UpdateLibrarySessionParams
 	clearedBlocksOf   []uuid.UUID
+	createdCycles     []repos.CreateCycleParams
+	insertedGoals     []repos.InsertCycleGoalParams
 }
 
 // newFake returns a fake whose lookups hold a single and a superset kind, a "reps" unit and
@@ -71,6 +74,7 @@ func newFake() (*fakeQueries, uuid.UUID, uuid.UUID) {
 		knownSessions: map[uuid.UUID]bool{},
 		knownSlots:    map[uuid.UUID]bool{},
 		foreignExer:   map[uuid.UUID]bool{},
+		ownedCycles:   map[uuid.UUID]bool{},
 	}, reps, kg
 }
 
@@ -290,6 +294,24 @@ func (f *fakeQueries) ListRepUnits(context.Context) ([]repos.ListRepUnitsRow, er
 func (f *fakeQueries) ListLoadUnits(context.Context) ([]repos.ListLoadUnitsRow, error) {
 	f.calls = append(f.calls, "ListLoadUnits")
 	return f.loadUnits, nil
+}
+
+func (f *fakeQueries) UserOwnsCycle(_ context.Context, arg repos.UserOwnsCycleParams) (bool, error) {
+	f.calls = append(f.calls, "UserOwnsCycle")
+	return f.ownedCycles[arg.ID], nil
+}
+
+func (f *fakeQueries) CreateCycle(_ context.Context, arg repos.CreateCycleParams) (repos.CreateCycleRow, error) {
+	f.calls = append(f.calls, "CreateCycle")
+	f.createdCycles = append(f.createdCycles, arg)
+	return repos.CreateCycleRow{ID: uuid.New(), Name: arg.Name, Description: arg.Description,
+		StartDate: arg.StartDate, EndDate: endDate(arg.StartDate, arg.Weeks), Weeks: arg.Weeks}, nil
+}
+
+func (f *fakeQueries) InsertCycleGoal(_ context.Context, arg repos.InsertCycleGoalParams) error {
+	f.calls = append(f.calls, "InsertCycleGoal")
+	f.insertedGoals = append(f.insertedGoals, arg)
+	return nil
 }
 
 // wantError fails the test unless err is a *service.Error of kind with message msg.

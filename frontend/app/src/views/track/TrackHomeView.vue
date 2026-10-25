@@ -9,6 +9,18 @@
 
     <template v-else-if="week">
       <template v-if="week.training">
+        <!-- The training's cycle, if any: one tappable row opening its overview page. -->
+        <RouterLink
+          v-if="week.cycle"
+          :to="{ name: 'track-cycle', params: { id: week.cycle.id }, query: { training: week.training.id } }"
+          class="mb-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 active:bg-slate-50"
+        >
+          <ArrowPathIcon class="size-5 shrink-0 text-indigo-500" aria-hidden="true" />
+          <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+            {{ week.cycle.name }} · {{ cycleLine(week.cycle) }}
+          </span>
+          <ChevronRightIcon class="size-5 shrink-0 text-slate-400" aria-hidden="true" />
+        </RouterLink>
         <p class="text-sm text-slate-500">
           <template v-if="week.week_number">Week {{ week.week_number }} of {{ week.training.weeks }} · </template>
           {{ formatPeriod(week.training.start_date, week.training.end_date) }}
@@ -82,6 +94,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ApiError } from '../../api'
+import { ArrowPathIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import SessionCard from '../../components/workout/SessionCard.vue'
@@ -89,7 +102,7 @@ import { sessionSummary, type SummaryLine } from '../../components/workout/worko
 import { addDays, formatDate, formatPeriod, toIso, today, weekStart } from '../../dates'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWorkoutsStore } from '../../stores/workouts'
-import type { TrainingDetail } from '../../types'
+import type { TrainingDetail, WeekCycle } from '../../types'
 
 interface Session {
   key: string
@@ -108,6 +121,12 @@ const { week, loading } = storeToRefs(store)
 const training = ref<TrainingDetail | null>(null)
 const error = ref('')
 const starting = ref(false)
+
+// Where this week is in the cycle: "Week 3 of 10", "starts 26 Oct" or "ended".
+function cycleLine(c: WeekCycle): string {
+  if (c.week_number !== null) return `Week ${c.week_number} of ${c.weeks}`
+  return c.start_date > monday ? `starts ${formatDate(c.start_date, { year: false })}` : 'ended'
+}
 
 const linesOf = (sessionId: string | null) => {
   const session = training.value?.sessions.find((s) => s.id === sessionId)

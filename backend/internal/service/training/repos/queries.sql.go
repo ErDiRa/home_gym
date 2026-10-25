@@ -12,14 +12,64 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createCycle = `-- name: CreateCycle :one
+INSERT INTO cycles (user_id, name, description, start_date, weeks)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, description, start_date, end_date, weeks, created_at, updated_at
+`
+
+type CreateCycleParams struct {
+	UserID      uuid.UUID   `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	StartDate   pgtype.Date `json:"start_date"`
+	Weeks       int32       `json:"weeks"`
+}
+
+type CreateCycleRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	Weeks       int32              `json:"weeks"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+// For a cycle import (the cycle service has the same query for a new cycle).
+func (q *Queries) CreateCycle(ctx context.Context, arg CreateCycleParams) (CreateCycleRow, error) {
+	row := q.db.QueryRow(ctx, createCycle,
+		arg.UserID,
+		arg.Name,
+		arg.Description,
+		arg.StartDate,
+		arg.Weeks,
+	)
+	var i CreateCycleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Weeks,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createTraining = `-- name: CreateTraining :one
-INSERT INTO trainings (user_id, name, description, active, start_date, weeks)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at
+INSERT INTO trainings (user_id, cycle_id, name, description, active, start_date, weeks)
+VALUES ($1, $2, $3, $4, $5,
+        $6, $7)
+RETURNING id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 `
 
 type CreateTrainingParams struct {
 	UserID      uuid.UUID   `json:"user_id"`
+	CycleID     *uuid.UUID  `json:"cycle_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Active      bool        `json:"active"`
@@ -29,6 +79,7 @@ type CreateTrainingParams struct {
 
 type CreateTrainingRow struct {
 	ID          uuid.UUID          `json:"id"`
+	CycleID     *uuid.UUID         `json:"cycle_id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
@@ -39,9 +90,11 @@ type CreateTrainingRow struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+// The cycle is checked to be the user's before (UserOwnsCycle).
 func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) (CreateTrainingRow, error) {
 	row := q.db.QueryRow(ctx, createTraining,
 		arg.UserID,
+		arg.CycleID,
 		arg.Name,
 		arg.Description,
 		arg.Active,
@@ -51,6 +104,7 @@ func (q *Queries) CreateTraining(ctx context.Context, arg CreateTrainingParams) 
 	var i CreateTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.CycleID,
 		&i.Name,
 		&i.Description,
 		&i.Active,
@@ -186,7 +240,7 @@ func (q *Queries) GetLibrarySession(ctx context.Context, arg GetLibrarySessionPa
 }
 
 const getTraining = `-- name: GetTraining :one
-SELECT id, name, description, active, start_date, end_date, weeks, created_at, updated_at
+SELECT id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 FROM trainings
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
@@ -198,6 +252,7 @@ type GetTrainingParams struct {
 
 type GetTrainingRow struct {
 	ID          uuid.UUID          `json:"id"`
+	CycleID     *uuid.UUID         `json:"cycle_id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
@@ -214,6 +269,7 @@ func (q *Queries) GetTraining(ctx context.Context, arg GetTrainingParams) (GetTr
 	var i GetTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.CycleID,
 		&i.Name,
 		&i.Description,
 		&i.Active,
@@ -224,6 +280,32 @@ func (q *Queries) GetTraining(ctx context.Context, arg GetTrainingParams) (GetTr
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const insertCycleGoal = `-- name: InsertCycleGoal :exec
+INSERT INTO cycle_goals (cycle_id, position, title, target, status, notes)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertCycleGoalParams struct {
+	CycleID  uuid.UUID `json:"cycle_id"`
+	Position int32     `json:"position"`
+	Title    string    `json:"title"`
+	Target   string    `json:"target"`
+	Status   string    `json:"status"`
+	Notes    string    `json:"notes"`
+}
+
+func (q *Queries) InsertCycleGoal(ctx context.Context, arg InsertCycleGoalParams) error {
+	_, err := q.db.Exec(ctx, insertCycleGoal,
+		arg.CycleID,
+		arg.Position,
+		arg.Title,
+		arg.Target,
+		arg.Status,
+		arg.Notes,
+	)
+	return err
 }
 
 const insertSession = `-- name: InsertSession :one
@@ -887,6 +969,8 @@ func (q *Queries) ListTrainingSessions(ctx context.Context, trainingID uuid.UUID
 const listTrainings = `-- name: ListTrainings :many
 SELECT
     t.id,
+    t.cycle_id,
+    c.name AS cycle_name,
     t.name,
     t.description,
     t.active,
@@ -897,12 +981,15 @@ SELECT
     (SELECT count(*) FROM sessions s WHERE s.training_id = t.id)::bigint AS session_count,
     (SELECT count(*) FROM training_week_sessions ws WHERE ws.training_id = t.id)::bigint AS planned_count
 FROM trainings t
+LEFT JOIN cycles c ON c.id = t.cycle_id AND c.deleted_at IS NULL
 WHERE t.user_id = $1 AND t.deleted_at IS NULL
 ORDER BY t.active DESC, t.start_date DESC, t.name
 `
 
 type ListTrainingsRow struct {
 	ID           uuid.UUID          `json:"id"`
+	CycleID      *uuid.UUID         `json:"cycle_id"`
+	CycleName    *string            `json:"cycle_name"`
 	Name         string             `json:"name"`
 	Description  string             `json:"description"`
 	Active       bool               `json:"active"`
@@ -914,7 +1001,7 @@ type ListTrainingsRow struct {
 	PlannedCount int64              `json:"planned_count"`
 }
 
-// A user's trainings with their size, the active one first, then the newest.
+// A user's trainings with their size and cycle, the active one first, then the newest.
 func (q *Queries) ListTrainings(ctx context.Context, userID uuid.UUID) ([]ListTrainingsRow, error) {
 	rows, err := q.db.Query(ctx, listTrainings, userID)
 	if err != nil {
@@ -926,6 +1013,8 @@ func (q *Queries) ListTrainings(ctx context.Context, userID uuid.UUID) ([]ListTr
 		var i ListTrainingsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.CycleID,
+			&i.CycleName,
 			&i.Name,
 			&i.Description,
 			&i.Active,
@@ -1013,23 +1102,26 @@ func (q *Queries) UpdateLibrarySession(ctx context.Context, arg UpdateLibrarySes
 
 const updateTraining = `-- name: UpdateTraining :one
 UPDATE trainings
-SET name = $3, description = $4, active = $5, start_date = $6, weeks = $7, updated_at = now()
-WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, name, description, active, start_date, end_date, weeks, created_at, updated_at
+SET cycle_id = $1, name = $2, description = $3,
+    active = $4, start_date = $5, weeks = $6, updated_at = now()
+WHERE id = $7 AND user_id = $8 AND deleted_at IS NULL
+RETURNING id, cycle_id, name, description, active, start_date, end_date, weeks, created_at, updated_at
 `
 
 type UpdateTrainingParams struct {
-	ID          uuid.UUID   `json:"id"`
-	UserID      uuid.UUID   `json:"user_id"`
+	CycleID     *uuid.UUID  `json:"cycle_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Active      bool        `json:"active"`
 	StartDate   pgtype.Date `json:"start_date"`
 	Weeks       int32       `json:"weeks"`
+	ID          uuid.UUID   `json:"id"`
+	UserID      uuid.UUID   `json:"user_id"`
 }
 
 type UpdateTrainingRow struct {
 	ID          uuid.UUID          `json:"id"`
+	CycleID     *uuid.UUID         `json:"cycle_id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`
@@ -1043,17 +1135,19 @@ type UpdateTrainingRow struct {
 // Another user's training updates nothing (no row).
 func (q *Queries) UpdateTraining(ctx context.Context, arg UpdateTrainingParams) (UpdateTrainingRow, error) {
 	row := q.db.QueryRow(ctx, updateTraining,
-		arg.ID,
-		arg.UserID,
+		arg.CycleID,
 		arg.Name,
 		arg.Description,
 		arg.Active,
 		arg.StartDate,
 		arg.Weeks,
+		arg.ID,
+		arg.UserID,
 	)
 	var i UpdateTrainingRow
 	err := row.Scan(
 		&i.ID,
+		&i.CycleID,
 		&i.Name,
 		&i.Description,
 		&i.Active,
@@ -1122,4 +1216,23 @@ func (q *Queries) UpdateWeekSession(ctx context.Context, arg UpdateWeekSessionPa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const userOwnsCycle = `-- name: UserOwnsCycle :one
+SELECT EXISTS (
+    SELECT 1 FROM cycles WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+)
+`
+
+type UserOwnsCycleParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+// Whether the cycle is one of the user's live cycles, before a training is put into it.
+func (q *Queries) UserOwnsCycle(ctx context.Context, arg UserOwnsCycleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userOwnsCycle, arg.ID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

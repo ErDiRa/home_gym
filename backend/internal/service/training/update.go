@@ -8,7 +8,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/training/repos"
 )
 
-// Update validates a training and replaces its fields, tree and schedule in one transaction.
+// Update validates a training and replaces its fields, cycle, tree and schedule in one transaction.
 // Sessions and slots sent with an id keep it, so the workouts done of them stay linked.
 func (s *Service) Update(ctx context.Context, userID, id uuid.UUID, in Input) (repos.UpdateTrainingRow, error) {
 	lk, err := loadLookups(ctx, s.q)
@@ -20,9 +20,12 @@ func (s *Service) Update(ctx context.Context, userID, id uuid.UUID, in Input) (r
 	}
 	var training repos.UpdateTrainingRow
 	err = s.inTx(ctx, func(q Queries) error {
+		if err := checkCycle(ctx, q, userID, in.CycleID); err != nil {
+			return err
+		}
 		var err error
 		training, err = q.UpdateTraining(ctx, repos.UpdateTrainingParams{
-			ID: id, UserID: userID, Name: in.Name, Description: in.Description, Active: in.Active,
+			ID: id, UserID: userID, CycleID: in.CycleID, Name: in.Name, Description: in.Description, Active: in.Active,
 			StartDate: in.start, Weeks: in.Weeks,
 		})
 		if err != nil {

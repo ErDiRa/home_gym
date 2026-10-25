@@ -1,0 +1,104 @@
+{
+  "format": "training-import/1",
+  "name": "Strength week",
+  "description": "A sample week: a single, a superset and a WOD.",
+  "start_date": "2026-11-02",
+  "sessions": [
+    {
+      "name": "Mon",
+      "notes": "Warm up well.",
+      "blocks": [
+        {
+          "kind": "single",
+          "name": "Squat",
+          "exercises": [
+            {
+              "exercise": "Squat",
+              "sets": 5,
+              "reps": {
+                "value": 3,
+                "unit": "reps"
+              },
+              "load": {
+                "value": 75,
+                "max": 80,
+                "unit": "% 1RM"
+              },
+              "tempo": "31X1"
+            }
+          ]
+        },
+        {
+          "kind": "wod",
+          "name": "Metcon",
+          "sets": 3,
+          "score": {
+            "type": "for_time",
+            "time_seconds": 600
+          },
+          "exercises": [
+            {
+              "exercise": "Wall Ball",
+              "reps": {
+                "value": 15,
+                "unit": "reps"
+              },
+              "load": {
+                "value": 9,
+                "unit": "kg"
+              }
+            },
+            {
+              "exercise": "Burpee",
+              "reps": {
+                "value": 10,
+                "unit": "reps"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Thu",
+      "blocks": [
+        {
+          "kind": "superset",
+          "name": "Accessory",
+          "sets": 3,
+          "exercises": [
+            {
+              "exercise": "Ring Row",
+              "reps": {
+                "value": 10,
+                "max": 12,
+                "unit": "reps"
+              }
+            },
+            {
+              "exercise": "Copenhagen Plank",
+              "reps": {
+                "value": 20,
+                "unit": "s",
+                "per_side": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "new_exercises": [
+    {
+      "name": "Copenhagen Plank",
+      "type": "strength",
+      "joints": [
+        "Hip"
+      ],
+      "muscle_groups": [
+        "Core"
+      ]
+    }
+  ],
+  "cycle": "  Mobility "
+}

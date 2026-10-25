@@ -64,6 +64,7 @@ export interface ImportNewExercise {
 
 export interface TrainingImport {
   format: typeof IMPORT_FORMAT
+  cycle?: string // the name of the cycle it goes into, preselected in the form when it exists
   name: string
   description?: string
   start_date: string // a Monday, YYYY-MM-DD
@@ -73,6 +74,7 @@ export interface TrainingImport {
 
 // What the form takes over from an import.
 export interface ImportedTraining {
+  cycle?: string
   name: string
   description: string
   startDate: string
@@ -80,18 +82,36 @@ export interface ImportedTraining {
   weeks: WeekRow[]
 }
 
+// Anything holding sessions to import: a training import or a training of a cycle import.
+export type WithSessions = Pick<TrainingImport, 'sessions'>
+
 // Names are matched trimmed and ignoring case.
 export const nameKey = (name: string) => name.trim().toLowerCase()
 
-class ImportError extends Error {}
+// A problem of an import file, with a message for the user.
+export class ImportError extends Error {}
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+export const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+export const isOptionalText = (v: unknown) => v === undefined || typeof v === 'string'
 const isCount = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100
 const isSeconds = (v: unknown) => v === undefined || v === null || (Number.isInteger(v) && (v as number) >= 1)
+export const isMondayDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && isMonday(v)
 
-function check(ok: boolean, where: string, message: string): asserts ok {
+export function check(ok: boolean, where: string, message: string): asserts ok {
   if (!ok) throw new ImportError(where ? `${where}: ${message}` : message)
+}
+
+// The JSON object of an import file.
+export function parseJSON(text: string): Record<string, unknown> {
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new ImportError('This is not valid JSON.')
+  }
+  check(isObject(data), '', 'Expected a JSON object.')
+  return data
 }
 
 function checkAmount(v: unknown, where: string) {
@@ -104,86 +124,89 @@ function checkAmount(v: unknown, where: string) {
   check(a.per_side === undefined || typeof a.per_side === 'boolean', where, 'per_side must be true or false.')
 }
 
-// Reads and checks the JSON of an import against the block kinds there are. The values are
-// checked by the form afterwards (sets, units, scores), like anything entered there.
+// Reads and checks the JSON of a training import against the block kinds there are. The values
+// are checked by the form afterwards (sets, units, scores), like anything entered there.
 export function parseImport(text: string, kinds: string[]): TrainingImport {
-  let data: unknown
-  try {
-    data = JSON.parse(text)
-  } catch {
-    throw new ImportError('This is not valid JSON.')
-  }
-  check(isObject(data), '', 'Expected a JSON object.')
-  const t = data as Record<string, unknown>
-  check(t.format === IMPORT_FORMAT, '', `Expected "format": "${IMPORT_FORMAT}".`)
-  check(isText(t.name), '', 'The training needs a name.')
-  check(t.description === undefined || typeof t.description === 'string', '', 'description must be text.')
-  check(
-    typeof t.start_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.start_date) && isMonday(t.start_date),
-    '',
-    'start_date must be a Monday as YYYY-MM-DD.',
-  )
-  check(Array.isArray(t.sessions) && t.sessions.length >= 1, '', 'There are no sessions.')
-  const sessions = t.sessions as unknown[]
-  check(sessions.length <= MAX_SLOTS, '', `A week holds at most ${MAX_SLOTS} sessions.`)
+  return checkTrainingImport(parseJSON(text), kinds)
+}
 
-  sessions.forEach((raw, i) => {
-    const where = `Session ${i + 1}`
-    check(isObject(raw), where, 'must be an object.')
-    const s = raw as Record<string, unknown>
-    check(isText(s.name), where, 'needs a name.')
-    check(s.notes === undefined || typeof s.notes === 'string', where, 'notes must be text.')
-    check(Array.isArray(s.blocks) && s.blocks.length >= 1, where, 'has no blocks.')
+// checkTrainingImport is parseImport for an already parsed file.
+export function checkTrainingImport(t: Record<string, unknown>, kinds: string[]): TrainingImport {
+  check(t.format === IMPORT_FORMAT, '', `Expected "format": "${IMPORT_FORMAT}".`)
+  check(t.cycle === undefined || isText(t.cycle), '', 'cycle must be the name of a cycle.')
+  check(isText(t.name), '', 'The training needs a name.')
+  check(isOptionalText(t.description), '', 'description must be text.')
+  check(isMondayDate(t.start_date), '', 'start_date must be a Monday as YYYY-MM-DD.')
+  checkSessions(t.sessions, kinds, '')
+  checkNewExercises(t.new_exercises, '')
+  return t as unknown as TrainingImport
+}
+
+// Checks the sessions of a training (1 to 7, each with blocks and exercises); where prefixes the
+// messages, e.g. 'Training 3 ("Week 3")'.
+export function checkSessions(raw: unknown, kinds: string[], where: string) {
+  const at = (s: string) => (where ? `${where}, ${s}` : s)
+  check(Array.isArray(raw) && raw.length >= 1, where, 'There are no sessions.')
+  check(raw.length <= MAX_SLOTS, where, `A week holds at most ${MAX_SLOTS} sessions.`)
+
+  raw.forEach((rawSession, i) => {
+    const sessionAt = at(`Session ${i + 1}`)
+    check(isObject(rawSession), sessionAt, 'must be an object.')
+    const s = rawSession
+    check(isText(s.name), sessionAt, 'needs a name.')
+    check(isOptionalText(s.notes), sessionAt, 'notes must be text.')
+    check(Array.isArray(s.blocks) && s.blocks.length >= 1, sessionAt, 'has no blocks.')
     ;(s.blocks as unknown[]).forEach((rawBlock, j) => {
-      const at = `${s.name}, block ${blockLetter(j)}`
-      check(isObject(rawBlock), at, 'must be an object.')
-      const b = rawBlock as Record<string, unknown>
-      check(typeof b.kind === 'string' && kinds.includes(b.kind), at, `unknown kind "${String(b.kind)}" (${kinds.join(', ')}).`)
-      check(b.name === undefined || typeof b.name === 'string', at, 'name must be text.')
-      check(b.notes === undefined || typeof b.notes === 'string', at, 'notes must be text.')
-      check(b.sets === undefined || b.sets === null || isCount(b.sets), at, 'sets must be 1-100.')
-      checkAmount(b.reps, `${at}, reps`)
-      checkAmount(b.load, `${at}, load`)
+      const blockAt = at(`${s.name}, block ${blockLetter(j)}`)
+      check(isObject(rawBlock), blockAt, 'must be an object.')
+      const b = rawBlock
+      check(typeof b.kind === 'string' && kinds.includes(b.kind), blockAt, `unknown kind "${String(b.kind)}" (${kinds.join(', ')}).`)
+      check(isOptionalText(b.name), blockAt, 'name must be text.')
+      check(isOptionalText(b.notes), blockAt, 'notes must be text.')
+      check(b.sets === undefined || b.sets === null || isCount(b.sets), blockAt, 'sets must be 1-100.')
+      checkAmount(b.reps, `${blockAt}, reps`)
+      checkAmount(b.load, `${blockAt}, load`)
       if (b.score !== undefined && b.score !== null) {
-        check(isObject(b.score), at, 'score must be an object.')
-        const score = b.score as Record<string, unknown>
+        check(isObject(b.score), blockAt, 'score must be an object.')
+        const score = b.score
         check(
           scoreFormats.some((f) => f.code === score.type),
-          at,
+          blockAt,
           `unknown score type "${String(score.type)}" (${scoreFormats.map((f) => f.code).join(', ')}).`,
         )
-        check(isSeconds(score.time_seconds) && isSeconds(score.interval_seconds), at, 'times are whole seconds.')
+        check(isSeconds(score.time_seconds) && isSeconds(score.interval_seconds), blockAt, 'times are whole seconds.')
       }
-      check(Array.isArray(b.exercises) && b.exercises.length >= 1, at, 'has no exercises.')
+      check(Array.isArray(b.exercises) && b.exercises.length >= 1, blockAt, 'has no exercises.')
       ;(b.exercises as unknown[]).forEach((rawExercise, k) => {
-        const ex = `${at}, exercise ${k + 1}`
-        check(isObject(rawExercise), ex, 'must be an object.')
-        const e = rawExercise as Record<string, unknown>
-        check(isText(e.exercise), ex, 'needs the exercise name.')
-        check(e.sets === undefined || e.sets === null || isCount(e.sets), `${at}, ${e.exercise}`, 'sets must be 1-100.')
-        checkAmount(e.reps, `${at}, ${e.exercise}, reps`)
-        checkAmount(e.load, `${at}, ${e.exercise}, load`)
-        check(e.tempo === undefined || typeof e.tempo === 'string', ex, 'tempo must be text.')
-        check(e.notes === undefined || typeof e.notes === 'string', ex, 'notes must be text.')
+        const exerciseAt = `${blockAt}, exercise ${k + 1}`
+        check(isObject(rawExercise), exerciseAt, 'must be an object.')
+        const e = rawExercise
+        check(isText(e.exercise), exerciseAt, 'needs the exercise name.')
+        check(e.sets === undefined || e.sets === null || isCount(e.sets), `${blockAt}, ${e.exercise}`, 'sets must be 1-100.')
+        checkAmount(e.reps, `${blockAt}, ${e.exercise}, reps`)
+        checkAmount(e.load, `${blockAt}, ${e.exercise}, load`)
+        check(isOptionalText(e.tempo), exerciseAt, 'tempo must be text.')
+        check(isOptionalText(e.notes), exerciseAt, 'notes must be text.')
       })
     })
   })
+}
 
-  if (t.new_exercises !== undefined) {
-    check(Array.isArray(t.new_exercises), '', 'new_exercises must be a list.')
-    ;(t.new_exercises as unknown[]).forEach((n, i) => {
-      check(isObject(n) && isText((n as Record<string, unknown>).name), `new_exercises ${i + 1}`, 'needs a name.')
-    })
-  }
-  return data as unknown as TrainingImport
+// Checks a list of suggestions for new exercises, if there is one.
+export function checkNewExercises(raw: unknown, where: string) {
+  if (raw === undefined) return
+  check(Array.isArray(raw), where, 'new_exercises must be a list.')
+  raw.forEach((n, i) => {
+    check(isObject(n) && isText(n.name), where ? `${where}, new_exercises ${i + 1}` : `new_exercises ${i + 1}`, 'needs a name.')
+  })
 }
 
 // The import's error message, or a generic one for anything unexpected.
 export const importErrorMessage = (e: unknown) => (e instanceof ImportError ? e.message : 'The import could not be read.')
 
-// Every amount of the import with its part, block and exercise amounts alike.
-function* amounts(imp: TrainingImport): Generator<[AmountPart, ImportAmount]> {
-  for (const s of imp.sessions)
+// Every amount of the trainings with its part, block and exercise amounts alike.
+function* amounts(trainings: WithSessions[]): Generator<[AmountPart, ImportAmount]> {
+  for (const s of trainings.flatMap((t) => t.sessions))
     for (const b of s.blocks)
       for (const owner of [b, ...b.exercises]) {
         if (owner.reps) yield ['reps', owner.reps]
@@ -191,16 +214,18 @@ function* amounts(imp: TrainingImport): Generator<[AmountPart, ImportAmount]> {
       }
 }
 
-// The exercise and unit names of the import nobody has yet, each once, as first written.
-export function unresolvedNames(imp: TrainingImport, exercises: Exercise[]) {
+// The exercise and unit names of the trainings (one import, or all of a cycle's) nobody has yet,
+// each once, as first written.
+export function unresolvedNames(imports: WithSessions | WithSessions[], exercises: Exercise[]) {
+  const trainings = Array.isArray(imports) ? imports : [imports]
   const known = new Set(exercises.map((e) => nameKey(e.name)))
   const missing = new Map<string, string>()
-  for (const s of imp.sessions)
+  for (const s of trainings.flatMap((t) => t.sessions))
     for (const b of s.blocks)
       for (const e of b.exercises) if (!known.has(nameKey(e.exercise))) missing.set(nameKey(e.exercise), e.exercise.trim())
 
   const units = new Map<string, { part: AmountPart; name: string }>()
-  for (const [part, a] of amounts(imp)) {
+  for (const [part, a] of amounts(trainings)) {
     if (!unitIdOf(part, a.unit)) units.set(`${part}:${nameKey(a.unit)}`, { part, name: a.unit.trim() })
   }
   return { exercises: [...missing.values()], units: [...units.values()] }
@@ -228,9 +253,14 @@ function toAmount(reps?: ImportAmount, load?: ImportAmount): Amount {
 }
 
 // Turns an import into the form's rows once every name is known (exerciseByName by nameKey):
-// one session per imported session, all planned in order in the one week. Sets are filled on
-// both sides like for a loaded training, so the form's checks see what the kind uses.
-export function toImportedTraining(imp: TrainingImport, exerciseByName: Map<string, Exercise>): ImportedTraining {
+// one session per imported session, all planned in order in each of the weeks (one for a training
+// import; a cycle's training may run several). Sets are filled on both sides like for a loaded
+// training, so the form's checks see what the kind uses.
+export function toImportedTraining(
+  imp: Pick<TrainingImport, 'cycle' | 'name' | 'description' | 'start_date' | 'sessions'>,
+  exerciseByName: Map<string, Exercise>,
+  weekCount = 1,
+): ImportedTraining {
   const lookups = useLookupsStore()
   const sessions: SessionRow[] = imp.sessions.map((s) => ({
     key: nextKey(),
@@ -271,10 +301,11 @@ export function toImportedTraining(imp: TrainingImport, exerciseByName: Map<stri
     }),
   }))
   return {
+    cycle: imp.cycle?.trim(),
     name: imp.name.trim(),
     description: imp.description ?? '',
     startDate: imp.start_date,
     sessions,
-    weeks: [newWeek(sessions.map((s) => ({ key: nextKey(), sessionKey: s.key })))],
+    weeks: Array.from({ length: weekCount }, () => newWeek(sessions.map((s) => ({ key: nextKey(), sessionKey: s.key })))),
   }
 }

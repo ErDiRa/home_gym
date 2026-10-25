@@ -8,18 +8,22 @@
         <AppButton :to="{ name: 'training-new' }">New training</AppButton>
       </div>
     </div>
-    <TextInput
-      v-model="query"
-      type="search"
-      placeholder="Search trainings..."
-      class="mb-4"
-    />
+    <div class="mb-4 flex flex-wrap gap-3">
+      <TextInput v-model="query" type="search" placeholder="Search trainings..." class="min-w-60 flex-1" />
+      <SelectField
+        v-model="cycleFilter"
+        :options="cycleOptions"
+        :searchable="false"
+        aria-label="Filter by cycle"
+        class="w-56"
+      />
+    </div>
 
     <p v-if="error" class="text-center text-red-600">{{ error }}</p>
     <AgGridVue
       v-else
       class="min-h-0 flex-1"
-      :row-data="trainings"
+      :row-data="shown"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
       :quick-filter-text="query"
@@ -33,12 +37,13 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ActiveCell from '../../components/grid/ActiveCell.vue'
 import { formatDay, formatPeriod } from '../../dates'
@@ -53,6 +58,20 @@ const store = useTrainingsStore()
 const { trainings, loading } = storeToRefs(store)
 const query = ref('')
 const error = ref('')
+
+// '' = all trainings, 'none' = the ones in no cycle, else a cycle's id.
+const cycleFilter = ref<string | null>('')
+const cycleOptions = computed(() => {
+  const cycles = new Map<string, string>()
+  for (const t of trainings.value) if (t.cycle_id) cycles.set(t.cycle_id, t.cycle_name ?? '')
+  const byName = [...cycles].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ id, name }))
+  return [{ id: '', name: 'All cycles' }, { id: 'none', name: 'No cycle' }, ...byName]
+})
+const shown = computed(() => {
+  const f = cycleFilter.value
+  if (!f) return trainings.value
+  return trainings.value.filter((t) => (f === 'none' ? !t.cycle_id : t.cycle_id === f))
+})
 
 const columnDefs: ColDef<Training>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
@@ -77,6 +96,7 @@ const columnDefs: ColDef<Training>[] = [
     getQuickFilterText: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
   },
   { field: 'weeks', headerName: 'Weeks', flex: 1, minWidth: 90 },
+  { field: 'cycle_name', headerName: 'Cycle', flex: 2, minWidth: 140 },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   { field: 'session_count', headerName: 'Sessions', flex: 1, minWidth: 110 },
   { field: 'planned_count', headerName: 'Planned', flex: 1, minWidth: 100, headerTooltip: 'Planned sessions over all weeks' },

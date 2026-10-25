@@ -61,7 +61,7 @@ import { computed, ref, useId } from 'vue'
 import { ChevronRightIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import TextInput from '../form/TextInput.vue'
-import MoveRemoveButtons from './MoveRemoveButtons.vue'
+import MoveRemoveButtons from '../ui/MoveRemoveButtons.vue'
 import TrainingBlockEditor from './TrainingBlockEditor.vue'
 import { move, newBlock, sessionProblem, type SessionRow } from './trainingForm'
 

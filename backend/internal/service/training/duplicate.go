@@ -10,7 +10,8 @@ import (
 )
 
 // Duplicate copies one of the user's trainings, with its sessions and schedule. The copy starts
-// inactive, and as the next phase: as many weeks, from the Monday after the source ends.
+// inactive, and as the next phase: as many weeks, from the Monday after the source ends, in the
+// same cycle (e.g. next week of a plan that arrives week by week).
 func (s *Service) Duplicate(ctx context.Context, userID, id uuid.UUID) (repos.CreateTrainingRow, error) {
 	// The source was validated when it was saved, so the copy isn't checked again.
 	var training repos.CreateTrainingRow
@@ -20,7 +21,7 @@ func (s *Service) Duplicate(ctx context.Context, userID, id uuid.UUID) (repos.Cr
 			return err
 		}
 		training, err = q.CreateTraining(ctx, repos.CreateTrainingParams{
-			UserID: userID, Name: source.Name, Description: source.Description,
+			UserID: userID, CycleID: source.CycleID, Name: source.Name, Description: source.Description,
 			StartDate: addDays(source.EndDate, 1), Weeks: source.Weeks, // the end is a Sunday
 		})
 		if err != nil {

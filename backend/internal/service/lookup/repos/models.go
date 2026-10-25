@@ -22,6 +22,29 @@ type BlockKind struct {
 	Scored       bool   `json:"scored"`
 }
 
+type Cycle struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	StartDate   pgtype.Date        `json:"start_date"`
+	Weeks       int32              `json:"weeks"`
+	EndDate     pgtype.Date        `json:"end_date"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type CycleGoal struct {
+	ID       uuid.UUID `json:"id"`
+	CycleID  uuid.UUID `json:"cycle_id"`
+	Position int32     `json:"position"`
+	Title    string    `json:"title"`
+	Target   string    `json:"target"`
+	Status   string    `json:"status"`
+	Notes    string    `json:"notes"`
+}
+
 type Exercise struct {
 	ID          uuid.UUID          `json:"id"`
 	UserID      uuid.UUID          `json:"user_id"`
@@ -162,6 +185,7 @@ type SessionExercise struct {
 type Training struct {
 	ID          uuid.UUID          `json:"id"`
 	UserID      uuid.UUID          `json:"user_id"`
+	CycleID     *uuid.UUID         `json:"cycle_id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description"`
 	Active      bool               `json:"active"`

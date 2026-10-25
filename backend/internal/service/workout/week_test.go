@@ -135,3 +135,112 @@ func TestListPeriod(t *testing.T) {
 	_, err := s.List(context.Background(), uuid.New(), monday, monday.AddDate(1, 0, 2))
 	wantError(t, err, service.KindInvalid, "the period can be at most a year")
 }
+
+// A cycle planned week by week has many active trainings; only the ones running this week are
+// offered. Trainings without a cycle always are.
+func TestWeekOffersCycleTrainingsOfTheWeek(t *testing.T) {
+	cycle := uuid.New()
+	thisWeek, nextWeek, lastWeek, mobility := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	f, _, _ := newFake()
+	f.trainings = []repos.ListActiveTrainingsRow{
+		{ID: mobility, Name: "Mobility", StartDate: date(2026, 1, 5), Weeks: 4}, // ended long ago, no cycle
+		{ID: lastWeek, Name: "Week 1", StartDate: date(2026, 10, 5), Weeks: 1, CycleID: &cycle},
+		{ID: thisWeek, Name: "Week 2", StartDate: date(2026, 10, 12), Weeks: 1, CycleID: &cycle},
+		{ID: nextWeek, Name: "Week 3", StartDate: date(2026, 10, 19), Weeks: 1, CycleID: &cycle},
+	}
+
+	got, err := (&Service{q: f}).Week(context.Background(), uuid.New(), thisWeek, mondayDate, monday, sunday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var offered []uuid.UUID
+	for _, tr := range got.Trainings {
+		offered = append(offered, tr.ID)
+	}
+	if len(offered) != 2 || offered[0] != mobility || offered[1] != thisWeek {
+		t.Errorf("offered %v, want Mobility and Week 2", got.Trainings)
+	}
+	if got.Training == nil || got.Training.ID != thisWeek || got.WeekNumber == nil || *got.WeekNumber != 1 {
+		t.Errorf("chosen %+v, week %v", got.Training, got.WeekNumber)
+	}
+
+	// A training of the cycle that isn't offered can't be chosen: the first offered one is.
+	got, err = (&Service{q: f}).Week(context.Background(), uuid.New(), nextWeek, mondayDate, monday, sunday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Training == nil || got.Training.ID != mobility {
+		t.Errorf("chosen %+v, want the first offered", got.Training)
+	}
+}
+
+// When no training would be left, all are kept, so the tracker can say when they start or ended.
+func TestWeekKeepsAllWhenNoneRuns(t *testing.T) {
+	cycle := uuid.New()
+	f, _, _ := newFake()
+	f.trainings = []repos.ListActiveTrainingsRow{
+		{ID: uuid.New(), Name: "Week 1", StartDate: date(2026, 11, 2), Weeks: 1, CycleID: &cycle},
+		{ID: uuid.New(), Name: "Week 2", StartDate: date(2026, 11, 9), Weeks: 1, CycleID: &cycle},
+	}
+
+	got, err := (&Service{q: f}).Week(context.Background(), uuid.New(), uuid.Nil, mondayDate, monday, sunday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Trainings) != 2 || got.Training == nil || got.WeekNumber != nil {
+		t.Errorf("week = %+v", got)
+	}
+}
+
+func TestWeekCycle(t *testing.T) {
+	tests := []struct {
+		name  string
+		start pgtype.Date
+		want  *int32 // nil: outside the cycle's weeks
+	}{
+		{"first week", date(2026, 10, 12), ptr[int32](1)},
+		{"last week", date(2026, 8, 24), ptr[int32](8)},
+		{"after the end", date(2026, 8, 17), nil},
+		{"before the start", date(2026, 10, 19), nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cycleID := uuid.New()
+			f, _, _ := newFake()
+			// The training runs this week; the cycle may not (a training may lie outside it).
+			f.trainings = []repos.ListActiveTrainingsRow{{ID: uuid.New(), Name: "Hips", StartDate: date(2026, 10, 12), Weeks: 1, CycleID: &cycleID}}
+			f.cycle = &repos.GetWeekCycleRow{Name: "Mobility", StartDate: tt.start, Weeks: 8}
+			f.goals = []repos.ListWeekCycleGoalsRow{{Title: "Better hips", Status: "open"}}
+
+			got, err := (&Service{q: f}).Week(context.Background(), uuid.New(), uuid.Nil, mondayDate, monday, sunday)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c := got.Cycle
+			if c == nil || c.ID != cycleID || c.Name != "Mobility" || c.Weeks != 8 || len(c.Goals) != 1 {
+				t.Fatalf("cycle = %+v", c)
+			}
+			if (tt.want == nil) != (c.WeekNumber == nil) || (tt.want != nil && *c.WeekNumber != *tt.want) {
+				t.Errorf("cycle week = %v, want %v", c.WeekNumber, tt.want)
+			}
+		})
+	}
+}
+
+func TestWeekWithoutCycle(t *testing.T) {
+	f, _, _ := newFake()
+	f.trainings = []repos.ListActiveTrainingsRow{{ID: uuid.New(), Name: "Strength", StartDate: date(2026, 10, 12), Weeks: 4}}
+	got, err := (&Service{q: f}).Week(context.Background(), uuid.New(), uuid.Nil, mondayDate, monday, sunday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Cycle != nil {
+		t.Errorf("cycle = %+v, want none", got.Cycle)
+	}
+	// A cycle deleted meanwhile is none either.
+	cycleID := uuid.New()
+	f.trainings[0].CycleID = &cycleID
+	if got, err = (&Service{q: f}).Week(context.Background(), uuid.New(), uuid.Nil, mondayDate, monday, sunday); err != nil || got.Cycle != nil {
+		t.Errorf("cycle = %+v, err %v", got.Cycle, err)
+	}
+}

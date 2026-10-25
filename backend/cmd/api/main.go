@@ -20,6 +20,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/handlers"
 	"github.com/erdira/homegym/backend/internal/logging"
 	"github.com/erdira/homegym/backend/internal/service/account"
+	"github.com/erdira/homegym/backend/internal/service/cycle"
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
@@ -85,6 +86,7 @@ func run() error {
 	})
 	services := handlers.Services{
 		Trainings: training.New(dbpool),
+		Cycles:    cycle.New(dbpool),
 		Exercises: exercise.New(dbpool),
 		Lookups:   lookup.New(dbpool),
 		Feedback:  feedback.New(dbpool),

@@ -11,6 +11,14 @@
 
 A personal workout planner and tracker. In the dashboard you keep your exercise library and plan trainings: units (e.g. "Day A") made of blocks (single, superset, complex), each exercise with its sets, reps, load and tempo, and a number of sessions per week instead of fixed days. The mobile-first tracker shows this week's sessions like a todo list, suggests the next unit, and logs every set as you go.
 
+## Features
+
+- **Exercises:** your own library with joints, muscle groups, focuses, video links and ratings.
+- **Trainings:** sessions made of blocks (single, superset, complex, WOD with for time, AMRAP, EMOM, max reps or calories), each exercise with sets, reps, load and tempo, and an explicit plan for every week. Several trainings can be active side by side.
+- **Cycles:** a planned period of weeks with goals (e.g. "Mobility, 8 weeks: better hips"), grouping trainings that may run in parallel. The dashboard shows them on a week-by-week timeline; the tracker shows the cycle's week and goals above the training.
+- **Tracker:** this week's sessions as cards, logging sets and WOD scores as you go, and the history.
+- **Import:** a training week or a whole cycle from a JSON file (see [Import formats](#import-formats)).
+
 ## Tech stack
 
 - **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries
@@ -93,10 +101,49 @@ backend/
   db/migrations/      schema
   db/seed/            dev seed data
 frontend/
-  app/                the app: dashboard (exercises, trainings) and tracker (mobile first)
+  app/                the app: dashboard (exercises, sessions, cycles, trainings) and tracker (mobile first)
 deploy/               production compose file, Caddyfile and .env.example
 Dockerfile            production image (frontend build + Go binary)
 ```
+
+## Import formats
+
+Trainings → Import (or Cycles → Import) reads two kinds of JSON files. Exercises, units and block kinds are named, not referenced by id; the dialog lets you map unknown exercises to yours or create them (prefilled from the file's optional `new_exercises`), and creates unknown units.
+
+**`training-import/1`: one training of one week.** It opens in the training form as a draft, so you check it before saving. With an optional `"cycle": "<name>"`, the form preselects your cycle of that name.
+
+```jsonc
+{
+  "format": "training-import/1",
+  "cycle": "Mobility",              // optional
+  "name": "Strength week",
+  "start_date": "2026-11-02",       // a Monday
+  "sessions": [                     // 1-7, planned in this order in the week
+    { "name": "Mon", "blocks": [
+      { "kind": "single", "exercises": [
+        { "exercise": "Squat", "sets": 5, "reps": { "value": 3, "unit": "reps" }, "load": { "value": 75, "max": 80, "unit": "% 1RM" } }
+      ] }
+    ] }
+  ]
+}
+```
+
+**`cycle-import/1`: a whole cycle.** It creates the cycle, its goals and all its trainings at once, or nothing if any part is invalid. Each training is placed by the cycle week it starts in (`week`, from 1) and runs `weeks` weeks (default 1, its sessions planned in each), so moving the cycle is one date. Several trainings may share a week. Trainings take no `start_date` or `format` of their own; their `sessions` are those of `training-import/1`.
+
+```jsonc
+{
+  "format": "cycle-import/1",
+  "name": "Mobility",
+  "start_date": "2026-11-02",       // a Monday: the cycle's first week
+  "weeks": 4,                       // 1-52
+  "goals": [{ "title": "Better hips", "target": "Deep squat hold 2 min" }],   // up to 20
+  "trainings": [                    // up to 60
+    { "week": 1, "weeks": 4, "name": "Hips", "sessions": [ /* as in training-import/1 */ ] }
+  ]
+}
+```
+
+Complete examples are `training-week.json` and `training-week-into-cycle.json` in `frontend/app/src/components/training/__fixtures__/`, and `cycle.json` in `frontend/app/src/components/cycle/__fixtures__/`; the parsers and their rules are `trainingImport.ts` and `cycleImport.ts` in those folders.
 
 ## Development
 
@@ -107,6 +154,7 @@ Dockerfile            production image (frontend build + Go binary)
 | `cd backend && go test ./...`                   | Run the Go tests                                              |
 | `docker exec -it workout_backend sqlc generate` | Regenerate database code after changing queries or the schema |
 | `cd frontend/app && npm run build`              | Type-check and build the app                                  |
+| `cd frontend/app && npm run test`               | Run the frontend tests (vitest)                               |
 
 There are no migrations yet: during v1 development the schema in `backend/db/migrations/000001_init_schema.up.sql` is edited directly, so run `task backend:fresh` after pulling schema changes.
 

@@ -1,0 +1,58 @@
+{
+  "format": "cycle-import/1",
+  "name": "Mobility",
+  "description": "Hips and elbows, side by side.",
+  "start_date": "2026-11-02",
+  "weeks": 4,
+  "goals": [
+    { "title": "Better hips", "target": "Deep squat hold 2 min" },
+    { "title": "Better elbow extension", "notes": "Measure on video." }
+  ],
+  "trainings": [
+    {
+      "week": 1,
+      "weeks": 4,
+      "name": "Hips",
+      "sessions": [
+        {
+          "name": "Hips",
+          "blocks": [
+            { "kind": "single", "exercises": [{ "exercise": "Cossack Squat", "sets": 3, "reps": { "value": 8, "unit": "reps", "per_side": true } }] }
+          ]
+        }
+      ],
+      "new_exercises": [{ "name": "Cossack Squat", "type": "strength", "joints": ["Hip"], "muscle_groups": ["Glutes"] }]
+    },
+    {
+      "week": 1,
+      "weeks": 2,
+      "name": "Elbows 1",
+      "active": false,
+      "sessions": [
+        {
+          "name": "Elbows",
+          "blocks": [
+            { "kind": "single", "exercises": [{ "exercise": "Pigeon Pose", "sets": 2, "reps": { "value": 60, "unit": "s" } }] }
+          ]
+        }
+      ]
+    },
+    {
+      "week": 3,
+      "weeks": 2,
+      "name": "Elbows 2",
+      "sessions": [
+        {
+          "name": "Elbows",
+          "blocks": [
+            { "kind": "single", "exercises": [{ "exercise": "Pigeon Pose", "sets": 3, "reps": { "value": 90, "unit": "s" } }] }
+          ]
+        }
+      ]
+    }
+  ],
+  "new_exercises": [
+    { "name": "cossack squat ", "type": "mobility", "joints": ["Hip", "Knee"], "muscle_groups": ["Glutes"] },
+    { "name": "Pigeon Pose", "type": "mobility", "joints": ["Hip"], "muscle_groups": ["Glutes"] }
+  ]
+}
