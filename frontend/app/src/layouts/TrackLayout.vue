@@ -21,15 +21,22 @@
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+    <!-- With the tabs, the padding keeps the end of the page clear of them (h-14 plus the border). -->
+    <main
+      :class="[
+        'mx-auto w-full max-w-md flex-1 px-4 pt-6',
+        showTabs ? 'pb-[calc(5rem+1px+env(safe-area-inset-bottom))]' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
+      ]"
+    >
       <!-- Keyed by path so moving between two workouts mounts a fresh page. -->
       <RouterView :key="route.path" />
     </main>
 
-    <!-- Tabs; hidden during a workout, whose own bar takes the bottom of the screen. -->
+    <!-- Tabs; hidden during a workout, whose own bar takes the bottom of the screen. Fixed, not
+         sticky: a sticky bar is dragged up when iOS bounces the page at its end. -->
     <nav
-      v-if="route.name !== 'workout'"
-      class="sticky bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+      v-if="showTabs"
+      class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
       aria-label="Tracker"
     >
       <div class="mx-auto flex max-w-md">
@@ -49,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ArrowRightStartOnRectangleIcon,
@@ -62,6 +70,7 @@ import { logout } from '../api'
 import AppButton from '../components/button/AppButton.vue'
 
 const route = useRoute()
+const showTabs = computed(() => route.name !== 'workout')
 
 const tabs = [
   { name: 'This week', to: { name: 'track' }, icon: CalendarDaysIcon },
