@@ -76,24 +76,16 @@
       <section v-if="sessions.length" class="mt-3" aria-labelledby="week-heading">
         <ul class="space-y-3">
           <li v-for="s in sessions" :key="s.key">
-            <RouterLink
-              v-if="s.workoutId"
-              :to="{ name: 'workout', params: { id: s.workoutId } }"
-              class="block rounded-2xl active:opacity-80"
-            >
-              <SessionCard :name="s.name" :lines="s.lines" :done="s.done" />
-            </RouterLink>
             <!-- Only the current week's sessions are started; other weeks just show their plan. -->
-            <SessionCard v-else-if="!isCurrent" :name="s.name" :lines="s.lines" :done="s.done" />
-            <button
-              v-else
-              type="button"
-              class="block w-full rounded-2xl text-left active:opacity-80 disabled:opacity-60"
+            <SessionCard
+              :name="s.name"
+              :lines="s.lines"
+              :done="s.done"
+              :to="s.workoutId ? { name: 'workout', params: { id: s.workoutId } } : undefined"
+              :startable="!s.workoutId && isCurrent"
               :disabled="starting"
-              @click="start(s.slotId!)"
-            >
-              <SessionCard :name="s.name" :lines="s.lines" :done="s.done" />
-            </button>
+              @start="start(s.slotId!)"
+            />
           </li>
         </ul>
       </section>

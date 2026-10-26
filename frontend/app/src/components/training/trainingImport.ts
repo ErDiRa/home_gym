@@ -27,11 +27,14 @@ export interface ImportAmount {
   per_side?: boolean
 }
 
+// A load may name only its unit: the unit the sets are logged in, e.g. calories on a machine.
+export type ImportLoad = Omit<ImportAmount, 'value'> & { value?: number | null }
+
 export interface ImportExercise {
   exercise: string // by name
   sets?: number // when the block's kind doesn't share sets
   reps?: ImportAmount
-  load?: ImportAmount
+  load?: ImportLoad
   tempo?: string
   notes?: string
 }
@@ -42,7 +45,7 @@ export interface ImportBlock {
   notes?: string
   sets?: number // of a kind sharing sets; a WOD's rounds (optional)
   reps?: ImportAmount // when the kind shares them
-  load?: ImportAmount
+  load?: ImportLoad
   score?: { type: ScoreType; time_seconds?: number | null; interval_seconds?: number | null } // a WOD's
   exercises: ImportExercise[]
 }
@@ -114,11 +117,13 @@ export function parseJSON(text: string): Record<string, unknown> {
   return data
 }
 
-function checkAmount(v: unknown, where: string) {
+function checkAmount(v: unknown, where: string, unitOnly = false) {
   if (v === undefined || v === null) return
   check(isObject(v), where, 'must be an object with value and unit.')
   const a = v as Record<string, unknown>
-  check(typeof a.value === 'number' && a.value >= 0, where, 'value must be a number of at least 0.')
+  const noValue = unitOnly && (a.value === undefined || a.value === null)
+  check(noValue || (typeof a.value === 'number' && a.value >= 0), where, 'value must be a number of at least 0.')
+  check(!noValue || a.max === undefined || a.max === null, where, 'max needs a value.')
   check(a.max === undefined || a.max === null || typeof a.max === 'number', where, 'max must be a number.')
   check(isText(a.unit), where, 'unit is missing.')
   check(a.per_side === undefined || typeof a.per_side === 'boolean', where, 'per_side must be true or false.')
@@ -165,7 +170,7 @@ export function checkSessions(raw: unknown, kinds: string[], where: string) {
       check(isOptionalText(b.notes), blockAt, 'notes must be text.')
       check(b.sets === undefined || b.sets === null || isCount(b.sets), blockAt, 'sets must be 1-100.')
       checkAmount(b.reps, `${blockAt}, reps`)
-      checkAmount(b.load, `${blockAt}, load`)
+      checkAmount(b.load, `${blockAt}, load`, true)
       if (b.score !== undefined && b.score !== null) {
         check(isObject(b.score), blockAt, 'score must be an object.')
         const score = b.score
@@ -184,7 +189,7 @@ export function checkSessions(raw: unknown, kinds: string[], where: string) {
         check(isText(e.exercise), exerciseAt, 'needs the exercise name.')
         check(e.sets === undefined || e.sets === null || isCount(e.sets), `${blockAt}, ${e.exercise}`, 'sets must be 1-100.')
         checkAmount(e.reps, `${blockAt}, ${e.exercise}, reps`)
-        checkAmount(e.load, `${blockAt}, ${e.exercise}, load`)
+        checkAmount(e.load, `${blockAt}, ${e.exercise}, load`, true)
         check(isOptionalText(e.tempo), exerciseAt, 'tempo must be text.')
         check(isOptionalText(e.notes), exerciseAt, 'notes must be text.')
       })
@@ -205,7 +210,7 @@ export function checkNewExercises(raw: unknown, where: string) {
 export const importErrorMessage = (e: unknown) => (e instanceof ImportError ? e.message : 'The import could not be read.')
 
 // Every amount of the trainings with its part, block and exercise amounts alike.
-function* amounts(trainings: WithSessions[]): Generator<[AmountPart, ImportAmount]> {
+function* amounts(trainings: WithSessions[]): Generator<[AmountPart, ImportAmount | ImportLoad]> {
   for (const s of trainings.flatMap((t) => t.sessions))
     for (const b of s.blocks)
       for (const owner of [b, ...b.exercises]) {
@@ -236,7 +241,7 @@ const unitIdOf = (part: AmountPart, name: string) =>
     .unitsOf(part)
     .find((u) => nameKey(u.name) === nameKey(name))?.id ?? null
 
-function toAmount(reps?: ImportAmount, load?: ImportAmount): Amount {
+function toAmount(reps?: ImportAmount, load?: ImportLoad): Amount {
   const a = emptyAmount()
   if (reps) {
     a.reps_value = reps.value
@@ -245,7 +250,7 @@ function toAmount(reps?: ImportAmount, load?: ImportAmount): Amount {
     a.per_side = reps.per_side ?? false
   }
   if (load) {
-    a.load_value = load.value
+    a.load_value = load.value ?? null
     a.load_max = load.max ?? null
     a.load_unit = unitIdOf('load', load.unit)
   }

@@ -59,6 +59,12 @@ describe('parseImport', () => {
       'Mon, block B: unknown score type "tabata" (for_time, amrap, max_reps, max_calories, emom).',
     ],
     ['an amount without unit', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.unit), 'Mon, block A, Squat, reps: unit is missing.'],
+    ['reps without value', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.value), 'Mon, block A, Squat, reps: value must be a number of at least 0.'],
+    [
+      'a load max without value',
+      changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { max: 80, unit: 'kg' })),
+      'Mon, block A, Squat, load: max needs a value.',
+    ],
   ])('rejects %s', (_, text, message) => {
     expect(errorOf(text)).toBe(message)
   })
@@ -101,6 +107,12 @@ describe('toImportedTraining', () => {
     // The WOD keeps its rounds and score; the form's own checks find nothing.
     expect(t.sessions[0].blocks[1]).toMatchObject({ rounds: 3, score_type: 'for_time', time_seconds: 600 })
     expect(t.sessions.map(sessionProblem)).toEqual(['', ''])
+  })
+
+  it('keeps a load given only by its unit', () => {
+    const text = changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { unit: 'kg' }))
+    const squat = toImportedTraining(parseImport(text, kinds), names).sessions[0].blocks[0].exercises[0]
+    expect(squat).toMatchObject({ load_value: null, load_max: null, load_unit: 'unit-kg' })
   })
 
   it('keeps the cycle named in the file, trimmed', () => {

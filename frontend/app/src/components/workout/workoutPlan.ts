@@ -167,7 +167,7 @@ export function buildCards(
       // set is the plan.
       const planned = b.sets ?? e.sets ?? 1
       const reps = e.reps_value !== null ? e : b
-      const load = e.load_value !== null ? e : b
+      const load = e.load_unit !== null ? e : b
       const logged = (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id === e.exercise_id)
       loggedByPlace.set(key, (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id !== e.exercise_id))
       const planUnit = load.load_unit ? loads?.unitOf(load.load_unit) : undefined
@@ -188,6 +188,7 @@ export function buildCards(
         text.push(scored ? amount : `${planned} × ${amount}`)
       }
       if (load.load_value !== null) text.push(`${range(load.load_value, load.load_max)} ${load.load_unit_name}`)
+      else if (load.load_unit !== null) text.push(`in ${load.load_unit_name}`) // logged in this unit, e.g. "in cal"
       return {
         key,
         label: exerciseLabel(b.exercises.length, i, j),

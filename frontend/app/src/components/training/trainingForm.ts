@@ -155,11 +155,12 @@ function toBlockRows(blocks: TrainingBlock[]): BlockRow[] {
   }))
 }
 
-// cleanAmount drops what an empty value leaves behind (a preselected unit, a lone max).
+// cleanAmount drops what an empty value leaves behind (a preselected unit, a lone max). A load
+// unit stays without a value: the unit the sets are logged in, e.g. calories on a machine.
 function cleanAmount(a: Amount): Amount {
   const out = pickAmount(a)
   if (out.reps_value === null) Object.assign(out, { reps_max: null, reps_unit: null, per_side: false })
-  if (out.load_value === null) Object.assign(out, { load_max: null, load_unit: null })
+  if (out.load_value === null) out.load_max = null
   return out
 }
 

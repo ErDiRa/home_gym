@@ -131,7 +131,9 @@ Trainings → Import (or Cycles → Import) reads two kinds of JSON files. Exerc
   "sessions": [                     // 1-7, planned in this order in the week
     { "name": "Mon", "blocks": [
       { "kind": "single", "exercises": [
-        { "exercise": "Squat", "sets": 5, "reps": { "value": 3, "unit": "reps" }, "load": { "value": 75, "max": 80, "unit": "% 1RM" } }
+        { "exercise": "Squat", "sets": 5, "reps": { "value": 3, "unit": "reps" }, "load": { "value": 75, "max": 80, "unit": "% 1RM" } },
+        // a load with only a unit: what each set is logged in, e.g. the calories of a 4 min interval
+        { "exercise": "Echo Bike", "sets": 3, "reps": { "value": 4, "unit": "min" }, "load": { "unit": "cal" } }
       ] }
     ] }
   ]

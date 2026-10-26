@@ -28,13 +28,13 @@
         class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm"
         :aria-label="`Block ${block.letter}`"
       >
-        <!-- Tapping the header collapses the block; its progress stays visible. -->
+        <!-- Blocks start collapsed for an overview; tapping the header opens one. -->
         <button
           type="button"
           class="flex min-h-11 w-full items-center gap-2 text-left"
-          :class="collapsed.has(block.key) ? 'pb-3' : 'border-b border-slate-100 pb-2'"
-          :aria-expanded="!collapsed.has(block.key)"
-          @click="toggleCollapsed(block.key)"
+          :class="expanded.has(block.key) ? 'border-b border-slate-100 pb-2' : 'pb-3'"
+          :aria-expanded="expanded.has(block.key)"
+          @click="toggleExpanded(block.key)"
         >
           <span class="flex size-7 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-sm font-bold text-white">
             {{ block.letter }}
@@ -48,11 +48,11 @@
           <span class="shrink-0 text-xs text-slate-500">{{ blockProgress(block) }}</span>
           <ChevronDownIcon
             class="size-5 shrink-0 text-slate-400 transition-transform"
-            :class="{ '-rotate-90': collapsed.has(block.key) }"
+            :class="{ '-rotate-90': !expanded.has(block.key) }"
             aria-hidden="true"
           />
         </button>
-        <div v-show="!collapsed.has(block.key)">
+        <div v-show="expanded.has(block.key)">
           <div class="divide-y divide-slate-100">
             <ExerciseSets
               v-for="(card, i) in block.exercises"
@@ -70,18 +70,18 @@
         <button
           type="button"
           class="flex min-h-11 w-full items-center gap-2 text-left text-sm font-semibold text-slate-800"
-          :class="collapsed.has('extras') ? 'pb-3' : 'border-b border-slate-100 pb-2'"
-          :aria-expanded="!collapsed.has('extras')"
-          @click="toggleCollapsed('extras')"
+          :class="expanded.has('extras') ? 'border-b border-slate-100 pb-2' : 'pb-3'"
+          :aria-expanded="expanded.has('extras')"
+          @click="toggleExpanded('extras')"
         >
           <span class="flex-1">{{ extras.length ? 'Other logged sets' : 'Other logged scores' }}</span>
           <ChevronDownIcon
             class="size-5 shrink-0 text-slate-400 transition-transform"
-            :class="{ '-rotate-90': collapsed.has('extras') }"
+            :class="{ '-rotate-90': !expanded.has('extras') }"
             aria-hidden="true"
           />
         </button>
-        <div v-show="!collapsed.has('extras')" class="divide-y divide-slate-100">
+        <div v-show="expanded.has('extras')" class="divide-y divide-slate-100">
           <ExerciseSets
             v-for="(card, i) in extras"
             :key="card.key"
@@ -216,8 +216,8 @@ const notes = ref('')
 // The day the workout was done: today by default, or its date once finished; changeable for a
 // workout logged on another day.
 const doneOn = ref(today())
-// The sections collapsed by the user: block keys, and 'extras' for the other logged sets.
-const collapsed = reactive(new Set<string>())
+// The sections opened by the user (all start collapsed): block keys, and 'extras' for the other logged sets.
+const expanded = reactive(new Set<string>())
 // Ratings picked while finishing, by exercise id; saved with the workout.
 const ratingDrafts = reactive(new Map<string, number>())
 
@@ -343,8 +343,8 @@ async function toggleScore(wod: WodCard) {
   }
 }
 
-function toggleCollapsed(key: string) {
-  if (!collapsed.delete(key)) collapsed.add(key)
+function toggleExpanded(key: string) {
+  if (!expanded.delete(key)) expanded.add(key)
 }
 
 // How much of a block is logged, e.g. "4/9 sets" or "Score logged", shown in its header.

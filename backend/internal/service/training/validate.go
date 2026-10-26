@@ -257,10 +257,17 @@ func checkReps(a *Amount, lk lookups) string {
 	return checkRange("reps", a.RepsValue, a.RepsMax, a.RepsUnit, lk.repUnits)
 }
 
-// checkLoad validates the optional load of an amount.
+// checkLoad validates the optional load of an amount: a value with a unit, only a unit (what the
+// sets are logged in, e.g. calories on a machine) or nothing (e.g. bodyweight).
 func checkLoad(a *Amount, lk lookups) string {
-	if a.LoadValue == nil && a.LoadMax == nil && a.LoadUnit == nil {
-		return "" // no load, e.g. bodyweight
+	if a.LoadValue == nil && a.LoadMax == nil {
+		if a.LoadUnit == nil {
+			return ""
+		}
+		if _, ok := lk.loadUnits[*a.LoadUnit]; !ok {
+			return "unknown load unit"
+		}
+		return ""
 	}
 	return checkRange("load", a.LoadValue, a.LoadMax, a.LoadUnit, lk.loadUnits)
 }
