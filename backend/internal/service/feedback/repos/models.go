@@ -252,6 +252,35 @@ type Workout struct {
 	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type WorkoutLog struct {
+	UserEmail     string             `json:"user_email"`
+	DoneOn        pgtype.Date        `json:"done_on"`
+	Training      *string            `json:"training"`
+	Week          int32              `json:"week"`
+	Session       string             `json:"session"`
+	Label         interface{}        `json:"label"`
+	Entry         string             `json:"entry"`
+	Exercise      string             `json:"exercise"`
+	Set           int32              `json:"set"`
+	Reps          bool               `json:"reps"`
+	Load          bool               `json:"load"`
+	Score         *string            `json:"score"`
+	Rx            pgtype.Bool        `json:"rx"`
+	Notes         *string            `json:"notes"`
+	WorkoutNotes  string             `json:"workout_notes"`
+	StartedAt     pgtype.Timestamptz `json:"started_at"`
+	DoneAt        pgtype.Timestamptz `json:"done_at"`
+	LoggedAt      pgtype.Timestamptz `json:"logged_at"`
+	UserID        uuid.UUID          `json:"user_id"`
+	TrainingID    *uuid.UUID         `json:"training_id"`
+	SessionID     *uuid.UUID         `json:"session_id"`
+	WeekSessionID *uuid.UUID         `json:"week_session_id"`
+	WorkoutID     uuid.UUID          `json:"workout_id"`
+	SetID         uuid.UUID          `json:"set_id"`
+	ResultID      *uuid.UUID         `json:"result_id"`
+	ExerciseID    uuid.UUID          `json:"exercise_id"`
+}
+
 type WorkoutResult struct {
 	ID            uuid.UUID          `json:"id"`
 	WorkoutID     uuid.UUID          `json:"workout_id"`
