@@ -23,7 +23,7 @@
       </p>
 
       <section
-        v-for="block in blocks"
+        v-for="(block, bi) in blocks"
         :key="block.key"
         class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 pt-3 shadow-sm"
         :aria-label="`Block ${block.letter}`"
@@ -53,7 +53,8 @@
           />
         </button>
         <div v-show="expanded.has(block.key)">
-          <div class="divide-y divide-slate-100">
+          <ComplexSets v-if="block.complex" v-model="blocks[bi]" @toggle="toggleRound" />
+          <div v-else class="divide-y divide-slate-100">
             <ExerciseSets
               v-for="(card, i) in block.exercises"
               :key="card.key"
@@ -167,6 +168,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
 import { isNewMax } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
+import ComplexSets from '../../components/workout/ComplexSets.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'
 import WodResult from '../../components/workout/WodResult.vue'
@@ -177,11 +179,14 @@ import {
   buildCards,
   changed,
   num,
+  progressOf,
+  roundState,
   scoreChanged,
   scoreDraft,
   scoreValues,
   type BlockCard,
   type ExerciseCard,
+  type Round,
   type SetRow,
   type WodCard,
 } from '../../components/workout/workoutPlan'
@@ -223,8 +228,15 @@ const ratingDrafts = reactive(new Map<string, number>())
 
 const session = computed(() => training.value?.sessions.find((s) => s.id === workout.value?.session_id) ?? null)
 const allCards = computed(() => [...blocks.value.flatMap((b) => b.exercises), ...extras.value])
-const plannedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.length, 0))
-const loggedCount = computed(() => allCards.value.reduce((n, c) => n + c.rows.filter((r) => r.logged).length, 0))
+// Sets to log: a complex's rounds count as one set each.
+const progress = computed(() =>
+  [...blocks.value.map(progressOf), ...extras.value.map((c) => ({ logged: c.rows.filter((r) => r.logged).length, total: c.rows.length }))].reduce(
+    (sum, p) => ({ logged: sum.logged + p.logged, total: sum.total + p.total }),
+    { logged: 0, total: 0 },
+  ),
+)
+const plannedCount = computed(() => progress.value.total)
+const loggedCount = computed(() => progress.value.logged)
 const wods = computed(() => blocks.value.flatMap((b) => (b.wod ? [b.wod] : [])))
 const scoredCount = computed(() => wods.value.filter((w) => w.result).length)
 // Each exercise once, in workout order.
@@ -267,8 +279,9 @@ onMounted(async () => {
   }
 })
 
-// Logs a set, saves its changed values, or undoes it when it is logged and unchanged.
-async function toggle(card: ExerciseCard, row: SetRow) {
+// Logs a set, saves its changed values, or undoes it when it is logged and unchanged. offerMax
+// offers a logged single above the 1RM as the new one.
+async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
   if (!workout.value || row.saving) return
   row.saving = true
   try {
@@ -298,12 +311,25 @@ async function toggle(card: ExerciseCard, row: SetRow) {
     })
     row.reps = reps
     row.load = load
-    offerNewMax(card, row.logged)
+    if (offerMax) offerNewMax(card, row.logged)
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the set.')
   } finally {
     row.saving = false
   }
+}
+
+// Logs a round of a complex (its sets not logged or changed), or undoes it when logged and unchanged.
+// A single of a complex isn't offered as a 1RM.
+async function toggleRound(round: Round) {
+  const state = roundState(round)
+  const { card, row } = round.sets[0]
+  if (state !== 'logged' && num(row.reps) === null && num(row.load) === null) {
+    toast.error(`Enter the ${card.repsUnitName || 'reps'} or the load of set ${round.number} first.`)
+    return
+  }
+  const sets = state === 'logged' ? round.sets : round.sets.filter((s) => !s.row.logged || changed(s.card, s.row))
+  await Promise.all(sets.map((s) => toggle(s.card, s.row, false)))
 }
 
 const loadUnitOf = (id: string) => lookups.loadUnits.find((u) => u.id === id)
@@ -349,9 +375,9 @@ function toggleExpanded(key: string) {
 
 // How much of a block is logged, e.g. "4/9 sets" or "Score logged", shown in its header.
 function blockProgress(block: BlockCard): string {
-  const rows = block.exercises.flatMap((c) => c.rows)
-  if (block.wod && !rows.length) return block.wod.result ? 'Score logged' : 'No score'
-  return `${rows.filter((r) => r.logged).length}/${rows.length} sets`
+  const { logged, total } = progressOf(block)
+  if (block.wod && !total) return block.wod.result ? 'Score logged' : 'No score'
+  return `${logged}/${total} sets`
 }
 
 async function openFinish() {

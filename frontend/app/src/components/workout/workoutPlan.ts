@@ -65,6 +65,7 @@ export interface BlockCard {
   hint: string // how to go through it, e.g. "3 rounds: A1 → A2" or "AMRAP 12:00"
   notes: string
   exercises: ExerciseCard[]
+  complex: boolean // its exercises are done in rounds with the same weight: one row per round, see roundsOf
   wod: WodCard | null // set for a WOD block
 }
 
@@ -109,6 +110,38 @@ export function scoreChanged(wod: WodCard): boolean {
     r.rx !== wod.draft.rx ||
     r.notes !== wod.draft.notes.trim()
   )
+}
+
+// One round of a complex: the set of that number of each of its exercises, logged together with
+// the same reps and load (rows of sets logged beyond the plan may be missing for some).
+export interface Round {
+  number: number
+  sets: { card: ExerciseCard; row: SetRow }[]
+}
+
+export function roundsOf(block: BlockCard): Round[] {
+  const numbers = [...new Set(block.exercises.flatMap((c) => c.rows.map((r) => r.number)))].sort((a, b) => a - b)
+  return numbers.map((number) => ({
+    number,
+    sets: block.exercises.flatMap((card) => card.rows.filter((r) => r.number === number).map((row) => ({ card, row }))),
+  }))
+}
+
+// A round is logged when all its sets are, and edited when some are or were changed since.
+export function roundState(round: Round): 'open' | 'logged' | 'edited' {
+  const logged = round.sets.filter((s) => s.row.logged)
+  if (!logged.length) return 'open'
+  return logged.length === round.sets.length && !logged.some((s) => changed(s.card, s.row)) ? 'logged' : 'edited'
+}
+
+// How much of a block is logged: its sets, or a complex's rounds.
+export function progressOf(block: BlockCard): { logged: number; total: number } {
+  if (block.complex) {
+    const rounds = roundsOf(block)
+    return { logged: rounds.filter((r) => roundState(r) === 'logged').length, total: rounds.length }
+  }
+  const rows = block.exercises.flatMap((c) => c.rows)
+  return { logged: rows.filter((r) => r.logged).length, total: rows.length }
 }
 
 // A value or a range, e.g. "8" or "8–10".
@@ -210,6 +243,19 @@ export function buildCards(
         rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad),
       }
     })
+    const complex = !!kind?.shared_load && !scored && exercises.length > 1
+    // A complex is logged in one unit; a set not logged yet takes the load another exercise was
+    // logged with in that round.
+    if (complex) {
+      for (const card of exercises) {
+        card.loadUnit = exercises[0].loadUnit
+        for (const row of card.rows) {
+          if (row.logged) continue
+          const done = exercises.flatMap((c) => c.rows).find((r) => r.number === row.number && r.logged?.load_unit === card.loadUnit)
+          if (done) row.load = done.logged!.load_value
+        }
+      }
+    }
     const sets = b.sets ?? 0
     const result = scored ? (resultByBlock.get(i + 1) ?? null) : null
     if (scored) resultByBlock.delete(i + 1)
@@ -225,6 +271,7 @@ export function buildCards(
           : '',
       notes: b.notes,
       exercises,
+      complex,
       wod: scored
         ? {
             blockPosition: i + 1,

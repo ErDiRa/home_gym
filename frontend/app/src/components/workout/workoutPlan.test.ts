@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, type LoadContext } from './workoutPlan'
+import { buildCards, progressOf, roundsOf, roundState, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -110,5 +110,87 @@ describe('buildCards with % 1RM', () => {
     const card = cardOf([logged], context(120))
     expect(card.loadUnit).toBe('lb')
     expect(card.rows.map((r) => r.load)).toEqual([185, 185, 185]) // 84 kg = 185.2 lb
+  })
+})
+
+// A complex: 3 rounds of a power clean and a front squat at 60 kg, sharing sets, reps and load.
+const complex: BlockKind = { ...single, code: 'complex', name: 'Complex', shared_sets: true, shared_reps: true, shared_load: true }
+const plannedExercise = session.blocks[0].exercises[0]
+const complexSession: TrainingSession = {
+  ...session,
+  blocks: [
+    {
+      ...session.blocks[0],
+      kind: 'complex',
+      sets: 3,
+      reps_value: 1,
+      reps_unit: 'reps',
+      load_value: 60,
+      load_unit: 'kg',
+      exercises: ['clean', 'squat'].map((id) => ({
+        ...plannedExercise,
+        exercise_id: id,
+        sets: null,
+        reps_value: null,
+        reps_unit: null,
+        load_value: null,
+        load_max: null,
+        load_unit: null,
+      })),
+    },
+  ],
+}
+const cleanSet: WorkoutSet = {
+  id: 'set1',
+  exercise_id: 'clean',
+  block_position: 1,
+  exercise_position: 1,
+  set_number: 2,
+  reps_value: 1,
+  reps_unit: 'reps',
+  per_side: false,
+  load_value: 65,
+  load_unit: 'kg',
+  completed_at: '',
+  exercise_name: 'Power clean',
+  reps_unit_name: 'reps',
+  load_unit_name: 'kg',
+}
+const complexBlock = (sets: WorkoutSet[] = []) =>
+  buildCards(complexSession, sets, [], () => complex, 'kg', context(null)).blocks[0]
+
+describe('a complex', () => {
+  it('is logged in rounds of all its exercises', () => {
+    const block = complexBlock()
+    expect(block.complex).toBe(true)
+    const rounds = roundsOf(block)
+    expect(rounds.map((r) => r.number)).toEqual([1, 2, 3])
+    expect(rounds[0].sets.map((s) => s.card.exerciseId)).toEqual(['clean', 'squat'])
+    expect(progressOf(block)).toEqual({ logged: 0, total: 3 })
+  })
+
+  it('counts a round as logged only when all its sets are', () => {
+    const block = complexBlock([cleanSet])
+    const round = roundsOf(block)[1]
+    expect(roundState(round)).toBe('edited')
+    expect(roundState(roundsOf(block)[0])).toBe('open')
+
+    const squatSet = { ...cleanSet, id: 'set2', exercise_id: 'squat', exercise_position: 2, exercise_name: 'Front squat' }
+    const done = complexBlock([cleanSet, squatSet])
+    expect(roundState(roundsOf(done)[1])).toBe('logged')
+    expect(progressOf(done)).toEqual({ logged: 1, total: 3 })
+    roundsOf(done)[1].sets[1].row.load = 70
+    expect(roundState(roundsOf(done)[1])).toBe('edited')
+  })
+
+  it('starts a set not logged yet with the load the other exercise was logged with', () => {
+    const [, squat] = complexBlock([cleanSet]).exercises
+    expect(squat.rows.map((r) => r.load)).toEqual([60, 65, 60])
+  })
+
+  it('is only a kind that shares the load', () => {
+    const block = buildCards(complexSession, [], [], () => single, 'kg', context(null)).blocks[0]
+    expect(block.complex).toBe(false)
+    expect(progressOf(block)).toEqual({ logged: 0, total: 6 }) // every exercise's own sets
   })
 })
