@@ -3,6 +3,7 @@ package web
 
 import (
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -17,6 +18,12 @@ const (
 	// Other files (e.g. from public/) keep their names across builds.
 	cacheShort = "public, max-age=3600"
 )
+
+// Go's built-in table lacks the web app manifest (home screen name and icons), and the
+// Alpine image has no /etc/mime.types, so it would be sniffed as text/plain.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 // SPA serves the files in dir. Paths that match no file and have no extension are client-side
 // routes (e.g. /track/history) and get index.html; a missing file with an extension (an asset
