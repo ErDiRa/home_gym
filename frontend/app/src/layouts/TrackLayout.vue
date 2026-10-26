@@ -50,7 +50,14 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { ArrowRightStartOnRectangleIcon, CalendarDaysIcon, ClockIcon, Cog6ToothIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
+import {
+  ArrowRightStartOnRectangleIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  Squares2X2Icon,
+  TrophyIcon,
+} from '@heroicons/vue/24/outline'
 import { logout } from '../api'
 import AppButton from '../components/button/AppButton.vue'
 
@@ -59,5 +66,6 @@ const route = useRoute()
 const tabs = [
   { name: 'This week', to: { name: 'track' }, icon: CalendarDaysIcon },
   { name: 'History', to: { name: 'history' }, icon: ClockIcon },
+  { name: 'PRs', to: { name: 'track-prs' }, icon: TrophyIcon },
 ]
 </script>

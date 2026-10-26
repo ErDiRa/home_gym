@@ -38,15 +38,30 @@
           @update:model-value="(id) => id && pick(id)"
         />
         <h1 v-else class="text-2xl font-bold tracking-tight text-slate-900">{{ week.training.name }}</h1>
+
+        <!-- The week shown: the current one by default, stepping back and ahead to see other weeks' plans. -->
+        <nav class="mt-4 flex items-center gap-1" aria-label="Weeks">
+          <AppButton variant="ghost" size="touch" icon aria-label="Previous week" @click="shift(-1)">
+            <ChevronLeftIcon class="size-5" aria-hidden="true" />
+          </AppButton>
+          <div class="min-w-0 flex-1 px-1">
+            <h2 id="week-heading" class="font-semibold text-slate-900">{{ weekDates }}</h2>
+          </div>
+          <AppButton v-if="!isCurrent" variant="text" size="touch" @click="shift(0)">Current</AppButton>
+          <AppButton variant="ghost" size="touch" icon aria-label="Next week" @click="shift(1)">
+            <ChevronRightIcon class="size-5" aria-hidden="true" />
+          </AppButton>
+        </nav>
+
         <p
           v-if="!week.week_number || !week.planned.length"
-          class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500"
+          class="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500"
         >
           {{
             !week.week_number
-              ? week.training.start_date > today()
-                ? 'This training starts later. Nothing is planned this week.'
-                : 'This training has ended. Plan the next one in the dashboard.'
+              ? week.training.start_date > monday
+                ? `This training starts on ${formatDate(week.training.start_date)}. Nothing is planned this week.`
+                : `This training ${week.training.end_date < today() ? 'ended' : 'ends'} on ${formatDate(week.training.end_date)}. Plan the next one in the dashboard.`
               : 'No sessions planned this week.'
           }}
         </p>
@@ -57,13 +72,9 @@
         <AppButton :to="{ name: 'trainings' }" variant="secondary" size="touch" class="mt-4">Open trainings</AppButton>
       </div>
 
-      <!-- This week's sessions: the done ones checked, then what's left. -->
-      <section v-if="sessions.length" class="mt-6" aria-labelledby="week-heading">
-        <h2 id="week-heading" class="flex items-baseline justify-between gap-2 font-semibold text-slate-900">
-          This week
-          <span class="text-sm font-normal text-slate-500">{{ weekDates }}</span>
-        </h2>
-        <ul class="mt-2 space-y-3">
+      <!-- The week's sessions: the done ones checked, then what's left. -->
+      <section v-if="sessions.length" class="mt-3" aria-labelledby="week-heading">
+        <ul class="space-y-3">
           <li v-for="s in sessions" :key="s.key">
             <RouterLink
               v-if="s.workoutId"
@@ -72,6 +83,8 @@
             >
               <SessionCard :name="s.name" :lines="s.lines" :done="s.done" />
             </RouterLink>
+            <!-- Only the current week's sessions are started; other weeks just show their plan. -->
+            <SessionCard v-else-if="!isCurrent" :name="s.name" :lines="s.lines" :done="s.done" />
             <button
               v-else
               type="button"
@@ -94,12 +107,12 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ApiError } from '../../api'
-import { ArrowPathIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import SessionCard from '../../components/workout/SessionCard.vue'
 import { sessionSummary, type SummaryLine } from '../../components/workout/workoutPlan'
-import { addDays, formatDate, formatPeriod, toIso, today, weekStart } from '../../dates'
+import { addDays, formatDate, formatPeriod, isMonday, toIso, today, weekStart } from '../../dates'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWorkoutsStore } from '../../stores/workouts'
 import type { TrainingDetail, WeekCycle } from '../../types'
@@ -125,7 +138,7 @@ const starting = ref(false)
 // Where this week is in the cycle: "Week 3 of 10", "starts 26 Oct" or "ended".
 function cycleLine(c: WeekCycle): string {
   if (c.week_number !== null) return `Week ${c.week_number} of ${c.weeks}`
-  return c.start_date > monday ? `starts ${formatDate(c.start_date, { year: false })}` : 'ended'
+  return c.start_date > monday.value ? `starts ${formatDate(c.start_date, { year: false })}` : 'ended'
 }
 
 const linesOf = (sessionId: string | null) => {
@@ -135,11 +148,18 @@ const linesOf = (sessionId: string | null) => {
 
 // The training shown, chosen in the URL (?training=id) so a reload or going back keeps it;
 // without one the server picks the first active training.
-// The current calendar week, e.g. "19 Oct – 25 Oct 2026" (trainings run over calendar weeks).
-const monday = toIso(weekStart())
-const weekDates = `${formatDate(monday, { year: false })} – ${formatDate(addDays(monday, 6))}`
-
 const chosen = computed(() => (typeof route.query.training === 'string' ? route.query.training : undefined))
+
+// The calendar week shown (trainings run over calendar weeks), its Monday in the URL (?week=)
+// like the training; without one, the current week.
+const thisMonday = toIso(weekStart())
+const monday = computed(() => {
+  const w = route.query.week
+  return typeof w === 'string' && isMonday(w) ? w : thisMonday
+})
+const isCurrent = computed(() => monday.value === thisMonday)
+// e.g. "19 Oct – 25 Oct 2026".
+const weekDates = computed(() => `${formatDate(monday.value, { year: false })} – ${formatDate(addDays(monday.value, 6))}`)
 
 // The week's planned sessions of the training shown, in order, each done when a finished workout
 // was started from its slot (so of a session planned twice, only the one done is checked).
@@ -171,10 +191,12 @@ const sessions = computed((): Session[] => {
 async function load() {
   error.value = ''
   try {
-    await store.loadWeek(chosen.value)
+    await store.loadWeek(chosen.value, monday.value)
     const id = week.value?.training?.id
+    if (id && training.value?.id === id) return // stepping weeks keeps the training
     // Without the plan the cards still show the sessions' names.
-    training.value = id ? await trainings.getTraining(id).catch(() => null) : null
+    const detail = id ? await trainings.getTraining(id).catch(() => null) : null
+    if (week.value?.training?.id === id) training.value = detail
   } catch {
     error.value = 'Could not load your week.'
   }
@@ -197,5 +219,11 @@ function pick(trainingId: string) {
   router.replace({ query: { ...route.query, training: trainingId } })
 }
 
-watch(chosen, load, { immediate: true })
+// Steps the given number of weeks from the one shown; 0 goes back to the current week.
+function shift(weeks: number) {
+  const target = weeks === 0 ? thisMonday : addDays(monday.value, weeks * 7)
+  router.replace({ query: { ...route.query, week: target === thisMonday ? undefined : target } })
+}
+
+watch([chosen, monday], load, { immediate: true })
 </script>

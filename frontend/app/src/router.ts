@@ -69,7 +69,7 @@ const router = createRouter({
       ],
     },
     {
-      // Tracking (mobile first): this week's sessions, the workout in progress and the history.
+      // Tracking (mobile first): the week's sessions, the workout in progress, the history and the PRs.
       path: '/track',
       component: () => import('./layouts/TrackLayout.vue'),
       meta: { requiresAuth: true },
@@ -78,6 +78,7 @@ const router = createRouter({
         { path: 'workouts/:id', name: 'workout', component: () => import('./views/track/WorkoutView.vue') },
         { path: 'cycles/:id', name: 'track-cycle', component: () => import('./views/track/CycleView.vue') },
         { path: 'history', name: 'history', component: () => import('./views/track/HistoryView.vue') },
+        { path: 'prs', name: 'track-prs', component: () => import('./views/track/PrsView.vue') },
         { path: 'settings', name: 'track-settings', component: () => import('./views/track/SettingsView.vue') },
       ],
     },

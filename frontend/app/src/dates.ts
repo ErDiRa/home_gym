@@ -6,6 +6,11 @@ function parse(date: string): Date {
   return new Date(y, m - 1, d)
 }
 
+// The local start (00:00) of a YYYY-MM-DD date.
+export function startOf(date: string): Date {
+  return parse(date)
+}
+
 export function toIso(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

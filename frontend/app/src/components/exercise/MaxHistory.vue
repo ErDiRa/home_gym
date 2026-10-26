@@ -1,6 +1,6 @@
 <template>
   <div>
-    <p class="text-sm text-slate-600">
+    <p v-if="!readonly" class="text-sm text-slate-600">
       <template v-if="current">
         Current 1RM <span class="font-semibold text-slate-900">{{ formatLoad(current.load_value, current.load_unit_name) }}</span>
         · {{ formatDate(current.achieved_on) }}
@@ -9,7 +9,7 @@
     </p>
 
     <!-- A new entry: it becomes the current max, the older ones stay as the history. -->
-    <form class="mt-3 grid grid-cols-[1fr_6rem] gap-2" @submit.prevent="add">
+    <form v-if="!readonly" class="mt-3 grid grid-cols-[1fr_6rem] gap-2" @submit.prevent="add">
       <TextInput
         v-model.number="value"
         type="number"
@@ -29,7 +29,7 @@
       </AppButton>
     </form>
 
-    <ul v-if="history.length" class="mt-3 divide-y divide-slate-100" aria-label="1RM history">
+    <ul v-if="history.length" :class="['divide-y divide-slate-100', { 'mt-3': !readonly }]" aria-label="1RM history">
       <li v-for="m in history" :key="m.id" class="flex items-center gap-2 py-1.5">
         <div class="min-w-0 flex-1">
           <p class="text-sm text-slate-800">
@@ -41,6 +41,7 @@
           <p v-if="m.notes" class="truncate text-xs text-slate-500">{{ m.notes }}</p>
         </div>
         <AppButton
+          v-if="!readonly"
           variant="ghost"
           :size="touch ? 'touch' : 'sm'"
           icon
@@ -72,9 +73,12 @@ import { num } from '../workout/workoutPlan'
 import { formatLoad, prIds } from './maxes'
 
 // The user's 1RM history of an exercise, shown in ExerciseMaxDialog: the current max, adding a
-// new one and the entries before, the PRs marked. touch sizes it for the tracker. Needs the load
-// units loaded.
-const props = withDefaults(defineProps<{ exerciseId: string; touch?: boolean }>(), { touch: false })
+// new one and the entries before, the PRs marked. touch sizes it for the tracker; readonly shows
+// only the entries (the tracker's PR list). Needs the load units loaded.
+const props = withDefaults(defineProps<{ exerciseId: string; touch?: boolean; readonly?: boolean }>(), {
+  touch: false,
+  readonly: false,
+})
 const emit = defineEmits<{ added: [max: ExerciseMax] }>()
 
 const store = useExercisesStore()
