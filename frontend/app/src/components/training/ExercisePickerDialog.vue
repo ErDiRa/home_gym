@@ -128,13 +128,14 @@
           </div>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <p class="mr-auto text-xs text-slate-500">
-              <template v-if="limit != null">This block takes {{ limit }} more {{ limit === 1 ? 'exercise' : 'exercises' }}. </template>
+              <template v-if="limit != null && !addLabel">This block takes {{ limit }} more {{ limit === 1 ? 'exercise' : 'exercises' }}. </template>
               <kbd class="font-sans">↑↓</kbd> move · <kbd class="font-sans">Enter</kbd> {{ limit === 1 ? 'add' : 'select' }}<template v-if="limit !== 1">
                 · <kbd class="font-sans">{{ modKey }}+Enter</kbd> add</template>
             </p>
             <AppButton variant="secondary" size="md" @click="emit('close')">Cancel</AppButton>
             <AppButton size="md" :disabled="!selected.length" @click="addSelected">
-              Add {{ selected.length || '' }} {{ selected.length === 1 ? 'exercise' : 'exercises' }}
+              <template v-if="addLabel">{{ addLabel }}</template>
+              <template v-else>Add {{ selected.length || '' }} {{ selected.length === 1 ? 'exercise' : 'exercises' }}</template>
             </AppButton>
           </div>
         </div>
@@ -165,6 +166,7 @@ const props = defineProps<{
   title: string
   inBlock: string[] // exercise ids already in the block
   limit: number | null // how many more the block takes; null = no limit
+  addLabel?: string // the add button's label when picking for something else than a block, e.g. "Log PR"
 }>()
 const emit = defineEmits<{ close: []; add: [exercises: Exercise[]] }>()
 

@@ -14,6 +14,7 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 ## Features
 
 - **Exercises:** your own library with joints, muscle groups, focuses, video links and ratings.
+- **PRs (1RM):** your one-rep max per exercise in kg or lb, with its history and PRs, on its own dashboard page (Log PR: search the exercise, enter the max). Loads planned in % 1RM show as a weight in the tracker, switching between kg and lb converts, and a logged single above your 1RM offers to save it as the new one.
 - **Trainings:** sessions made of blocks (single, superset, complex, WOD with for time, AMRAP, EMOM, max reps or calories), each exercise with sets, reps, load and tempo, and an explicit plan for every week. Several trainings can be active side by side.
 - **Cycles:** a planned period of weeks with goals (e.g. "Mobility, 8 weeks: better hips"), grouping trainings that may run in parallel. The dashboard shows them on a week-by-week timeline; the tracker shows the cycle's week and goals above the training.
 - **Tracker:** this week's sessions as cards, logging sets and WOD scores as you go, and the history.
@@ -95,7 +96,7 @@ INSERT INTO users (email, first_name, last_name, password_hash)
 VALUES ('you@example.com', 'First', 'Last', crypt('password', gen_salt('bf', 12)));
 ```
 
-Schema changes are not applied to an existing volume; there is no migration tool yet.
+Schema changes ship as migrations in `backend/db/migrations`, embedded in the image: the app applies pending ones when it starts (a database created before the migration runner is baselined at version 1 first).
 
 ## Project layout
 

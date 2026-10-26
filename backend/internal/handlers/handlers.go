@@ -16,6 +16,7 @@ type Handler struct {
 	exercises ExerciseService
 	lookups   LookupService
 	feedback  FeedbackService
+	maxes     MaxService
 	workouts  WorkoutService
 	whoop     WhoopService
 	accounts  AccountService
@@ -33,6 +34,7 @@ func New(s Services, tokens *auth.TokenManager, secureCookies bool) *Handler {
 		exercises: s.Exercises,
 		lookups:   s.Lookups,
 		feedback:  s.Feedback,
+		maxes:     s.Maxes,
 		workouts:  s.Workouts,
 		whoop:     s.Whoop,
 		accounts:  s.Accounts,
@@ -63,6 +65,9 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Put("/exercises/{id}", h.UpdateExercise)
 			r.Post("/exercises/{id}/feedback", h.RateExercise)
 			r.Get("/exercise-ratings", h.ListExerciseRatings)
+			r.Post("/exercises/{id}/maxes", h.AddExerciseMax)
+			r.Get("/exercise-maxes", h.ListExerciseMaxes)
+			r.Delete("/exercise-maxes/{id}", h.DeleteExerciseMax)
 			r.Get("/stats/exercises", h.ExerciseStats)
 
 			r.Get("/joints", h.ListJoints)

@@ -76,6 +76,19 @@ type ExerciseJoint struct {
 	JointID    uuid.UUID `json:"joint_id"`
 }
 
+type ExerciseMax struct {
+	ID           uuid.UUID          `json:"id"`
+	UserID       uuid.UUID          `json:"user_id"`
+	ExerciseID   uuid.UUID          `json:"exercise_id"`
+	LoadValue    float64            `json:"load_value"`
+	LoadUnit     uuid.UUID          `json:"load_unit"`
+	AchievedOn   pgtype.Date        `json:"achieved_on"`
+	WorkoutSetID *uuid.UUID         `json:"workout_set_id"`
+	Notes        string             `json:"notes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type ExerciseMuscleGroup struct {
 	ExerciseID    uuid.UUID `json:"exercise_id"`
 	MuscleGroupID uuid.UUID `json:"muscle_group_id"`
@@ -106,13 +119,15 @@ type Joint struct {
 }
 
 type LoadUnit struct {
-	ID        uuid.UUID          `json:"id"`
-	Name      string             `json:"name"`
-	MinValue  *float64           `json:"min_value"`
-	MaxValue  *float64           `json:"max_value"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	ID           uuid.UUID          `json:"id"`
+	Name         string             `json:"name"`
+	MinValue     *float64           `json:"min_value"`
+	MaxValue     *float64           `json:"max_value"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+	KgPerUnit    *float64           `json:"kg_per_unit"`
+	PercentOfMax bool               `json:"percent_of_max"`
 }
 
 type MuscleGroup struct {

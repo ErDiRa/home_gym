@@ -58,6 +58,7 @@
               v-for="(card, i) in block.exercises"
               :key="card.key"
               v-model="block.exercises[i]"
+              :done-on="doneOn"
               @toggle="toggle(card, $event)"
             />
           </div>
@@ -81,7 +82,13 @@
           />
         </button>
         <div v-show="!collapsed.has('extras')" class="divide-y divide-slate-100">
-          <ExerciseSets v-for="(card, i) in extras" :key="card.key" v-model="extras[i]" @toggle="toggle(card, $event)" />
+          <ExerciseSets
+            v-for="(card, i) in extras"
+            :key="card.key"
+            v-model="extras[i]"
+            :done-on="doneOn"
+            @toggle="toggle(card, $event)"
+          />
           <p v-for="r in extraResults" :key="r.id" class="py-3 text-sm text-slate-700">
             <span class="font-semibold text-indigo-600">{{ blockLetter(r.block_position - 1) }}</span>
             {{ scoreFormat(r.score_type)?.label }}: <span class="font-semibold">{{ scoreText(r) }}</span> · {{ r.rx ? 'Rx' : 'Scaled' }}
@@ -158,6 +165,7 @@ import { ArrowLeftIcon, ChevronDownIcon, TrashIcon } from '@heroicons/vue/24/out
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
+import { isNewMax } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'
@@ -183,7 +191,7 @@ import { useLookupsStore } from '../../stores/lookups'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWhoopStore } from '../../stores/whoop'
 import { useWorkoutsStore } from '../../stores/workouts'
-import type { TrainingDetail, Workout, WorkoutResult } from '../../types'
+import type { LoggedSet, TrainingDetail, Workout, WorkoutResult } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -231,6 +239,7 @@ onMounted(async () => {
       lookups.loadTrainingLookups(),
       exercises.loadExercises(),
       exercises.loadRatings(),
+      exercises.loadMaxes(),
       // Without WHOOP (not configured or failing) the workout just shows no WHOOP card.
       whoop.loadStatus().catch(() => {}),
     ])
@@ -239,7 +248,13 @@ onMounted(async () => {
     if (loaded.completed_at) doneOn.value = toIso(new Date(loaded.completed_at))
     // The training may have been deleted since; then only the logged sets are shown.
     if (loaded.training_id) training.value = await trainings.getTraining(loaded.training_id).catch(() => null)
-    const cards = buildCards(session.value, loaded.sets, loaded.results, lookups.kindOf, lookups.defaultUnit('load'))
+    const cards = buildCards(session.value, loaded.sets, loaded.results, lookups.kindOf, lookups.defaultUnit('load'), {
+      unitOf: loadUnitOf,
+      maxOf: (exerciseId) => {
+        const max = exercises.currentMax(exerciseId)
+        return max ? { value: max.load_value, unit: loadUnitOf(max.load_unit) } : null
+      },
+    })
     blocks.value = cards.blocks
     extras.value = cards.extras
     extraResults.value = cards.extraResults
@@ -259,6 +274,7 @@ async function toggle(card: ExerciseCard, row: SetRow) {
   try {
     if (row.logged && !changed(card, row)) {
       await workouts.deleteSet(workout.value.id, row.logged.id)
+      if (card.newMax?.id === row.logged.id) card.newMax = null
       row.logged = null
       return
     }
@@ -282,11 +298,24 @@ async function toggle(card: ExerciseCard, row: SetRow) {
     })
     row.reps = reps
     row.load = load
+    offerNewMax(card, row.logged)
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the set.')
   } finally {
     row.saving = false
   }
+}
+
+const loadUnitOf = (id: string) => lookups.loadUnits.find((u) => u.id === id)
+
+// A single logged above the exercise's 1RM (or without one yet) is offered as the new 1RM; a
+// set corrected below it withdraws the offer.
+function offerNewMax(card: ExerciseCard, set: LoggedSet) {
+  const max = exercises.currentMax(card.exerciseId)
+  const reps = card.repsUnitName === 'reps' ? set.reps_value : null
+  const unit = set.load_unit ? loadUnitOf(set.load_unit) : undefined
+  if (isNewMax(reps, set.load_value, unit, max ? { value: max.load_value, unit: loadUnitOf(max.load_unit) } : null)) card.newMax = set
+  else if (card.newMax?.id === set.id) card.newMax = null
 }
 
 // Logs the score of a WOD block, saves its changed values, or undoes it when logged and unchanged.

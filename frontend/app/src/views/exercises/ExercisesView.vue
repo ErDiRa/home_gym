@@ -59,6 +59,8 @@ import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import RatingCell from '../../components/grid/RatingCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
 import { useExercisesStore } from '../../stores/exercises'
+import { useLookupsStore } from '../../stores/lookups'
+import { formatLoad, inKg } from '../../components/exercise/maxes'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
 
 // AG Grid only includes the features registered here: all free (community) ones.
@@ -67,6 +69,7 @@ ModuleRegistry.registerModules([AllCommunityModule])
 const router = useRouter()
 const store = useExercisesStore()
 const { exercises, loading, ratings } = storeToRefs(store)
+const lookups = useLookupsStore()
 const query = ref('')
 const error = ref('')
 const gridApi = shallowRef<GridApi | null>(null)
@@ -139,6 +142,22 @@ const columnDefs: ColDef<Exercise>[] = [
     valueGetter: (p) => (p.data ? ratingOf(p.data.id) : 0),
     filter: false,
   },
+  {
+    colId: 'max',
+    headerName: '1RM',
+    flex: 1,
+    minWidth: 100,
+    // Sorts by the current max in kg, so kg and lb compare; shows it as entered.
+    valueGetter: (p) => {
+      const max = p.data ? store.currentMax(p.data.id) : null
+      return max ? (inKg(max.load_value, lookups.loadUnits.find((u) => u.id === max.load_unit)) ?? 0) : null
+    },
+    valueFormatter: (p) => {
+      const max = p.data ? store.currentMax(p.data.id) : null
+      return max ? formatLoad(max.load_value, max.load_unit_name) : ''
+    },
+    filter: false,
+  },
   { field: 'description', headerName: 'Description', flex: 3, minWidth: 200 },
   {
     field: 'video_urls',
@@ -159,15 +178,19 @@ function openExercise(event: RowClickedEvent<Exercise>) {
 async function load() {
   // Without the ratings the list still shows, just unrated.
   const ratingsLoaded = store.loadRatings().catch(() => toast.error('Could not load your ratings.'))
+  // Likewise without the maxes; the units sort them across kg and lb.
+  const maxesLoaded = Promise.all([store.loadMaxes(), lookups.loadTrainingLookups()]).catch(() =>
+    toast.error('Could not load your 1RMs.'),
+  )
   try {
     await store.loadExercises()
   } catch {
     error.value = 'Could not load exercises.'
     toast.error(error.value)
   }
-  await ratingsLoaded
-  // The rating column's sort values are cached by the grid.
-  gridApi.value?.refreshCells({ columns: ['rating'], force: true })
+  await Promise.all([ratingsLoaded, maxesLoaded])
+  // The rating and 1RM columns' sort values are cached by the grid.
+  gridApi.value?.refreshCells({ columns: ['rating', 'max'], force: true })
 }
 
 onMounted(load)

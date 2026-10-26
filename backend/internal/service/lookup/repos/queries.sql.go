@@ -36,7 +36,7 @@ func (q *Queries) CreateFocus(ctx context.Context, arg CreateFocusParams) (Creat
 
 const createLoadUnit = `-- name: CreateLoadUnit :one
 INSERT INTO load_units (name, min_value, max_value) VALUES ($1, $2, $3)
-RETURNING id, name, min_value, max_value
+RETURNING id, name, min_value, max_value, kg_per_unit, percent_of_max
 `
 
 type CreateLoadUnitParams struct {
@@ -46,10 +46,12 @@ type CreateLoadUnitParams struct {
 }
 
 type CreateLoadUnitRow struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	MinValue *float64  `json:"min_value"`
-	MaxValue *float64  `json:"max_value"`
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	MinValue     *float64  `json:"min_value"`
+	MaxValue     *float64  `json:"max_value"`
+	KgPerUnit    *float64  `json:"kg_per_unit"`
+	PercentOfMax bool      `json:"percent_of_max"`
 }
 
 func (q *Queries) CreateLoadUnit(ctx context.Context, arg CreateLoadUnitParams) (CreateLoadUnitRow, error) {
@@ -60,6 +62,8 @@ func (q *Queries) CreateLoadUnit(ctx context.Context, arg CreateLoadUnitParams) 
 		&i.Name,
 		&i.MinValue,
 		&i.MaxValue,
+		&i.KgPerUnit,
+		&i.PercentOfMax,
 	)
 	return i, err
 }
@@ -206,19 +210,22 @@ func (q *Queries) ListJoints(ctx context.Context) ([]ListJointsRow, error) {
 }
 
 const listLoadUnits = `-- name: ListLoadUnits :many
-SELECT id, name, min_value, max_value FROM load_units
+SELECT id, name, min_value, max_value, kg_per_unit, percent_of_max FROM load_units
 WHERE deleted_at IS NULL
 ORDER BY created_at, name
 `
 
 type ListLoadUnitsRow struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	MinValue *float64  `json:"min_value"`
-	MaxValue *float64  `json:"max_value"`
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	MinValue     *float64  `json:"min_value"`
+	MaxValue     *float64  `json:"max_value"`
+	KgPerUnit    *float64  `json:"kg_per_unit"`
+	PercentOfMax bool      `json:"percent_of_max"`
 }
 
-// Oldest first, like ListRepUnits.
+// Oldest first, like ListRepUnits. kg_per_unit converts between weight units, percent_of_max
+// marks % 1RM.
 func (q *Queries) ListLoadUnits(ctx context.Context) ([]ListLoadUnitsRow, error) {
 	rows, err := q.db.Query(ctx, listLoadUnits)
 	if err != nil {
@@ -233,6 +240,8 @@ func (q *Queries) ListLoadUnits(ctx context.Context) ([]ListLoadUnitsRow, error)
 			&i.Name,
 			&i.MinValue,
 			&i.MaxValue,
+			&i.KgPerUnit,
+			&i.PercentOfMax,
 		); err != nil {
 			return nil, err
 		}

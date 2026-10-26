@@ -19,11 +19,13 @@ import (
 	"github.com/erdira/homegym/backend/internal/auth"
 	"github.com/erdira/homegym/backend/internal/handlers"
 	"github.com/erdira/homegym/backend/internal/logging"
+	"github.com/erdira/homegym/backend/internal/migrate"
 	"github.com/erdira/homegym/backend/internal/service/account"
 	"github.com/erdira/homegym/backend/internal/service/cycle"
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
+	"github.com/erdira/homegym/backend/internal/service/maxes"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	"github.com/erdira/homegym/backend/internal/service/whoop"
 	"github.com/erdira/homegym/backend/internal/service/workout"
@@ -62,6 +64,9 @@ func run() error {
 	if err := dbpool.Ping(ctx); err != nil {
 		return err
 	}
+	if err := migrate.Up(ctx, dbpool); err != nil {
+		return err
+	}
 
 	tokens, err := auth.NewTokenManager(os.Getenv("JWT_SECRET"))
 	if err != nil {
@@ -91,6 +96,7 @@ func run() error {
 		Exercises: exercise.New(dbpool),
 		Lookups:   lookup.New(dbpool),
 		Feedback:  feedback.New(dbpool),
+		Maxes:     maxes.New(dbpool),
 		Workouts:  workout.New(dbpool),
 		Whoop: whoop.New(dbpool, whoop.Config{
 			ClientID:     os.Getenv("WHOOP_CLIENT_ID"),

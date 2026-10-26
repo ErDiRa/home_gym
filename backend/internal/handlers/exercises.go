@@ -6,6 +6,7 @@ import (
 	"github.com/erdira/homegym/backend/internal/service/exercise"
 	"github.com/erdira/homegym/backend/internal/service/feedback"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
+	"github.com/erdira/homegym/backend/internal/service/maxes"
 )
 
 // ListExercises returns the user's exercises with the names of their links.
@@ -84,6 +85,43 @@ func (h *Handler) RateExercise(w http.ResponseWriter, r *http.Request) {
 // ListExerciseRatings returns how the user rated their exercises, for the exercise picker.
 func (h *Handler) ListExerciseRatings(w http.ResponseWriter, r *http.Request) {
 	listOwn(w, r, h.feedback.Ratings)
+}
+
+// AddExerciseMax adds a 1RM to the history of one of the user's exercises; the newest is the
+// current max.
+func (h *Handler) AddExerciseMax(w http.ResponseWriter, r *http.Request) {
+	userID, exerciseID, ok := userAndID(w, r, "exercise")
+	if !ok {
+		return
+	}
+	var in maxes.MaxInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	m, err := h.maxes.Add(r.Context(), userID, exerciseID, in)
+	if err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, m)
+}
+
+// ListExerciseMaxes returns the user's 1RM history of all their exercises, newest first.
+func (h *Handler) ListExerciseMaxes(w http.ResponseWriter, r *http.Request) {
+	listOwn(w, r, h.maxes.List)
+}
+
+// DeleteExerciseMax removes an entry from the user's 1RM history.
+func (h *Handler) DeleteExerciseMax(w http.ResponseWriter, r *http.Request) {
+	userID, id, ok := userAndID(w, r, "1RM")
+	if !ok {
+		return
+	}
+	if err := h.maxes.Delete(r.Context(), userID, id); err != nil {
+		serviceError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ExerciseStats lists the exercises the user has done in workouts, most often first, with

@@ -33,11 +33,12 @@ INSERT INTO rep_units (name, min_value, max_value) VALUES ($1, $2, $3)
 RETURNING id, name, min_value, max_value;
 
 -- name: ListLoadUnits :many
--- Oldest first, like ListRepUnits.
-SELECT id, name, min_value, max_value FROM load_units
+-- Oldest first, like ListRepUnits. kg_per_unit converts between weight units, percent_of_max
+-- marks % 1RM.
+SELECT id, name, min_value, max_value, kg_per_unit, percent_of_max FROM load_units
 WHERE deleted_at IS NULL
 ORDER BY created_at, name;
 
 -- name: CreateLoadUnit :one
 INSERT INTO load_units (name, min_value, max_value) VALUES ($1, $2, $3)
-RETURNING id, name, min_value, max_value;
+RETURNING id, name, min_value, max_value, kg_per_unit, percent_of_max;

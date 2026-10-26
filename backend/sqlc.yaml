@@ -74,6 +74,13 @@ sql:
         out: "internal/service/lookup/repos"
   - engine: "postgresql"
     schema: "db/migrations"
+    queries: "internal/service/maxes/queries.sql"
+    gen:
+      go:
+        <<: *go
+        out: "internal/service/maxes/repos"
+  - engine: "postgresql"
+    schema: "db/migrations"
     queries: "internal/service/training/queries.sql"
     gen:
       go:

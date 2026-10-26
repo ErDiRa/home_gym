@@ -87,6 +87,10 @@ export interface Unit {
   name: string
   min_value: number | null
   max_value: number | null
+  // Load units only: a weight unit's size in kg (kg 1, lb 0.4536), so loads convert between
+  // them, and whether the unit is a percentage of the 1RM (% 1RM).
+  kg_per_unit?: number | null
+  percent_of_max?: boolean
 }
 
 // Planned reps and load. A value is null when not set; a max turns it into a range (8-10).
@@ -313,6 +317,28 @@ export interface LibrarySessionDetail {
   created_at: string
   updated_at: string
   blocks: TrainingBlock[]
+}
+
+// An entry of the user's 1RM history of an exercise, always in a weight unit; the newest is the
+// current max. workout_set_id is the logged single it was saved from (null when entered by hand).
+export interface ExerciseMax {
+  id: string
+  exercise_id: string
+  load_value: number
+  load_unit: string
+  load_unit_name: string
+  achieved_on: string // YYYY-MM-DD
+  workout_set_id: string | null
+  notes: string
+  created_at: string
+}
+
+export interface ExerciseMaxInput {
+  load_value: number
+  load_unit: string
+  achieved_on: string
+  workout_set_id?: string | null
+  notes: string
 }
 
 // How the user rated an exercise (1-5), with their notes.

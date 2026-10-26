@@ -1,4 +1,5 @@
-import type { BlockKind, LoggedSet, ScoreType, TrainingSession, WorkoutResult, WorkoutSet } from '../../types'
+import type { BlockKind, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
+import { convertLoad, roundLoad, type MaxLoad } from '../exercise/maxes'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
 import { emomRounds, wodSummary } from '../training/wod'
 
@@ -30,6 +31,8 @@ export interface ExerciseCard {
   repsUnitName: string
   perSide: boolean
   loadUnit: string | null // the unit the load inputs are in
+  percentPlan: { value: number; max: number | null } | null // a load planned in % 1RM (a range with max)
+  newMax: LoggedSet | null // a logged single above the current 1RM, offered to be saved as the new one
   scored: boolean // in a WOD block: no set rows, the block has one score
   rows: SetRow[]
 }
@@ -129,15 +132,24 @@ function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, loa
   return rows
 }
 
+// What loads convert with: the load units by id and the user's current 1RM of an exercise.
+export interface LoadContext {
+  unitOf: (id: string) => Unit | undefined
+  maxOf: (exerciseId: string) => MaxLoad | null
+}
+
 // Builds the cards of a workout from the session's plan (null when the session is gone) and the sets
 // and scores logged so far. kindOf gives a block kind by code; defaultLoadUnit is where load
-// starts when the plan has none.
+// starts when the plan has none. A load planned in % 1RM is done in the unit of the exercise's
+// 1RM, calculated from it, when there is one (loads); a planned load in another unit than the
+// logged sets' is converted too, where it can be.
 export function buildCards(
   session: TrainingSession | null,
   sets: WorkoutSet[],
   results: WorkoutResult[],
   kindOf: (code: string) => BlockKind | undefined,
   defaultLoadUnit: string | null,
+  loads?: LoadContext,
 ): { blocks: BlockCard[]; extras: ExerciseCard[]; extraResults: WorkoutResult[] } {
   const resultByBlock = new Map(results.map((r) => [r.block_position, r]))
   const loggedByPlace = new Map<string, WorkoutSet[]>()
@@ -158,8 +170,16 @@ export function buildCards(
       const load = e.load_value !== null ? e : b
       const logged = (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id === e.exercise_id)
       loggedByPlace.set(key, (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id !== e.exercise_id))
-      const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? load.load_unit ?? defaultLoadUnit
-      const plannedLoad = load.load_unit === loadUnit ? load.load_value : null
+      const planUnit = load.load_unit ? loads?.unitOf(load.load_unit) : undefined
+      const max = loads?.maxOf(e.exercise_id) ?? null
+      const startUnit = planUnit?.percent_of_max && max?.unit ? max.unit.id : load.load_unit
+      const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? startUnit ?? defaultLoadUnit
+      let plannedLoad: number | null = null
+      if (load.load_value !== null && load.load_unit === loadUnit) plannedLoad = load.load_value
+      else if (load.load_value !== null && loadUnit) {
+        const converted = convertLoad(load.load_value, planUnit, loads?.unitOf(loadUnit), max)
+        plannedLoad = converted === null ? null : roundLoad(converted)
+      }
 
       // A WOD's exercises are done in its rounds, so they show their reps without sets, if any.
       const text: string[] = []
@@ -182,6 +202,8 @@ export function buildCards(
         repsUnitName: reps.reps_unit_name,
         perSide: reps.per_side,
         loadUnit,
+        percentPlan: planUnit?.percent_of_max && load.load_value !== null ? { value: load.load_value, max: load.load_max } : null,
+        newMax: null,
         scored,
         // Sets logged in a WOD block before it became one still show.
         rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad),
@@ -236,6 +258,8 @@ export function buildCards(
       repsUnitName: first.reps_unit_name,
       perSide: first.per_side,
       loadUnit: logged.find((s) => s.load_unit)?.load_unit ?? defaultLoadUnit,
+      percentPlan: null,
+      newMax: null,
       scored: false,
       rows: rowsFor(0, logged, null, null),
     })

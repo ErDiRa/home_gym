@@ -15,6 +15,8 @@ import (
 	feedbackrepos "github.com/erdira/homegym/backend/internal/service/feedback/repos"
 	"github.com/erdira/homegym/backend/internal/service/lookup"
 	lookuprepos "github.com/erdira/homegym/backend/internal/service/lookup/repos"
+	"github.com/erdira/homegym/backend/internal/service/maxes"
+	maxesrepos "github.com/erdira/homegym/backend/internal/service/maxes/repos"
 	"github.com/erdira/homegym/backend/internal/service/training"
 	trainingrepos "github.com/erdira/homegym/backend/internal/service/training/repos"
 	"github.com/erdira/homegym/backend/internal/service/whoop"
@@ -78,6 +80,13 @@ type FeedbackService interface {
 	Stats(ctx context.Context, userID uuid.UUID) ([]feedbackrepos.GetExerciseStatsRow, error)
 }
 
+// MaxService keeps the user's 1RM history per exercise.
+type MaxService interface {
+	List(ctx context.Context, userID uuid.UUID) ([]maxesrepos.ListExerciseMaxesRow, error)
+	Add(ctx context.Context, userID, exerciseID uuid.UUID, in maxes.MaxInput) (maxesrepos.CreateExerciseMaxRow, error)
+	Delete(ctx context.Context, userID, id uuid.UUID) error
+}
+
 type WorkoutService interface {
 	Week(ctx context.Context, userID, trainingID uuid.UUID, monday, from, to time.Time) (workout.Week, error)
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]workoutrepos.ListWorkoutsRow, error)
@@ -117,6 +126,7 @@ type Services struct {
 	Exercises ExerciseService
 	Lookups   LookupService
 	Feedback  FeedbackService
+	Maxes     MaxService
 	Workouts  WorkoutService
 	Whoop     WhoopService
 	Accounts  AccountService
@@ -129,6 +139,7 @@ var (
 	_ ExerciseService = (*exercise.Service)(nil)
 	_ LookupService   = (*lookup.Service)(nil)
 	_ FeedbackService = (*feedback.Service)(nil)
+	_ MaxService      = (*maxes.Service)(nil)
 	_ WorkoutService  = (*workout.Service)(nil)
 	_ WhoopService    = (*whoop.Service)(nil)
 	_ AccountService  = (*account.Service)(nil)

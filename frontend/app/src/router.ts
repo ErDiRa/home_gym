@@ -36,6 +36,7 @@ const router = createRouter({
           name: 'exercise-edit',
           component: () => import('./views/exercises/ExerciseFormView.vue'),
         },
+        { path: 'prs', name: 'maxes', component: () => import('./views/maxes/MaxesView.vue') },
         { path: 'sessions', name: 'sessions', component: () => import('./views/sessions/SessionsView.vue') },
         {
           path: 'sessions/new',

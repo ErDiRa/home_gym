@@ -10,6 +10,8 @@ import type {
   Exercise,
   ExerciseDetail,
   ExerciseInput,
+  ExerciseMax,
+  ExerciseMaxInput,
   ExerciseRating,
   Focus,
   LibrarySession,
@@ -84,6 +86,11 @@ export const updateExercise = (id: string, input: ExerciseInput) => api.put<Exer
 export const listExerciseRatings = () => api.get<ExerciseRating[]>('/exercise-ratings')
 export const rateExercise = (id: string, rating: number, notes: string) =>
   api.post<ExerciseRating>(`/exercises/${id}/feedback`, { rating, notes })
+// The user's 1RM history of all their exercises, newest first per exercise.
+export const listExerciseMaxes = () => api.get<ExerciseMax[]>('/exercise-maxes')
+export const addExerciseMax = (exerciseId: string, input: ExerciseMaxInput) =>
+  api.post<ExerciseMax>(`/exercises/${exerciseId}/maxes`, input)
+export const deleteExerciseMax = (id: string) => api.delete(`/exercise-maxes/${id}`)
 
 export const listBlockKinds = () => api.get<BlockKind[]>('/block-kinds')
 export const listRepUnits = () => api.get<Unit[]>('/rep-units')
