@@ -61,8 +61,8 @@
               <div v-else class="mt-2 space-y-2">
                 <SegmentedControl v-model="row.type" :options="typeOptions" label="Type" size="xs" />
                 <div class="grid gap-2 sm:grid-cols-2">
-                  <MultiSelect v-model="row.jointIds" label="Joints" required :options="lookups.joints" />
-                  <MultiSelect v-model="row.muscleGroupIds" label="Muscle groups" required :options="lookups.muscleGroups" />
+                  <MultiSelect v-model="row.jointIds" label="Joints" :options="lookups.joints" />
+                  <MultiSelect v-model="row.muscleGroupIds" label="Muscle groups" :options="lookups.muscleGroups" />
                 </div>
               </div>
             </li>
@@ -258,8 +258,6 @@ function mappingRow(suggestions: ImportNewExercise[], name: string): MappingRow 
 const rowProblem = computed(() => {
   for (const r of rows.value) {
     if (r.choice === 'existing' && !r.exerciseId) return `Pick an exercise for ${r.name}.`
-    if (r.choice === 'new' && (!r.jointIds.length || !r.muscleGroupIds.length))
-      return `${r.name} needs at least one joint and muscle group.`
   }
   return ''
 })

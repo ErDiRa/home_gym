@@ -49,8 +49,8 @@ type Input struct {
 // tables' primary keys) and only non-blank video links are kept.
 func validate(in *Input) error {
 	in.JointIDs, in.MuscleGroupIDs, in.FocusIDs = unique(in.JointIDs), unique(in.MuscleGroupIDs), unique(in.FocusIDs)
-	if in.Name == "" || len(in.JointIDs) == 0 || len(in.MuscleGroupIDs) == 0 {
-		return service.Invalid("name, joint_ids and muscle_group_ids are required")
+	if in.Name == "" {
+		return service.Invalid("name is required")
 	}
 	if in.Type != "mobility" && in.Type != "strength" {
 		return service.Invalid("type must be mobility or strength")

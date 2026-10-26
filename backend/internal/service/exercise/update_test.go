@@ -25,5 +25,5 @@ func TestUpdate(t *testing.T) {
 	wantError(t, err, service.KindNotFound, "exercise not found")
 
 	_, err = (&Service{q: f}).Update(context.Background(), userID, id, Input{})
-	wantError(t, err, service.KindInvalid, "name, joint_ids and muscle_group_ids are required")
+	wantError(t, err, service.KindInvalid, "name is required")
 }

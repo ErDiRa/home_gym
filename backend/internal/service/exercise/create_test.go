@@ -41,6 +41,17 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestCreateWithoutJointsOrMuscleGroups(t *testing.T) {
+	f := &fakeQueries{}
+	in := Input{Name: "General Warmup 1", Type: "mobility"}
+	if _, err := (&Service{q: f}).Create(context.Background(), uuid.New(), in); err != nil {
+		t.Fatal(err)
+	}
+	if params := f.created[0]; params.JointIds == nil || len(params.JointIds) != 0 || len(params.MuscleGroupIds) != 0 {
+		t.Errorf("ids = %v, %v, want empty lists", params.JointIds, params.MuscleGroupIds)
+	}
+}
+
 func TestCreateRejects(t *testing.T) {
 	tooMany := make([]string, 11)
 	for i := range tooMany {
@@ -51,9 +62,7 @@ func TestCreateRejects(t *testing.T) {
 		edit    func(*Input)
 		wantMsg string
 	}{
-		{"no name", func(in *Input) { in.Name = "" }, "name, joint_ids and muscle_group_ids are required"},
-		{"no joints", func(in *Input) { in.JointIDs = nil }, "name, joint_ids and muscle_group_ids are required"},
-		{"no muscle groups", func(in *Input) { in.MuscleGroupIDs = []uuid.UUID{} }, "name, joint_ids and muscle_group_ids are required"},
+		{"no name", func(in *Input) { in.Name = "" }, "name is required"},
 		{"bad type", func(in *Input) { in.Type = "cardio" }, "type must be mobility or strength"},
 		{"not http", func(in *Input) { in.VideoURLs = []string{"ftp://example.com/v"} }, "video links must be http(s) URLs (max 500 characters)"},
 		{"no host", func(in *Input) { in.VideoURLs = []string{"https://"} }, "video links must be http(s) URLs (max 500 characters)"},

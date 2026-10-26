@@ -132,14 +132,12 @@
 				v-model="form.joint_ids"
 				label="Joints"
 				placeholder="Select joints"
-				required
 				:options="joints"
 			/>
 			<MultiSelect
 				v-model="form.muscle_group_ids"
 				label="Muscle groups"
 				placeholder="Select muscle groups"
-				required
 				:options="muscleGroups"
 			/>
 
@@ -262,12 +260,7 @@
 		videoInputs.value[form.video_urls.length - 1]?.focus();
 	}
 	// The fields the server requires besides the name (which the input's `required` covers).
-	const valid = computed(
-		() =>
-			form.type !== '' &&
-			form.joint_ids.length > 0 &&
-			form.muscle_group_ids.length > 0
-	);
+	const valid = computed(() => form.type !== '');
 
 	onMounted(async () => {
 		try {
