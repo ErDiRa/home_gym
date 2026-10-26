@@ -27,7 +27,6 @@
       @grid-ready="(e: GridReadyEvent) => (gridApi = e.api)"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
-      :quick-filter-text="query"
       row-class="cursor-pointer"
       @row-clicked="openExercise"
       :loading="loading"
@@ -55,6 +54,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
+import { searchExercises } from '../../components/exercise/exerciseSearch'
 import FocusTagsCell from '../../components/grid/FocusTagsCell.vue'
 import RatingCell from '../../components/grid/RatingCell.vue'
 import VideoLinkCell from '../../components/grid/VideoLinkCell.vue'
@@ -92,15 +92,16 @@ const matches: Record<string, (r: number) => boolean> = {
   '3': (r) => r >= 3,
   low: (r) => r > 0 && r <= 2,
 }
+// Searched first, so the search index is kept while typing; the grid's sorting still applies.
 const shown = computed(() => {
   const match = matches[ratingFilter.value ?? 'all'] ?? matches.all
-  return exercises.value.filter((e) => match(ratingOf(e.id)))
+  return searchExercises(exercises.value, query.value).filter((e) => match(ratingOf(e.id)))
 })
 
-// Joints and muscle groups are arrays: show them comma-separated and make them searchable.
+// Joints and muscle groups are arrays: show them comma-separated. AG Grid's column filters
+// filter array (object) columns by this formatted text.
 const listColumn: ColDef<Exercise> = {
   valueFormatter: (p) => (p.value as string[] | null)?.join(', ') ?? '',
-  getQuickFilterText: (p) => (p.value as string[] | null)?.join(' ') ?? '',
 }
 
 const columnDefs: ColDef<Exercise>[] = [
@@ -111,9 +112,8 @@ const columnDefs: ColDef<Exercise>[] = [
     flex: 1,
     minWidth: 110,
     cellRenderer: ExerciseTypeCell,
-    // Filter and search by the label, not the stored key.
+    // Filter by the label, not the stored key.
     valueFormatter: (p) => exerciseTypeLabels[p.value as ExerciseType] ?? '',
-    getQuickFilterText: (p) => exerciseTypeLabels[p.value as ExerciseType] ?? '',
   },
   { field: 'joints', headerName: 'Joints', flex: 1, minWidth: 130, ...listColumn },
   { field: 'muscle_groups', headerName: 'Muscle groups', flex: 1, minWidth: 160, ...listColumn },
@@ -123,9 +123,9 @@ const columnDefs: ColDef<Exercise>[] = [
     flex: 1,
     minWidth: 160,
     cellRenderer: FocusTagsCell,
-    // Sort, filter and search by name and alias, not by the objects.
+    // Sort and filter by name and alias, not by the objects.
     valueFormatter: (p) => (p.value as Focus[] | null)?.map((f) => f.name).join(', ') ?? '',
-    getQuickFilterText: (p) => (p.value as Focus[] | null)?.map((f) => `${f.name} ${f.alias}`).join(' ') ?? '',
+    filterValueGetter: (p) => p.data?.focuses?.map((f) => `${f.name} ${f.alias}`).join(' ') ?? '',
     // Sorted by the first focus, which the server returns alphabetically.
     comparator: (a: Focus[], b: Focus[]) => (a[0]?.name ?? '').localeCompare(b[0]?.name ?? ''),
   },

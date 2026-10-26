@@ -65,6 +65,18 @@ tasks:
     cmds:
       - docker buildx build --platform linux/amd64 -t {{.APP_IMAGE}} --push .
 
+  prod:copy:
+    desc: "Copy the files the production stack needs to $SERVER (e.g. stefan@1.2.3.4) under /opt/homegym, no repo checkout"
+    requires:
+      vars: [SERVER]
+    cmds:
+      # --relative keeps the repo layout, so the compose file's ../backend/db mounts resolve
+      - >-
+        rsync -av --relative
+        deploy/docker-compose.yml deploy/Caddyfile deploy/.env.example
+        backend/db/migrations/000001_init_schema.up.sql backend/db/seed/seed-lookups.sql
+        {{.SERVER}}:/opt/homegym/
+
   prod:up:
     desc: "On the server: pull the image and (re)start the production stack (needs deploy/.env)"
     dir: deploy

@@ -22,10 +22,9 @@
     <AgGridVue
       v-else
       class="min-h-0 flex-1"
-      :row-data="sessions"
+      :row-data="shown"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
-      :quick-filter-text="query"
       row-class="cursor-pointer"
       @row-clicked="openSession"
       :loading="loading"
@@ -36,7 +35,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
 import { useRouter } from 'vue-router'
@@ -44,6 +43,7 @@ import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import { formatDay } from '../../dates'
+import { fuzzySearch } from '../../fuzzySearch'
 import { useSessionsStore } from '../../stores/sessions'
 import type { LibrarySession } from '../../types'
 
@@ -55,6 +55,9 @@ const store = useSessionsStore()
 const { sessions, loading } = storeToRefs(store)
 const query = ref('')
 const error = ref('')
+
+const searchSessions = fuzzySearch<LibrarySession>([{ name: 'name', weight: 1, get: (s) => s.name }])
+const shown = computed(() => searchSessions(sessions.value, query.value))
 
 const columnDefs: ColDef<LibrarySession>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 180 },

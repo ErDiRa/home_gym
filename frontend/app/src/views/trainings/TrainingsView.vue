@@ -26,7 +26,6 @@
       :row-data="shown"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
-      :quick-filter-text="query"
       row-class="cursor-pointer"
       @row-clicked="openTraining"
       :loading="loading"
@@ -46,6 +45,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ActiveCell from '../../components/grid/ActiveCell.vue'
+import { searchTrainings } from '../../components/training/trainingSearch'
 import { formatDay, formatPeriod } from '../../dates'
 import { useTrainingsStore } from '../../stores/trainings'
 import type { Training } from '../../types'
@@ -67,10 +67,12 @@ const cycleOptions = computed(() => {
   const byName = [...cycles].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => ({ id, name }))
   return [{ id: '', name: 'All cycles' }, { id: 'none', name: 'No cycle' }, ...byName]
 })
+// Searched first, so the search index is kept while typing; the grid's sorting still applies.
 const shown = computed(() => {
   const f = cycleFilter.value
-  if (!f) return trainings.value
-  return trainings.value.filter((t) => (f === 'none' ? !t.cycle_id : t.cycle_id === f))
+  const found = searchTrainings(trainings.value, query.value)
+  if (!f) return found
+  return found.filter((t) => (f === 'none' ? !t.cycle_id : t.cycle_id === f))
 })
 
 const columnDefs: ColDef<Training>[] = [
@@ -81,9 +83,8 @@ const columnDefs: ColDef<Training>[] = [
     flex: 1,
     minWidth: 100,
     cellRenderer: ActiveCell,
-    // Filter and search by the label rather than true/false.
+    // Filter by the label rather than true/false.
     valueFormatter: (p) => (p.value ? 'Active' : 'Inactive'),
-    getQuickFilterText: (p) => (p.value ? 'Active' : ''), // so searching "active" skips inactive ones
   },
   {
     colId: 'period',
@@ -93,7 +94,6 @@ const columnDefs: ColDef<Training>[] = [
     // Sorts and filters by the start date (YYYY-MM-DD sorts as text); shows both dates.
     valueGetter: (p) => p.data?.start_date ?? '',
     valueFormatter: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
-    getQuickFilterText: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
   },
   { field: 'weeks', headerName: 'Weeks', flex: 1, minWidth: 90 },
   { field: 'cycle_name', headerName: 'Cycle', flex: 2, minWidth: 140 },

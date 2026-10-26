@@ -17,10 +17,9 @@
     <AgGridVue
       v-else
       class="min-h-0 flex-1"
-      :row-data="cycles"
+      :row-data="shown"
       :column-defs="columnDefs"
       :default-col-def="defaultColDef"
-      :quick-filter-text="query"
       row-class="cursor-pointer"
       @row-clicked="openCycle"
       :loading="loading"
@@ -31,12 +30,13 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent } from 'ag-grid-community'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import { searchCycles } from '../../components/cycle/cycleSearch'
 import { cycleStatus } from '../../components/cycle/cycleStatus'
 import TextInput from '../../components/form/TextInput.vue'
 import { formatDay, formatPeriod } from '../../dates'
@@ -51,6 +51,7 @@ const store = useCyclesStore()
 const { cycles, loading } = storeToRefs(store)
 const query = ref('')
 const error = ref('')
+const shown = computed(() => searchCycles(cycles.value, query.value))
 
 const columnDefs: ColDef<CycleSummary>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
@@ -70,7 +71,6 @@ const columnDefs: ColDef<CycleSummary>[] = [
     // Sorts and filters by the start date (YYYY-MM-DD sorts as text); shows both dates.
     valueGetter: (p) => p.data?.start_date ?? '',
     valueFormatter: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
-    getQuickFilterText: (p) => (p.data ? formatPeriod(p.data.start_date, p.data.end_date) : ''),
   },
   { field: 'weeks', headerName: 'Weeks', flex: 1, minWidth: 90 },
   { field: 'goal_count', headerName: 'Goals', flex: 1, minWidth: 90 },

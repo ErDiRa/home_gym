@@ -74,7 +74,11 @@ The root `Dockerfile` builds one image: the Go API, which also serves the built 
 # Locally: build for linux/amd64 and push (after `docker login ghcr.io`)
 task image:push APP_IMAGE=ghcr.io/<user>/homegym:<tag>
 
-# On the server: a checkout of this repo (the compose file mounts the schema from backend/db)
+# Copy the compose file, Caddyfile and the schema it mounts from backend/db to /opt/homegym
+# on the server (or use a checkout of this repo there)
+task prod:copy SERVER=user@host
+
+# On the server, in /opt/homegym
 cp deploy/.env.example deploy/.env    # set DOMAIN, APP_IMAGE, passwords, JWT_SECRET
 task prod:up                          # or: cd deploy && docker compose pull && docker compose up -d
 task prod:logs

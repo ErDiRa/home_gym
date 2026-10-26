@@ -149,6 +149,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { CheckIcon, MagnifyingGlassIcon, StarIcon, XMarkIcon } from '@heroicons/vue/16/solid'
 import AppButton from '../button/AppButton.vue'
+import { searchExercises } from '../exercise/exerciseSearch'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
 import RatingBadge from '../exercise/RatingBadge.vue'
 import MultiSelect from '../form/MultiSelect.vue'
@@ -210,26 +211,12 @@ const focusOptions = computed(() => {
 const ratingOptions = [1, 2, 3, 4, 5].map((r) => ({ value: r, label: String(r) })).concat({ value: 0, label: 'Not rated' })
 const ratingOf = (e: Exercise) => ratings.value.get(e.id)?.rating ?? 0
 
-// What the search matches against, lower-cased once per exercise.
-const searchText = computed(
-  () =>
-    new Map(
-      exercises.value.map((e) => [
-        e.id,
-        [e.name, ...(e.muscle_groups ?? []), ...(e.joints ?? []), ...(e.focuses ?? []).flatMap((f) => [f.name, f.alias])]
-          .join(' ')
-          .toLowerCase(),
-      ]),
-    ),
-)
-
-// Every search term has to match; within a filter any picked value does, across filters all.
+// The search orders by best match, so Enter takes the top one; within a filter any picked value
+// matches, across filters all.
 const filtered = computed(() => {
-  const terms = query.value.toLowerCase().split(/\s+/).filter(Boolean)
   const anyOf = (picked: string[], values: string[]) => !picked.length || values.some((v) => picked.includes(v))
-  return exercises.value.filter(
+  return searchExercises(exercises.value, query.value).filter(
     (e) =>
-      terms.every((t) => searchText.value.get(e.id)!.includes(t)) &&
       (!typeFilter.value.length || typeFilter.value.includes(e.type)) &&
       anyOf(muscleFilter.value, e.muscle_groups ?? []) &&
       anyOf(jointFilter.value, e.joints ?? []) &&
