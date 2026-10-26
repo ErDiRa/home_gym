@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-[calc(100vh-8rem)] flex-col lg:h-[calc(100vh-4rem)]">
-    <div class="mb-6 flex items-center justify-between gap-4">
+  <div class="flex h-list-page flex-col lg:h-[calc(100dvh-4rem)]">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h1 class="text-xl font-bold text-slate-900">Cycles</h1>
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-slate-500">{{ cycles.length }} cycles</span>
+      <div class="flex items-center gap-x-4 gap-y-2">
+        <span class="hidden text-sm text-slate-500 sm:inline">{{ cycles.length }} cycles</span>
         <AppButton variant="secondary" :to="{ name: 'training-new', query: { import: '1' } }">Import</AppButton>
         <AppButton :to="{ name: 'cycle-new' }">New cycle</AppButton>
       </div>
@@ -19,6 +19,7 @@
       class="min-h-0 flex-1"
       :row-data="shown"
       :column-defs="columnDefs"
+      :row-height="phoneRowHeight(phone)"
       :default-col-def="defaultColDef"
       row-class="cursor-pointer"
       @row-clicked="openCycle"
@@ -36,12 +37,14 @@ import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent }
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import { searchCycles } from '../../components/cycle/cycleSearch'
 import { cycleStatus } from '../../components/cycle/cycleStatus'
 import TextInput from '../../components/form/TextInput.vue'
 import { formatDay, formatPeriod } from '../../dates'
 import { useCyclesStore } from '../../stores/cycles'
 import type { CycleSummary } from '../../types'
+import { usePhone } from '../../usePhone'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -53,7 +56,7 @@ const query = ref('')
 const error = ref('')
 const shown = computed(() => searchCycles(cycles.value, query.value))
 
-const columnDefs: ColDef<CycleSummary>[] = [
+const columns: ColDef<CycleSummary>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
   {
     colId: 'status',
@@ -84,6 +87,9 @@ const columnDefs: ColDef<CycleSummary>[] = [
   },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: true, resizable: true }
+// A phone shows only the columns that tell the rows apart.
+const phone = usePhone()
+const columnDefs = computed(() => phoneColumns(columns, phone.value, ['name', 'status']))
 
 function openCycle(event: RowClickedEvent<CycleSummary>) {
   if (event.data) router.push({ name: 'cycle-edit', params: { id: event.data.id } })

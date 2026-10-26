@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-[calc(100vh-8rem)] flex-col lg:h-[calc(100vh-4rem)]">
-    <div class="mb-6 flex items-center justify-between gap-4">
+  <div class="flex h-list-page flex-col lg:h-[calc(100dvh-4rem)]">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h1 class="text-xl font-bold text-slate-900">Exercises</h1>
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-slate-500">{{ exercises.length }} exercises</span>
+      <div class="flex items-center gap-x-4 gap-y-2">
+        <span class="hidden text-sm text-slate-500 sm:inline">{{ exercises.length }} exercises</span>
         <AppButton :to="{ name: 'exercise-new' }">New exercise</AppButton>
       </div>
     </div>
@@ -14,7 +14,7 @@
         :options="ratingOptions"
         :searchable="false"
         aria-label="Filter by your rating"
-        class="w-52"
+        class="w-full sm:w-52"
       />
     </div>
 
@@ -26,6 +26,7 @@
       :get-row-id="(p: GetRowIdParams<Exercise>) => p.data.id"
       @grid-ready="(e: GridReadyEvent) => (gridApi = e.api)"
       :column-defs="columnDefs"
+      :row-height="phoneRowHeight(phone)"
       :default-col-def="defaultColDef"
       row-class="cursor-pointer"
       @row-clicked="openExercise"
@@ -51,6 +52,7 @@ import {
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
 import ExerciseTypeCell from '../../components/grid/ExerciseTypeCell.vue'
@@ -62,6 +64,7 @@ import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { formatLoad, inKg } from '../../components/exercise/maxes'
 import { exerciseTypeLabels, type Exercise, type ExerciseType, type Focus } from '../../types'
+import { usePhone } from '../../usePhone'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -107,7 +110,7 @@ const listColumn: ColDef<Exercise> = {
   valueFormatter: (p) => (p.value as string[] | null)?.join(', ') ?? '',
 }
 
-const columnDefs: ColDef<Exercise>[] = [
+const columns: ColDef<Exercise>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 160 },
   {
     field: 'type',
@@ -136,7 +139,7 @@ const columnDefs: ColDef<Exercise>[] = [
     colId: 'rating',
     headerName: 'Your rating',
     flex: 1,
-    minWidth: 140,
+    minWidth: 180, // the five stars, also on a phone
     cellRenderer: RatingCell,
     // Sorts by the rating; the filter above the grid filters by it.
     valueGetter: (p) => (p.data ? ratingOf(p.data.id) : 0),
@@ -170,6 +173,9 @@ const columnDefs: ColDef<Exercise>[] = [
   },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: true, resizable: true }
+// A phone shows only the columns that tell the rows apart.
+const phone = usePhone()
+const columnDefs = computed(() => phoneColumns(columns, phone.value, ['name', 'rating']))
 
 function openExercise(event: RowClickedEvent<Exercise>) {
   if (event.data) router.push({ name: 'exercise-edit', params: { id: event.data.id } })

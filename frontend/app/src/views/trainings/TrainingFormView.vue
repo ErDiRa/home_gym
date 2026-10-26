@@ -148,14 +148,13 @@
         <WeekPlanner v-model="weeks" :sessions="sessions" :start-date="startDate" />
       </section>
 
-      <!-- Sticks to the bottom of the screen so saving doesn't need scrolling down. -->
-      <div class="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50/95 py-4 backdrop-blur">
-        <p v-if="problem" class="mr-auto text-sm text-amber-700">{{ problem }}</p>
+      <!-- Always in reach, so saving doesn't need scrolling down. -->
+      <FormActions :problem="problem">
         <AppButton variant="secondary" :disabled="saving" @click="goBack">Cancel</AppButton>
         <AppButton type="submit" :disabled="saving || !!problem">
           {{ saving ? 'Saving…' : trainingId ? 'Save' : 'Create' }}
         </AppButton>
-      </div>
+      </FormActions>
     </form>
   </div>
 </template>
@@ -167,6 +166,7 @@ import { toast } from 'vue-sonner'
 import { ArrowLeftIcon, ArrowUpTrayIcon, BookOpenIcon, DocumentDuplicateIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
+import FormActions from '../../components/form/FormActions.vue'
 import AppCheckbox from '../../components/form/AppCheckbox.vue'
 import SegmentedControl from '../../components/form/SegmentedControl.vue'
 import SelectField from '../../components/form/SelectField.vue'

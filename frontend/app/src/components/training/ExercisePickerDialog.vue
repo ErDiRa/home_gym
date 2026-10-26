@@ -2,12 +2,15 @@
   <Dialog :open="open" :initial-focus="searchInput?.el" class="relative z-50" @close="emit('close')">
     <div class="fixed inset-0 bg-slate-900/40" aria-hidden="true" />
 
-    <div class="fixed inset-0 flex items-start justify-center p-4 sm:pt-[8vh]">
-      <DialogPanel class="flex max-h-[84vh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-2xl">
-        <div class="border-b border-slate-200 p-4">
+    <!-- Full screen on phones (clear of the notch and the home indicator), a panel on wider screens. -->
+    <div class="fixed inset-0 flex items-start justify-center sm:p-4 sm:pt-[8vh]">
+      <DialogPanel
+        class="flex h-dvh w-full max-w-3xl flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl sm:h-auto sm:max-h-[84vh] sm:rounded-xl sm:p-0"
+      >
+        <div class="border-b border-slate-200 p-4" :class="{ 'max-sm:flex-1': filtersOpen }">
           <div class="mb-3 flex items-center justify-between gap-4">
             <DialogTitle class="text-base font-semibold text-slate-900">{{ title }}</DialogTitle>
-            <AppButton variant="ghost" size="sm" icon aria-label="Close" @click="emit('close')">
+            <AppButton variant="ghost" size="md" icon class="-mr-2" aria-label="Close" @click="emit('close')">
               <XMarkIcon class="size-5" aria-hidden="true" />
             </AppButton>
           </div>
@@ -28,40 +31,53 @@
             />
           </div>
 
-          <div class="mt-3 grid gap-3 sm:grid-cols-3">
-            <MultiSelect v-model="muscleFilter" label="Muscle groups" :options="muscleOptions" placeholder="Any" />
-            <MultiSelect v-model="jointFilter" label="Joints" :options="jointOptions" placeholder="Any" />
-            <MultiSelect v-model="focusFilter" label="Focus" :options="focusOptions" placeholder="Any" />
+          <!-- Phones: the filters fold away behind a button, so the list keeps the screen; open, they take
+               the list's place (a scrolling area would cut off their dropdowns). -->
+          <div class="mt-3 flex items-center gap-2 text-sm sm:hidden">
+            <AppButton variant="secondary" size="sm" :pressed="filtersOpen" :aria-expanded="filtersOpen" @click="filtersOpen = !filtersOpen">
+              <FunnelIcon class="size-4" aria-hidden="true" />
+              {{ filtersOpen ? 'Show exercises' : `Filters${filterCount ? ` (${filterCount})` : ''}` }}
+            </AppButton>
+            <AppButton v-if="filtering" variant="text" size="sm" @click="clearFilters">Clear</AppButton>
+            <span class="ml-auto text-slate-500">{{ filtered.length }} {{ filtered.length === 1 ? 'exercise' : 'exercises' }}</span>
           </div>
 
-          <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <AppButton
-              v-for="(label, type) in exerciseTypeLabels"
-              :key="type"
-              variant="secondary"
-              size="xs"
-              :pressed="typeFilter.includes(type)"
-              @click="toggleType(type)"
-            >
-              {{ label }}
-            </AppButton>
-            <template v-if="ratings.size">
-              <span class="ml-2 text-xs font-medium text-slate-600">Your rating</span>
+          <div :class="{ 'max-sm:hidden': !filtersOpen }">
+            <div class="mt-3 grid gap-3 sm:grid-cols-3">
+              <MultiSelect v-model="muscleFilter" label="Muscle groups" :options="muscleOptions" placeholder="Any" />
+              <MultiSelect v-model="jointFilter" label="Joints" :options="jointOptions" placeholder="Any" />
+              <MultiSelect v-model="focusFilter" label="Focus" :options="focusOptions" placeholder="Any" />
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <AppButton
-                v-for="option in ratingOptions"
-                :key="option.value"
+                v-for="(label, type) in exerciseTypeLabels"
+                :key="type"
                 variant="secondary"
                 size="xs"
-                class="gap-0.5"
-                :pressed="ratingFilter.includes(option.value)"
-                @click="toggleRating(option.value)"
+                :pressed="typeFilter.includes(type)"
+                @click="toggleType(type)"
               >
-                <StarIcon v-if="option.value" class="size-3" aria-hidden="true" />
-                {{ option.label }}
+                {{ label }}
               </AppButton>
-            </template>
-            <span class="ml-auto text-slate-500">{{ filtered.length }} {{ filtered.length === 1 ? 'exercise' : 'exercises' }}</span>
-            <AppButton v-if="filtering" variant="text" size="xs" @click="clearFilters">Clear filters</AppButton>
+              <template v-if="ratings.size">
+                <span class="ml-2 text-xs font-medium text-slate-600">Your rating</span>
+                <AppButton
+                  v-for="option in ratingOptions"
+                  :key="option.value"
+                  variant="secondary"
+                  size="xs"
+                  class="gap-0.5"
+                  :pressed="ratingFilter.includes(option.value)"
+                  @click="toggleRating(option.value)"
+                >
+                  <StarIcon v-if="option.value" class="size-3" aria-hidden="true" />
+                  {{ option.label }}
+                </AppButton>
+              </template>
+              <span class="ml-auto text-slate-500 max-sm:hidden">{{ filtered.length }} {{ filtered.length === 1 ? 'exercise' : 'exercises' }}</span>
+              <AppButton v-if="filtering" variant="text" size="xs" class="max-sm:hidden" @click="clearFilters">Clear filters</AppButton>
+            </div>
           </div>
         </div>
 
@@ -71,6 +87,7 @@
           aria-multiselectable="true"
           :aria-label="title"
           class="min-h-40 flex-1 overflow-y-auto py-1"
+          :class="{ 'max-sm:hidden': filtersOpen }"
         >
           <li v-if="!filtered.length" class="px-4 py-6 text-center text-sm text-slate-500">No exercises match.</li>
           <li
@@ -81,7 +98,7 @@
             :aria-selected="isSelected(exercise.id)"
             :aria-disabled="!canSelect(exercise.id)"
             :class="[
-              'flex cursor-pointer items-start gap-3 px-4 py-2',
+              'flex cursor-pointer items-start gap-3 px-4 py-3 sm:py-2',
               i === active ? 'bg-indigo-50' : '',
               canSelect(exercise.id) ? '' : 'cursor-not-allowed opacity-50',
             ]"
@@ -113,7 +130,7 @@
           </li>
         </ul>
 
-        <div class="border-t border-slate-200 p-4">
+        <div class="shrink-0 border-t border-slate-200 p-4">
           <div v-if="selectedExercises.length" class="mb-3 flex flex-wrap gap-1">
             <AppBadge
               v-for="exercise in selectedExercises"
@@ -129,8 +146,10 @@
           <div class="flex flex-wrap items-center justify-end gap-3">
             <p class="mr-auto text-xs text-slate-500">
               <template v-if="limit != null && !addLabel">This block takes {{ limit }} more {{ limit === 1 ? 'exercise' : 'exercises' }}. </template>
-              <kbd class="font-sans">↑↓</kbd> move · <kbd class="font-sans">Enter</kbd> {{ limit === 1 ? 'add' : 'select' }}<template v-if="limit !== 1">
-                · <kbd class="font-sans">{{ modKey }}+Enter</kbd> add</template>
+              <span class="max-sm:hidden">
+                <kbd class="font-sans">↑↓</kbd> move · <kbd class="font-sans">Enter</kbd> {{ limit === 1 ? 'add' : 'select' }}<template v-if="limit !== 1">
+                  · <kbd class="font-sans">{{ modKey }}+Enter</kbd> add</template>
+              </span>
             </p>
             <AppButton variant="secondary" size="md" @click="emit('close')">Cancel</AppButton>
             <AppButton size="md" :disabled="!selected.length" @click="addSelected">
@@ -148,7 +167,7 @@
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
-import { CheckIcon, MagnifyingGlassIcon, StarIcon, XMarkIcon } from '@heroicons/vue/16/solid'
+import { CheckIcon, FunnelIcon, MagnifyingGlassIcon, StarIcon, XMarkIcon } from '@heroicons/vue/16/solid'
 import AppButton from '../button/AppButton.vue'
 import { searchExercises } from '../exercise/exerciseSearch'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
@@ -231,15 +250,17 @@ const filtered = computed(() => {
 })
 watch(filtered, () => (active.value = 0))
 
-const filtering = computed(
+// How many filter values are picked; on phones the filters are folded away unless opened.
+const filterCount = computed(
   () =>
     typeFilter.value.length +
-      muscleFilter.value.length +
-      jointFilter.value.length +
-      focusFilter.value.length +
-      ratingFilter.value.length >
-    0,
+    muscleFilter.value.length +
+    jointFilter.value.length +
+    focusFilter.value.length +
+    ratingFilter.value.length,
 )
+const filtering = computed(() => filterCount.value > 0)
+const filtersOpen = ref(false)
 
 function clearFilters() {
   typeFilter.value = []

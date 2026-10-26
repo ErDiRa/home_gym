@@ -10,7 +10,7 @@
         v-for="item in navigation"
         :key="item.name"
         :to="item.to"
-        class="mb-1 flex items-center gap-3 rounded-lg border-l-4 border-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white"
+        class="mb-1 flex items-center gap-3 rounded-lg max-lg:min-h-11 border-l-4 border-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white"
         active-class="!border-indigo-400 bg-slate-800 !text-white"
       >
         <component :is="item.icon" class="size-5 shrink-0" aria-hidden="true" />

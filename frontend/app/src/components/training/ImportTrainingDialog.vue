@@ -23,11 +23,12 @@
           <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
           <div class="mt-5 flex flex-wrap items-center gap-2">
             <input ref="file" type="file" accept=".json,application/json" class="hidden" @change="readFile" />
-            <AppButton variant="secondary" class="mr-auto" @click="fileInput?.click()">
+            <!-- On phones the file button takes its own line, Cancel and Continue the next one. -->
+            <AppButton variant="secondary" class="max-sm:w-full sm:mr-auto" @click="fileInput?.click()">
               <ArrowUpTrayIcon class="size-4" aria-hidden="true" />
               Choose file
             </AppButton>
-            <AppButton variant="secondary" @click="close">Cancel</AppButton>
+            <AppButton variant="secondary" class="max-sm:ml-auto" @click="close">Cancel</AppButton>
             <AppButton :disabled="!text.trim()" @click="read()">Continue</AppButton>
           </div>
         </template>

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* A list page's height on phones and tablets: the screen below the dashboard's top bar (h-14) and
+   the page padding (pt-6, pb-6), clear of the notch and the home indicator. */
+@utility h-list-page {
+  height: calc(100dvh - 6.5rem - 1px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+/* A page with a form's fixed save bar (FormActions, below lg) keeps its end clear of it. */
+@media (width < 64rem) {
+  main:has(.form-actions) {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+}
+
 @layer base {
   body {
     @apply bg-slate-50 text-slate-900 antialiased;

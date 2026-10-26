@@ -2,6 +2,7 @@ import { watch } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { restoreSession } from './api'
 import { isAuthenticated, state } from './session'
+import { isPhone } from './usePhone'
 
 // Typed route meta. Children inherit their parent's meta (vue-router merges it into to.meta).
 declare module 'vue-router' {
@@ -11,12 +12,10 @@ declare module 'vue-router' {
   }
 }
 
-// The tracker is made for phones and the dashboard for larger screens; "/" picks by width.
-const isPhone = () => window.matchMedia('(max-width: 767px)').matches
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // The tracker is made for phones and the dashboard for larger screens; "/" picks by width.
     { path: '/', name: 'home', redirect: () => ({ name: isPhone() ? 'track' : 'dashboard' }) },
     {
       // Planning (desktop first): exercises, the session library, cycles and trainings; later analytics and the wiki.

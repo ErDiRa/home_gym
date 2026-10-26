@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-[calc(100vh-8rem)] flex-col lg:h-[calc(100vh-4rem)]">
-    <div class="mb-2 flex items-center justify-between gap-4">
+  <div class="flex h-list-page flex-col lg:h-[calc(100dvh-4rem)]">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h1 class="text-xl font-bold text-slate-900">Sessions</h1>
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-slate-500">{{ sessions.length }} sessions</span>
+      <div class="flex items-center gap-x-4 gap-y-2">
+        <span class="hidden text-sm text-slate-500 sm:inline">{{ sessions.length }} sessions</span>
         <AppButton :to="{ name: 'session-new' }">New session</AppButton>
       </div>
     </div>
@@ -24,6 +24,7 @@
       class="min-h-0 flex-1"
       :row-data="shown"
       :column-defs="columnDefs"
+      :row-height="phoneRowHeight(phone)"
       :default-col-def="defaultColDef"
       row-class="cursor-pointer"
       @row-clicked="openSession"
@@ -41,11 +42,13 @@ import { AllCommunityModule, ModuleRegistry, type ColDef, type RowClickedEvent }
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import TextInput from '../../components/form/TextInput.vue'
 import { formatDay } from '../../dates'
 import { fuzzySearch } from '../../fuzzySearch'
 import { useSessionsStore } from '../../stores/sessions'
 import type { LibrarySession } from '../../types'
+import { usePhone } from '../../usePhone'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -59,7 +62,7 @@ const error = ref('')
 const searchSessions = fuzzySearch<LibrarySession>([{ name: 'name', weight: 1, get: (s) => s.name }])
 const shown = computed(() => searchSessions(sessions.value, query.value))
 
-const columnDefs: ColDef<LibrarySession>[] = [
+const columns: ColDef<LibrarySession>[] = [
   { field: 'name', headerName: 'Name', flex: 2, minWidth: 180 },
   { field: 'notes', headerName: 'Notes', flex: 3, minWidth: 200 },
   { field: 'block_count', headerName: 'Blocks', flex: 1, minWidth: 90 },
@@ -73,6 +76,9 @@ const columnDefs: ColDef<LibrarySession>[] = [
   },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: true, resizable: true }
+// A phone shows only the columns that tell the rows apart.
+const phone = usePhone()
+const columnDefs = computed(() => phoneColumns(columns, phone.value, ['name', 'exercise_count']))
 
 function openSession(event: RowClickedEvent<LibrarySession>) {
   if (event.data) router.push({ name: 'session-edit', params: { id: event.data.id } })

@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-[calc(100vh-8rem)] flex-col lg:h-[calc(100vh-4rem)]">
-    <div class="mb-6 flex items-center justify-between gap-4">
+  <div class="flex h-list-page flex-col lg:h-[calc(100dvh-4rem)]">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h1 class="text-xl font-bold text-slate-900">PRs</h1>
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-slate-500">{{ rows.length }} exercises</span>
+      <div class="flex items-center gap-x-4 gap-y-2">
+        <span class="hidden text-sm text-slate-500 sm:inline">{{ rows.length }} exercises</span>
         <AppButton @click="pickerOpen = true">
           <PlusIcon class="size-4" aria-hidden="true" />
           Log PR
@@ -23,6 +23,7 @@
       :row-data="shown"
       :get-row-id="(p: GetRowIdParams<MaxRow>) => p.data.id"
       :column-defs="columnDefs"
+      :row-height="phoneRowHeight(phone)"
       :default-col-def="defaultColDef"
       row-class="cursor-pointer"
       @row-clicked="(e: RowClickedEvent<MaxRow>) => e.data && open(e.data.id, e.data.name, false)"
@@ -63,6 +64,7 @@ import {
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import ExerciseMaxDialog from '../../components/exercise/ExerciseMaxDialog.vue'
 import { searchExercises } from '../../components/exercise/exerciseSearch'
 import { formatLoad, inKg, prIds } from '../../components/exercise/maxes'
@@ -72,6 +74,7 @@ import { formatDate } from '../../dates'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import type { ExerciseMax } from '../../types'
+import { usePhone } from '../../usePhone'
 
 // AG Grid only includes the features registered here: all free (community) ones.
 ModuleRegistry.registerModules([AllCommunityModule])
@@ -119,7 +122,7 @@ const shown = computed(() => {
 })
 
 // kg and lb sort together by their weight in kg; shown as entered.
-const columnDefs: ColDef<MaxRow>[] = [
+const columns: ColDef<MaxRow>[] = [
   { field: 'name', headerName: 'Exercise', flex: 2, minWidth: 180 },
   {
     colId: 'current',
@@ -149,6 +152,9 @@ const columnDefs: ColDef<MaxRow>[] = [
   { field: 'entries', headerName: 'Entries', width: 110 },
 ]
 const defaultColDef: ColDef = { sortable: true, filter: false, resizable: true }
+// A phone shows only the columns that tell the rows apart.
+const phone = usePhone()
+const columnDefs = computed(() => phoneColumns(columns, phone.value, ['name', 'current']))
 
 function open(id: string, name: string, logging: boolean) {
   pickerOpen.value = false
