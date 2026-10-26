@@ -5,4 +5,15 @@
     @apply bg-slate-50 text-slate-900 antialiased;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* iOS Safari gives date/time inputs a native minimum width (they overflow w-full) and puts the
+     value at the top; without the native appearance they size and align like text inputs. */
+  input:is([type="date"], [type="time"], [type="datetime-local"]) {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+  }
 }
