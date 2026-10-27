@@ -61,9 +61,6 @@ func NewPool(ctx context.Context, dbSource string) (*pgxpool.Pool, error) {
 // New migrates the database and wires the modules: Init (each module's migrations, in order),
 // RegisterContracts, then RegisterHTTP.
 func New(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, cfg Config) (*Svc, error) {
-	if err := legacy.Upgrade(ctx, pool); err != nil {
-		return nil, err
-	}
 
 	// Filled in by the modules (RegisterContracts); they call each other through it afterwards.
 	moduleContracts := &contracts.Contracts{}
