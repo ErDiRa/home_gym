@@ -1,37 +1,16 @@
+import createClient from 'openapi-fetch'
 import { toast } from 'vue-sonner'
-import { state, type User } from './session'
+import type { paths } from './openapi'
+import { state } from './session'
 import type {
-  BlockKind,
-  Cycle,
   CycleImportInput,
   CycleInput,
-  CycleSummary,
-  ImportedCycle,
-  Exercise,
-  ExerciseDetail,
   ExerciseInput,
-  ExerciseMax,
   ExerciseMaxInput,
-  ExerciseRating,
-  Focus,
-  LibrarySession,
-  LibrarySessionDetail,
-  LoggedSet,
-  Option,
   ResultInput,
   SetInput,
-  Training,
-  TrainingDetail,
   TrainingInput,
   TrainingSessionInput,
-  Unit,
-  Week,
-  WhoopCandidate,
-  WhoopData,
-  WhoopStatus,
-  Workout,
-  WorkoutResult,
-  WorkoutSummary,
 } from './types'
 
 // A failed request: the HTTP status plus the server's {"error": ...} message (or the status text).
@@ -44,133 +23,136 @@ export class ApiError extends Error {
   }
 }
 
-// Sends a request to /api and returns the decoded JSON, throwing ApiError on a non-2xx status.
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers)
-  if (init.body) headers.set('Content-Type', 'application/json')
+// The API client, typed by the spec (backend/api/openapi.yaml): paths, parameters, bodies and
+// responses are checked against it. Same-origin (Vite proxy / reverse proxy), so the auth cookie
+// is sent automatically.
+const client = createClient<paths>({ baseUrl: '/api' })
 
-  // Same-origin (Vite proxy / reverse proxy), so the auth cookie is sent automatically.
-  const res = await fetch(`/api${path}`, { ...init, headers })
-  // 204 has no body; a non-JSON body (e.g. a proxy's HTML error page) becomes null.
-  const body = res.status === 204 ? null : await res.json().catch(() => null)
-
-  if (!res.ok) {
+client.use({
+  onResponse({ request, response }) {
     // The cookie was rejected on a request that needed it: the session is gone.
-    if (res.status === 401 && state.user && path !== '/auth/login') {
+    if (response.status === 401 && state.user && !new URL(request.url).pathname.endsWith('/auth/login')) {
       state.user = null
       toast.error('Your session has expired. Please sign in again.')
     }
-    throw new ApiError(res.status, body?.error ?? res.statusText)
+  },
+})
+
+// The data of a successful response; a failed one throws ApiError. A non-JSON error body (e.g. a
+// proxy's HTML error page) falls back to the status text.
+async function unwrap<T>(request: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
+  const { data, error, response } = await request
+  if (!response.ok) {
+    const message = (error as { error?: string } | undefined)?.error
+    throw new ApiError(response.status, typeof message === 'string' ? message : response.statusText)
   }
-  return body as T
+  return data as T
 }
 
-export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, data?: unknown) =>
-    request<T>(path, { method: 'POST', body: data === undefined ? undefined : JSON.stringify(data) }),
-  put: <T>(path: string, data?: unknown) =>
-    request<T>(path, { method: 'PUT', body: data === undefined ? undefined : JSON.stringify(data) }),
-  delete: (path: string) => request<null>(path, { method: 'DELETE' }),
-}
+const byId = (id: string) => ({ params: { path: { id } } })
 
-export const listExercises = () => api.get<Exercise[]>('/exercises')
-export const getExercise = (id: string) => api.get<ExerciseDetail>(`/exercises/${id}`)
-export const listJoints = () => api.get<Option[]>('/joints')
-export const listFocuses = () => api.get<Focus[]>('/focuses')
-export const listMuscleGroups = () => api.get<Option[]>('/muscle-groups')
-export const createFocus = (name: string, alias: string) => api.post<Focus>('/focuses', { name, alias })
-export const createExercise = (input: ExerciseInput) => api.post<Exercise>('/exercises', input)
-export const updateExercise = (id: string, input: ExerciseInput) => api.put<Exercise>(`/exercises/${id}`, input)
+export const listExercises = () => unwrap(client.GET('/exercises'))
+export const getExercise = (id: string) => unwrap(client.GET('/exercises/{id}', byId(id)))
+export const listJoints = () => unwrap(client.GET('/joints'))
+export const listFocuses = () => unwrap(client.GET('/focuses'))
+export const listMuscleGroups = () => unwrap(client.GET('/muscle-groups'))
+export const createFocus = (name: string, alias: string) => unwrap(client.POST('/focuses', { body: { name, alias } }))
+export const createExercise = (input: ExerciseInput) => unwrap(client.POST('/exercises', { body: input }))
+export const updateExercise = (id: string, input: ExerciseInput) =>
+  unwrap(client.PUT('/exercises/{id}', { ...byId(id), body: input }))
 // How the user rated their exercises, for the rating filter in the exercise picker.
-export const listExerciseRatings = () => api.get<ExerciseRating[]>('/exercise-ratings')
+export const listExerciseRatings = () => unwrap(client.GET('/exercise-ratings'))
 export const rateExercise = (id: string, rating: number, notes: string) =>
-  api.post<ExerciseRating>(`/exercises/${id}/feedback`, { rating, notes })
+  unwrap(client.POST('/exercises/{id}/feedback', { ...byId(id), body: { rating, notes } }))
 // The user's 1RM history of all their exercises, newest first per exercise.
-export const listExerciseMaxes = () => api.get<ExerciseMax[]>('/exercise-maxes')
+export const listExerciseMaxes = () => unwrap(client.GET('/exercise-maxes'))
 export const addExerciseMax = (exerciseId: string, input: ExerciseMaxInput) =>
-  api.post<ExerciseMax>(`/exercises/${exerciseId}/maxes`, input)
-export const deleteExerciseMax = (id: string) => api.delete(`/exercise-maxes/${id}`)
+  unwrap(client.POST('/exercises/{id}/maxes', { ...byId(exerciseId), body: input }))
+export const deleteExerciseMax = (id: string) => unwrap(client.DELETE('/exercise-maxes/{id}', byId(id)))
 
-export const listBlockKinds = () => api.get<BlockKind[]>('/block-kinds')
-export const listRepUnits = () => api.get<Unit[]>('/rep-units')
-export const createRepUnit = (name: string) => api.post<Unit>('/rep-units', { name })
-export const listLoadUnits = () => api.get<Unit[]>('/load-units')
-export const createLoadUnit = (name: string) => api.post<Unit>('/load-units', { name })
+export const listBlockKinds = () => unwrap(client.GET('/block-kinds'))
+export const listRepUnits = () => unwrap(client.GET('/rep-units'))
+export const createRepUnit = (name: string) => unwrap(client.POST('/rep-units', { body: { name } }))
+export const listLoadUnits = () => unwrap(client.GET('/load-units'))
+export const createLoadUnit = (name: string) => unwrap(client.POST('/load-units', { body: { name } }))
 
-export const listTrainings = () => api.get<Training[]>('/trainings')
-export const getTraining = (id: string) => api.get<TrainingDetail>(`/trainings/${id}`)
-export const createTraining = (input: TrainingInput) => api.post<Training>('/trainings', input)
-export const updateTraining = (id: string, input: TrainingInput) => api.put<Training>(`/trainings/${id}`, input)
-export const deleteTraining = (id: string) => api.delete(`/trainings/${id}`)
+export const listTrainings = () => unwrap(client.GET('/trainings'))
+export const getTraining = (id: string) => unwrap(client.GET('/trainings/{id}', byId(id)))
+export const createTraining = (input: TrainingInput) => unwrap(client.POST('/trainings', { body: input }))
+export const updateTraining = (id: string, input: TrainingInput) =>
+  unwrap(client.PUT('/trainings/{id}', { ...byId(id), body: input }))
+export const deleteTraining = (id: string) => unwrap(client.DELETE('/trainings/{id}', byId(id)))
 // Copies a training (inactive) as the next phase.
-export const duplicateTraining = (id: string) => api.post<Training>(`/trainings/${id}/duplicate`)
+export const duplicateTraining = (id: string) => unwrap(client.POST('/trainings/{id}/duplicate', byId(id)))
 
-export const listCycles = () => api.get<CycleSummary[]>('/cycles')
-export const getCycle = (id: string) => api.get<Cycle>(`/cycles/${id}`)
-export const createCycle = (input: CycleInput) => api.post<Cycle>('/cycles', input)
-export const updateCycle = (id: string, input: CycleInput) => api.put<Cycle>(`/cycles/${id}`, input)
+export const listCycles = () => unwrap(client.GET('/cycles'))
+export const getCycle = (id: string) => unwrap(client.GET('/cycles/{id}', byId(id)))
+export const createCycle = (input: CycleInput) => unwrap(client.POST('/cycles', { body: input }))
+export const updateCycle = (id: string, input: CycleInput) => unwrap(client.PUT('/cycles/{id}', { ...byId(id), body: input }))
 // Its trainings are deleted too with withTrainings, else they stay and just leave the cycle.
 export const deleteCycle = (id: string, withTrainings: boolean) =>
-  api.delete(`/cycles/${id}?trainings=${withTrainings ? 'delete' : 'keep'}`)
+  unwrap(client.DELETE('/cycles/{id}', { params: { path: { id }, query: { trainings: withTrainings ? 'delete' : 'keep' } } }))
 
 // Creates a cycle with all its trainings, or nothing if any part is invalid.
-export const importCycle = (input: CycleImportInput) => api.post<ImportedCycle>('/cycles/import', input)
+export const importCycle = (input: CycleImportInput) => unwrap(client.POST('/cycles/import', { body: input }))
 
 // The session library: templates that trainings copy.
-export const listSessions = () => api.get<LibrarySession[]>('/sessions')
-export const getSession = (id: string) => api.get<LibrarySessionDetail>(`/sessions/${id}`)
-export const createSession = (input: TrainingSessionInput) => api.post<LibrarySessionDetail>('/sessions', input)
+export const listSessions = () => unwrap(client.GET('/sessions'))
+export const getSession = (id: string) => unwrap(client.GET('/sessions/{id}', byId(id)))
+export const createSession = (input: TrainingSessionInput) => unwrap(client.POST('/sessions', { body: input }))
 export const updateSession = (id: string, input: TrainingSessionInput) =>
-  api.put<LibrarySessionDetail>(`/sessions/${id}`, input)
-export const deleteSession = (id: string) => api.delete(`/sessions/${id}`)
+  unwrap(client.PUT('/sessions/{id}', { ...byId(id), body: input }))
+export const deleteSession = (id: string) => unwrap(client.DELETE('/sessions/{id}', byId(id)))
 
 // A period [from, to) as query parameters; instants, so the server needs no time zone.
-const period = (from: Date, to: Date) =>
-  new URLSearchParams({ from: from.toISOString(), to: to.toISOString() }).toString()
+const period = (from: Date, to: Date) => ({ from: from.toISOString(), to: to.toISOString() })
 
 // The week starting on the local Monday from (a YYYY-MM-DD date plus the instants), planned by
 // one of the active trainings (the first without one).
 export const getWeek = (monday: string, from: Date, to: Date, trainingId?: string) =>
-  api.get<Week>(`/week?date=${monday}&${period(from, to)}${trainingId ? `&training=${trainingId}` : ''}`)
+  unwrap(client.GET('/week', { params: { query: { date: monday, ...period(from, to), training: trainingId } } }))
 // Workouts finished in [from, to), newest first.
-export const listWorkouts = (from: Date, to: Date) => api.get<WorkoutSummary[]>(`/workouts?${period(from, to)}`)
-export const getWorkout = (id: string) => api.get<Workout>(`/workouts/${id}`)
+export const listWorkouts = (from: Date, to: Date) => unwrap(client.GET('/workouts', { params: { query: period(from, to) } }))
+export const getWorkout = (id: string) => unwrap(client.GET('/workouts/{id}', byId(id)))
 // A slot started before (and not finished) returns that workout instead of a new one.
-export const startWorkout = (weekSessionId: string) => api.post<Workout>('/workouts', { week_session_id: weekSessionId })
+export const startWorkout = (weekSessionId: string) =>
+  unwrap(client.POST('/workouts', { body: { week_session_id: weekSessionId } }))
 // Logs a set, or corrects it when the same block, position and set number was logged before.
-export const logSet = (workoutId: string, set: SetInput) => api.put<LoggedSet>(`/workouts/${workoutId}/sets`, set)
-export const deleteSet = (workoutId: string, setId: string) => api.delete(`/workouts/${workoutId}/sets/${setId}`)
+export const logSet = (workoutId: string, set: SetInput) =>
+  unwrap(client.PUT('/workouts/{id}/sets', { ...byId(workoutId), body: set }))
+export const deleteSet = (workoutId: string, setId: string) =>
+  unwrap(client.DELETE('/workouts/{id}/sets/{setID}', { params: { path: { id: workoutId, setID: setId } } }))
 // Logs the score of a WOD block, or corrects it when the block's score was logged before.
 export const logResult = (workoutId: string, result: ResultInput) =>
-  api.put<WorkoutResult>(`/workouts/${workoutId}/results`, result)
+  unwrap(client.PUT('/workouts/{id}/results', { ...byId(workoutId), body: result }))
 export const deleteResult = (workoutId: string, resultId: string) =>
-  api.delete(`/workouts/${workoutId}/results/${resultId}`)
+  unwrap(client.DELETE('/workouts/{id}/results/{resultID}', { params: { path: { id: workoutId, resultID: resultId } } }))
 // completedAt (RFC 3339) dates the workout to another day than today; omitted keeps its date.
 export const finishWorkout = (id: string, notes: string, completedAt?: string) =>
-  api.post<Workout>(`/workouts/${id}/finish`, { notes, completed_at: completedAt })
-export const deleteWorkout = (id: string) => api.delete(`/workouts/${id}`)
+  unwrap(client.POST('/workouts/{id}/finish', { ...byId(id), body: { notes, completed_at: completedAt } }))
+export const deleteWorkout = (id: string) => unwrap(client.DELETE('/workouts/{id}', byId(id)))
 
 // WHOOP: connecting is a full-page visit (WHOOP's login), which returns to /track/settings.
-export const getWhoopStatus = () => api.get<WhoopStatus>('/whoop')
+export const getWhoopStatus = () => unwrap(client.GET('/whoop'))
 export const connectWhoop = () => window.location.assign('/api/whoop/connect')
-export const disconnectWhoop = () => api.delete('/whoop')
+export const disconnectWhoop = () => unwrap(client.DELETE('/whoop'))
 // The WHOOP activities in [from, to), the workout's local day.
 export const listWhoopCandidates = (workoutId: string, from: Date, to: Date) =>
-  api.get<WhoopCandidate[]>(`/workouts/${workoutId}/whoop/candidates?${period(from, to)}`)
-export const getWorkoutWhoop = (workoutId: string) => api.get<WhoopData | null>(`/workouts/${workoutId}/whoop`)
+  unwrap(client.GET('/workouts/{id}/whoop/candidates', { params: { path: { id: workoutId }, query: period(from, to) } }))
+// The WHOOP data linked to the workout, or null.
+export const getWorkoutWhoop = (workoutId: string) => unwrap(client.GET('/workouts/{id}/whoop', byId(workoutId)))
 export const linkWhoop = (workoutId: string, whoopWorkoutId: string) =>
-  api.put<WhoopData>(`/workouts/${workoutId}/whoop`, { whoop_workout_id: whoopWorkoutId })
-export const unlinkWhoop = (workoutId: string) => api.delete(`/workouts/${workoutId}/whoop`)
+  unwrap(client.PUT('/workouts/{id}/whoop', { ...byId(workoutId), body: { whoop_workout_id: whoopWorkoutId } }))
+export const unlinkWhoop = (workoutId: string) => unwrap(client.DELETE('/workouts/{id}/whoop', byId(workoutId)))
 
 export async function login(email: string, password: string, remember: boolean) {
-  state.user = await api.post<User>('/auth/login', { email, password, remember })
+  state.user = await unwrap(client.POST('/auth/login', { body: { email, password, remember } }))
 }
 
 export async function logout() {
   // Sign out locally even if the request fails, so the UI never stays half-logged-in.
   try {
-    await api.post('/auth/logout')
+    await unwrap(client.POST('/auth/logout'))
   } finally {
     state.user = null
   }
@@ -180,7 +162,7 @@ export async function logout() {
 export async function restoreSession() {
   if (state.restored) return
   try {
-    state.user = await api.get<User>('/auth/me')
+    state.user = await unwrap(client.GET('/auth/me'))
   } catch {
     state.user = null
   } finally {

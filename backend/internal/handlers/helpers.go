@@ -1,14 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/erdira/homegym/backend/internal/api"
 	"github.com/erdira/homegym/backend/internal/auth"
 	"github.com/erdira/homegym/backend/internal/logging"
 	"github.com/erdira/homegym/backend/internal/service"
@@ -32,7 +36,7 @@ func writeError(w http.ResponseWriter, r *http.Request, status int, msg string) 
 // clientError is writeError with the underlying cause added to the log (never to the response).
 func clientError(w http.ResponseWriter, r *http.Request, status int, msg string, err error) {
 	logging.RequestError(r, status, msg, err)
-	writeJSON(w, status, map[string]string{"error": msg})
+	writeJSON(w, status, api.Error{Error: msg})
 }
 
 // serverError answers 500 with a generic message; err is only logged.
@@ -48,8 +52,8 @@ var serviceStatus = map[service.Kind]int{
 	service.KindUnauthorized: http.StatusUnauthorized,
 }
 
-// serviceError answers a failed service call: a *service.Error with its status and message,
-// anything else with a 500.
+// serviceError answers the error a handler returned: a *service.Error with its status and
+// message, anything else with a 500.
 func serviceError(w http.ResponseWriter, r *http.Request, err error) {
 	var svcErr *service.Error
 	if errors.As(err, &svcErr) {
@@ -61,54 +65,110 @@ func serviceError(w http.ResponseWriter, r *http.Request, err error) {
 	serverError(w, r, err)
 }
 
-// decodeJSON decodes the request body (max 1 MiB) into dst. On failure it has already written
-// the 400 response, so callers just return.
-func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
-	return decodeJSONLimit(w, r, dst, 1<<20)
+// bodyError answers a request body that isn't valid JSON (or is too large).
+func bodyError(w http.ResponseWriter, r *http.Request, err error) {
+	clientError(w, r, http.StatusBadRequest, "invalid JSON body", err)
 }
 
-// decodeJSONLimit is decodeJSON for a body of up to limit bytes, for the few routes that take a
-// larger one (a whole cycle with its trainings).
-func decodeJSONLimit(w http.ResponseWriter, r *http.Request, dst any, limit int64) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
-		clientError(w, r, http.StatusBadRequest, "invalid JSON body", err)
-		return false
+// paramError answers a path or query parameter that is missing or not of the spec's type,
+// e.g. an id that isn't a UUID.
+func paramError(w http.ResponseWriter, r *http.Request, err error) {
+	var required *api.RequiredParamError
+	var invalid *api.InvalidParamFormatError
+	switch {
+	case errors.As(err, &required):
+		clientError(w, r, http.StatusBadRequest, required.ParamName+" is required", err)
+	case errors.As(err, &invalid):
+		clientError(w, r, http.StatusBadRequest, "invalid "+invalid.ParamName, err)
+	default:
+		clientError(w, r, http.StatusBadRequest, "invalid request", err)
 	}
-	return true
 }
 
-// idParam parses the {id} URL parameter, writing a 400 ("invalid <what> id") when it isn't a
-// UUID (callers just return when ok is false).
-func idParam(w http.ResponseWriter, r *http.Request, what string) (uuid.UUID, bool) {
-	return uuidParam(w, r, "id", what)
+// Body limits: 1 MiB, except a cycle import (a 10-week cycle with ids is a few hundred KB).
+const (
+	maxBody       = 1 << 20
+	maxImportBody = 8 << 20
+)
+
+// limitBody caps the request body; a larger one fails decoding (400).
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit := int64(maxBody)
+		if r.URL.Path == "/api/cycles/import" {
+			limit = maxImportBody
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+		next.ServeHTTP(w, r)
+	})
 }
 
-// uuidParam parses the URL parameter name like idParam.
-func uuidParam(w http.ResponseWriter, r *http.Request, name, what string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(chi.URLParam(r, name))
-	if err != nil {
-		clientError(w, r, http.StatusBadRequest, "invalid "+what+" id", err)
-	}
-	return id, err == nil
-}
-
-// userAndID returns the signed-in user's ID and the {id} URL parameter, writing the error
-// response when either is missing (callers just return when ok is false).
-func userAndID(w http.ResponseWriter, r *http.Request, what string) (userID, id uuid.UUID, ok bool) {
-	if userID, ok = userIDFromRequest(w, r); !ok {
-		return
-	}
-	id, ok = idParam(w, r, what)
-	return
-}
-
-// userIDFromRequest returns the signed-in account's ID set by auth.Middleware, writing a 401
-// when it is missing (callers just return when ok is false).
-func userIDFromRequest(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	id, ok := auth.UserIDFromContext(r.Context())
+// currentUser returns the signed-in user's ID, which the auth middleware put into ctx.
+func currentUser(ctx context.Context) (uuid.UUID, error) {
+	id, ok := auth.UserIDFromContext(ctx)
 	if !ok {
-		writeError(w, r, http.StatusUnauthorized, "unauthenticated")
+		return uuid.Nil, service.Unauthorized("unauthenticated")
 	}
-	return id, ok
+	return id, nil
+}
+
+// listOwn returns the rows fetch returns for the signed-in user, mapped with toAPI.
+func listOwn[T, U any](ctx context.Context, fetch func(context.Context, uuid.UUID) ([]T, error), toAPI func(T) U) ([]U, error) {
+	userID, err := currentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := fetch(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return mapSlice(rows, toAPI), nil
+}
+
+// list returns the rows fetch returns, mapped with toAPI.
+func list[T, U any](ctx context.Context, fetch func(context.Context) ([]T, error), toAPI func(T) U) ([]U, error) {
+	rows, err := fetch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mapSlice(rows, toAPI), nil
+}
+
+// The mappers between the service types and the API models are named <thing>ToAPI and
+// <thing>FromAPI and live next to the handlers that use them.
+
+// mapSlice maps every element with f; the result is never nil, so it encodes as [].
+func mapSlice[T, U any](in []T, f func(T) U) []U {
+	out := make([]U, len(in))
+	for i, v := range in {
+		out[i] = f(v)
+	}
+	return out
+}
+
+// date is a database date as an API date.
+func date(d pgtype.Date) openapi_types.Date {
+	return openapi_types.Date{Time: d.Time}
+}
+
+// timestamp is a NOT NULL database timestamp as an API date-time.
+func timestamp(t pgtype.Timestamptz) time.Time {
+	return t.Time
+}
+
+// optionalTimestamp is a nullable database timestamp as an API date-time, nil when NULL.
+func optionalTimestamp(t pgtype.Timestamptz) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	return &t.Time
+}
+
+// value returns *p, or the zero value when p is nil (an optional field the client left out).
+func value[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

@@ -7,6 +7,7 @@ package repos
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -152,7 +153,7 @@ SELECT
         FROM exercise_focuses ef
         JOIN focuses f ON f.id = ef.focus_id AND f.deleted_at IS NULL
         WHERE ef.exercise_id = e.id
-    ), '[]'::jsonb) AS focuses
+    ), '[]'::jsonb)::jsonb AS focuses
 FROM exercises e
 WHERE e.user_id = $1 AND e.deleted_at IS NULL
 ORDER BY e.name
@@ -168,7 +169,7 @@ type ListExercisesRow struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	Joints       []string           `json:"joints"`
 	MuscleGroups []string           `json:"muscle_groups"`
-	Focuses      interface{}        `json:"focuses"`
+	Focuses      json.RawMessage    `json:"focuses"`
 }
 
 // A user's exercises with the names of joints and muscle groups and the focuses as JSON, for lists and the picker.

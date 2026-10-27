@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/erdira/homegym/backend/internal/service"
@@ -50,16 +49,7 @@ func (f *fakeCycles) Delete(_ context.Context, userID, _ uuid.UUID, withTraining
 
 func serveCycles(t *testing.T, fake *fakeCycles, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	h := New(Services{Cycles: fake}, nil, false)
-	r := chi.NewRouter()
-	r.Use(signedIn(testUser))
-	r.Post("/cycles", h.CreateCycle)
-	r.Get("/cycles/{id}", h.GetCycle)
-	r.Put("/cycles/{id}", h.UpdateCycle)
-	r.Delete("/cycles/{id}", h.DeleteCycle)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
-	return rec
+	return serveAPI(Services{Cycles: fake}, method, path, body)
 }
 
 func TestCycleHandlers(t *testing.T) {
@@ -112,7 +102,7 @@ func TestCycleHandlerErrors(t *testing.T) {
 		wantStatus int
 		wantMsg    string
 	}{
-		{"invalid id", nil, http.MethodGet, "/cycles/nope", "", http.StatusBadRequest, "invalid cycle id"},
+		{"invalid id", nil, http.MethodGet, "/cycles/nope", "", http.StatusBadRequest, "invalid id"},
 		{"invalid JSON", nil, http.MethodPost, "/cycles", "{", http.StatusBadRequest, "invalid JSON body"},
 		{"invalid input", service.Invalid("start_date must be a Monday"), http.MethodPost, "/cycles", "{}", http.StatusBadRequest, "start_date must be a Monday"},
 		{"another user's cycle", notFound, http.MethodGet, "/cycles/" + uuid.NewString(), "", http.StatusNotFound, "cycle not found"},
@@ -140,14 +130,7 @@ func (f *fakeTrainings) ImportCycle(_ context.Context, userID uuid.UUID, in trai
 // A cycle import may be larger than other bodies (1 MiB), up to 8 MiB.
 func TestImportCycleBodyLimit(t *testing.T) {
 	post := func(path, body string) *httptest.ResponseRecorder {
-		h := New(Services{Trainings: &fakeTrainings{}, Cycles: &fakeCycles{}}, nil, false)
-		r := chi.NewRouter()
-		r.Use(signedIn(testUser))
-		r.Post("/cycles/import", h.ImportCycle)
-		r.Post("/cycles", h.CreateCycle)
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)))
-		return rec
+		return serveAPI(Services{Trainings: &fakeTrainings{}, Cycles: &fakeCycles{}}, http.MethodPost, path, body)
 	}
 	name := func(size int) string { return `{"name":"` + strings.Repeat("x", size) + `"}` }
 

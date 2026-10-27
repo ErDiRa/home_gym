@@ -23,6 +23,7 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 ## Tech stack
 
 - **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries
+- **API:** API first: an [OpenAPI](https://www.openapis.org) spec from which [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) generates the Go server interface and models, and [openapi-typescript](https://openapi-ts.dev) the frontend types (client: openapi-fetch)
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (one app: dashboard and tracker)
 - **Dev setup:** Docker Compose (Postgres + API with hot reload via [air](https://github.com/air-verse/air)), [Task](https://taskfile.dev) as the task runner
 
@@ -102,8 +103,10 @@ Schema changes ship as migrations in `backend/db/migrations`, embedded in the im
 
 ```text
 backend/
+  api/openapi.yaml    the API contract
   cmd/api/            entrypoint
-  internal/handlers/  HTTP handlers and routes (thin adapters over the services)
+  internal/api/       generated from the spec: models, routes, server interface (don't edit by hand)
+  internal/handlers/  implement the generated interface (thin adapters over the services)
   internal/web/       serves the built frontend in production
   internal/service/   business logic, one package per domain (training, workout, ...):
                       one file per usecase, its SQL in queries.sql and the
@@ -165,6 +168,7 @@ Complete examples are `training-week.json` and `training-week-into-cycle.json` i
 | `task backend:fresh`                            | Wipe the database and recreate it from schema and seeds       |
 | `cd backend && go test ./...`                   | Run the Go tests                                              |
 | `docker exec -it workout_backend sqlc generate` | Regenerate database code after changing queries or the schema |
+| `task api:gen`                                  | Regenerate the API code (Go and TypeScript) after changing `backend/api/openapi.yaml` |
 | `cd frontend/app && npm run build`              | Type-check and build the app                                  |
 | `cd frontend/app && npm run test`               | Run the frontend tests (vitest)                               |
 

@@ -4,11 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/erdira/homegym/backend/internal/service"
@@ -60,17 +58,7 @@ func (f *fakeWorkouts) DeleteResult(_ context.Context, userID, _, _ uuid.UUID) e
 }
 
 func serveWorkouts(fake *fakeWorkouts, method, path, body string) *httptest.ResponseRecorder {
-	h := New(Services{Workouts: fake}, nil, false)
-	r := chi.NewRouter()
-	r.Use(signedIn(testUser))
-	r.Get("/week", h.GetWeek)
-	r.Post("/workouts", h.StartWorkout)
-	r.Put("/workouts/{id}/sets", h.LogSet)
-	r.Put("/workouts/{id}/results", h.LogResult)
-	r.Delete("/workouts/{id}/results/{resultID}", h.DeleteResult)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
-	return rec
+	return serveAPI(Services{Workouts: fake}, method, path, body)
 }
 
 func TestGetWeek(t *testing.T) {
@@ -126,7 +114,7 @@ func TestLogSet(t *testing.T) {
 	}
 
 	rec = serveWorkouts(&fakeWorkouts{}, http.MethodPut, "/workouts/nope/sets", `{}`)
-	if rec.Code != http.StatusBadRequest || errorBody(t, rec) != "invalid workout id" {
+	if rec.Code != http.StatusBadRequest || errorBody(t, rec) != "invalid id" {
 		t.Errorf("PUT with a bad id = %d", rec.Code)
 	}
 }

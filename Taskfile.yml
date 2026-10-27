@@ -40,6 +40,12 @@ tasks:
       - docker compose up -d --wait db
       - docker compose up -d backend
 
+  api:gen:
+    desc: Regenerate the API code from backend/api/openapi.yaml (Go server + models, frontend types)
+    cmds:
+      - cd backend && go generate ./internal/api
+      - cd frontend/app && npm run gen:api
+
   app:dev:
     desc: Run the frontend in dev mode (Vite on :5173)
     dir: frontend/app

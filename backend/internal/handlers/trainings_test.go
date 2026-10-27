@@ -51,16 +51,19 @@ func signedIn(userID uuid.UUID) func(http.Handler) http.Handler {
 // testUser is the signed-in user of the handler tests.
 var testUser = uuid.New()
 
+// serveAPI serves one request to /api<path> through the generated routes, with testUser
+// signed in.
+func serveAPI(s Services, method, path, body string) *httptest.ResponseRecorder {
+	r := chi.NewRouter()
+	New(s, nil, false).routes(r, signedIn(testUser))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(method, "/api"+path, strings.NewReader(body)))
+	return rec
+}
+
 func serve(t *testing.T, fake *fakeTrainings, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	h := New(Services{Trainings: fake}, nil, false)
-	r := chi.NewRouter()
-	r.Use(signedIn(testUser))
-	r.Get("/trainings/{id}", h.GetTraining)
-	r.Post("/trainings", h.CreateTraining)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
-	return rec
+	return serveAPI(Services{Trainings: fake}, method, path, body)
 }
 
 func errorBody(t *testing.T, rec *httptest.ResponseRecorder) string {
@@ -97,7 +100,7 @@ func TestTrainingHandlerErrors(t *testing.T) {
 		wantStatus int
 		wantMsg    string
 	}{
-		{"invalid id", nil, http.MethodGet, "/trainings/nope", "", http.StatusBadRequest, "invalid training id"},
+		{"invalid id", nil, http.MethodGet, "/trainings/nope", "", http.StatusBadRequest, "invalid id"},
 		{"invalid JSON", nil, http.MethodPost, "/trainings", "{", http.StatusBadRequest, "invalid JSON body"},
 		{"invalid input", service.Invalid("name is required"), http.MethodPost, "/trainings", "{}", http.StatusBadRequest, "name is required"},
 		{"not found", service.NotFound("training not found", errors.New("no rows")), http.MethodGet, "/trainings/" + uuid.NewString(), "", http.StatusNotFound, "training not found"},

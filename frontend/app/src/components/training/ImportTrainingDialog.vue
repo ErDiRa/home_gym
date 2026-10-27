@@ -270,6 +270,8 @@ async function finish() {
   importing.value = true
   const parsed = file.value
   const byName = knownExercises()
+  // The ids of the exercises created here, by name; the list reloaded after has them in full.
+  const createdIds = new Map<string, string>()
   try {
     for (const u of units.value) await lookups.addUnit(u.part, u.name)
     for (const r of rows.value) {
@@ -286,9 +288,10 @@ async function finish() {
         muscle_group_ids: r.muscleGroupIds,
         focus_ids: [],
       })
-      byName.set(nameKey(r.name), created)
+      createdIds.set(nameKey(r.name), created.id)
     }
     await exercisesStore.loadExercises()
+    for (const [key, id] of createdIds) byName.set(key, exercisesStore.exercises.find((e) => e.id === id)!)
     importing.value = false
     proceed(parsed, byName)
   } catch (e) {

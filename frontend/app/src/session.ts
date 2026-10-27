@@ -1,10 +1,8 @@
 import { reactive } from 'vue'
+import type { components } from './openapi'
 
 // The signed-in user, as returned by /api/auth/login and /api/auth/me.
-export interface User {
-  id: string
-  email: string
-}
+export type User = components['schemas']['Account']
 
 // The JWT lives in an HttpOnly cookie that scripts cannot read, so the only thing
 // kept client-side is the user the server reported, in memory.

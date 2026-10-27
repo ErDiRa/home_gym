@@ -35,6 +35,8 @@ export const exercise = (name: string): Exercise => ({
   id: `ex-${name}`,
   name,
   type: 'strength',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
   joints: [],
   muscle_groups: [],
   focuses: [],

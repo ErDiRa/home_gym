@@ -107,17 +107,37 @@ func statusLevel(status int) slog.Level {
 // request line; outside of it the failure is logged on its own, at error level
 // for 5xx and warn for everything else.
 func RequestError(r *http.Request, status int, msg string, err error) {
-	if f, ok := r.Context().Value(failureKey{}).(*failure); ok {
-		f.msg, f.err = msg, err
+	if record(r.Context(), msg, err) {
 		return
 	}
-	attrs := []slog.Attr{
-		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
+	logFailure(r.Context(), status, msg, err, slog.String("method", r.Method), slog.String("path", r.URL.Path))
+}
+
+// ContextError is RequestError for code that has the request's context but not the request,
+// such as the generated API handlers.
+func ContextError(ctx context.Context, status int, msg string, err error) {
+	if record(ctx, msg, err) {
+		return
+	}
+	logFailure(ctx, status, msg, err)
+}
+
+// record hands the failure to Middleware's request line, reporting whether it runs.
+func record(ctx context.Context, msg string, err error) bool {
+	f, ok := ctx.Value(failureKey{}).(*failure)
+	if ok {
+		f.msg, f.err = msg, err
+	}
+	return ok
+}
+
+// logFailure logs a failure outside Middleware as its own line.
+func logFailure(ctx context.Context, status int, msg string, err error, attrs ...slog.Attr) {
+	attrs = append(attrs,
 		slog.Int("status", status),
 		slog.String("reason", msg),
-		slog.String("request_id", middleware.GetReqID(r.Context())),
-	}
+		slog.String("request_id", middleware.GetReqID(ctx)),
+	)
 	if err != nil {
 		attrs = append(attrs, slog.Any("err", err))
 	}
@@ -125,5 +145,5 @@ func RequestError(r *http.Request, status int, msg string, err error) {
 	if status >= http.StatusInternalServerError {
 		level = slog.LevelError
 	}
-	slog.Default().LogAttrs(r.Context(), level, "request error", attrs...)
+	slog.Default().LogAttrs(ctx, level, "request error", attrs...)
 }

@@ -58,9 +58,9 @@ func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	return id, err == nil
 }
 
-// SetCookie stores the token in an HttpOnly cookie. A zero ttl makes it a
-// session cookie that the browser drops on exit.
-func SetCookie(w http.ResponseWriter, token string, ttl time.Duration, secure bool) {
+// Cookie is the HttpOnly cookie storing the token. A zero ttl makes it a session cookie that
+// the browser drops on exit.
+func Cookie(token string, ttl time.Duration, secure bool) *http.Cookie {
 	c := &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
@@ -72,20 +72,15 @@ func SetCookie(w http.ResponseWriter, token string, ttl time.Duration, secure bo
 	if ttl > 0 {
 		c.MaxAge = int(ttl.Seconds())
 	}
-	http.SetCookie(w, c)
+	return c
 }
 
-// ClearCookie deletes the auth cookie. Its attributes must match SetCookie's, or the browser
+// ClearedCookie deletes the auth cookie. Its attributes must match Cookie's, or the browser
 // treats it as a different cookie and keeps the old one.
-func ClearCookie(w http.ResponseWriter, secure bool) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     CookieName,
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-	})
+func ClearedCookie(secure bool) *http.Cookie {
+	c := Cookie("", 0, secure)
+	c.MaxAge = -1
+	return c
 }
 
 func unauthorized(w http.ResponseWriter, r *http.Request, msg string, err error) {

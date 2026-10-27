@@ -46,7 +46,7 @@ SELECT
         FROM exercise_focuses ef
         JOIN focuses f ON f.id = ef.focus_id AND f.deleted_at IS NULL
         WHERE ef.exercise_id = e.id
-    ), '[]'::jsonb) AS focuses
+    ), '[]'::jsonb)::jsonb AS focuses
 FROM exercises e
 WHERE e.user_id = $1 AND e.deleted_at IS NULL
 ORDER BY e.name;

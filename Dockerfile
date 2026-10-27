@@ -18,9 +18,10 @@ WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
-# Regenerate the repos/ packages from queries.sql and the schema, so the binary never builds
-# against stale generated code
+# Regenerate the repos/ packages from queries.sql and the schema, and internal/api from the
+# OpenAPI spec, so the binary never builds against stale generated code
 RUN sqlc generate
+RUN go generate ./internal/api
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 # --- Runtime ---

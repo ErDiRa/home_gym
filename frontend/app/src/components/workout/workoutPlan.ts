@@ -13,7 +13,7 @@ export interface SetRow {
   number: number
   reps: number | null
   load: number | null
-  logged: LoggedSet | null
+  logged: WorkoutSet | LoggedSet | null // as loaded with the workout, or as just logged
   saving: boolean
 }
 
