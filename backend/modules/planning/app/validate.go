@@ -257,8 +257,18 @@ func checkReps(a *Amount, lk lookups) string {
 }
 
 // checkLoad validates the optional load of an amount: a value with a unit, only a unit (what the
-// sets are logged in, e.g. calories on a machine) or nothing (e.g. bodyweight).
+// sets are logged in, e.g. calories on a machine) or nothing. On bodyweight the load is the weight
+// added to it, in a weight unit, or nothing (bodyweight alone, which keeps no unit).
 func checkLoad(a *Amount, lk lookups) string {
+	if a.LoadBodyweight {
+		if a.LoadValue == nil && a.LoadMax == nil {
+			a.LoadUnit = nil
+			return ""
+		}
+		if a.LoadUnit != nil && !lk.loadUnits[*a.LoadUnit].weight {
+			return "weight added to bodyweight needs a weight unit such as kg or lb"
+		}
+	}
 	if a.LoadValue == nil && a.LoadMax == nil {
 		if a.LoadUnit == nil {
 			return ""

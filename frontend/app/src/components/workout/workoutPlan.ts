@@ -31,6 +31,8 @@ export interface ExerciseCard {
   repsUnitName: string
   perSide: boolean
   loadUnit: string | null // the unit the load inputs are in
+  bodyweight: boolean // done on bodyweight: the load inputs hold the weight added to it, if any
+  showLoad: boolean // whether the load inputs show; on bodyweight only once weight is added
   percentPlan: { value: number; max: number | null } | null // a load planned in % 1RM (a range with max)
   newMax: LoggedSet | null // a logged single above the current 1RM, offered to be saved as the new one
   lastLoad: MaxLoad | null // the load last logged in another workout, suggested when the plan has none
@@ -167,11 +169,13 @@ function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, loa
 }
 
 // What loads convert with: the load units by id and the user's current 1RM of an exercise; lastOf
-// gives the load last logged of an exercise, if any.
+// gives the load last logged of an exercise, if any, and weightUnit the unit weight added to
+// bodyweight starts in (kg or lb).
 export interface LoadContext {
   unitOf: (id: string) => Unit | undefined
   maxOf: (exerciseId: string) => MaxLoad | null
   lastOf?: (exerciseId: string) => MaxLoad | null
+  weightUnit?: string | null
 }
 
 // Builds the cards of a workout from the session's plan (null when the session is gone) and the sets
@@ -179,7 +183,8 @@ export interface LoadContext {
 // starts when the plan has none. A load planned in % 1RM is done in the unit of the exercise's
 // 1RM, calculated from it, when there is one (loads); a planned load in another unit than the
 // logged sets' is converted too, where it can be. Without a planned load (or with only its unit) the
-// load last logged of the exercise is suggested, and its unit is where load starts.
+// load last logged of the exercise is suggested, and its unit is where load starts. On bodyweight
+// the load inputs only show with weight added to it (planned or logged), in a weight unit.
 export function buildCards(
   session: TrainingSession | null,
   sets: WorkoutSet[],
@@ -204,14 +209,19 @@ export function buildCards(
       // set is the plan.
       const planned = b.sets ?? e.sets ?? 1
       const reps = e.reps_value !== null ? e : b
-      const load = e.load_unit !== null ? e : b
+      const load = e.load_unit !== null || e.load_bodyweight ? e : b
       const logged = (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id === e.exercise_id)
+      const bodyweight = load.load_bodyweight || logged.some((s) => s.bodyweight)
       loggedByPlace.set(key, (loggedByPlace.get(key) ?? []).filter((s) => s.exercise_id !== e.exercise_id))
       const planUnit = load.load_unit ? loads?.unitOf(load.load_unit) : undefined
       const max = loads?.maxOf(e.exercise_id) ?? null
       const startUnit = planUnit?.percent_of_max && max?.unit ? max.unit.id : load.load_unit
-      const last = load.load_value === null ? (loads?.lastOf?.(e.exercise_id) ?? null) : null
-      const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? startUnit ?? last?.unit?.id ?? defaultLoadUnit
+      const last = load.load_value === null && !bodyweight ? (loads?.lastOf?.(e.exercise_id) ?? null) : null
+      const loadUnit =
+        logged.find((s) => s.load_unit)?.load_unit ??
+        startUnit ??
+        last?.unit?.id ??
+        (bodyweight ? (loads?.weightUnit ?? defaultLoadUnit) : defaultLoadUnit)
       let plannedLoad: number | null = null
       if (load.load_value !== null && load.load_unit === loadUnit) plannedLoad = load.load_value
       else if (load.load_value !== null && loadUnit) {
@@ -225,7 +235,9 @@ export function buildCards(
         const amount = `${range(reps.reps_value ?? 0, reps.reps_max)} ${reps.reps_unit_name}${reps.per_side ? ' per side' : ''}`
         text.push(scored ? amount : `${planned} × ${amount}`)
       }
-      if (load.load_value !== null) text.push(`${range(load.load_value, load.load_max)} ${load.load_unit_name}`)
+      const weight = load.load_value !== null ? `${range(load.load_value, load.load_max)} ${load.load_unit_name}` : ''
+      if (bodyweight) text.push(weight ? `bodyweight + ${weight}` : 'bodyweight')
+      else if (weight) text.push(weight)
       else if (load.load_unit !== null) text.push(`in ${load.load_unit_name}`) // logged in this unit, e.g. "in cal"
       return {
         key,
@@ -241,7 +253,9 @@ export function buildCards(
         repsUnitName: reps.reps_unit_name,
         perSide: reps.per_side,
         loadUnit,
-        percentPlan: planUnit?.percent_of_max && load.load_value !== null ? { value: load.load_value, max: load.load_max } : null,
+        bodyweight,
+        showLoad: !bodyweight || load.load_value !== null || logged.some((s) => s.load_value !== null),
+        percentPlan: planUnit?.percent_of_max && load.load_value !== null && !bodyweight ? { value: load.load_value, max: load.load_max } : null,
         newMax: null,
         lastLoad: scored ? null : last,
         scored,
@@ -253,8 +267,11 @@ export function buildCards(
     // A complex is logged in one unit; a set not logged yet takes the load another exercise was
     // logged with in that round.
     if (complex) {
+      const showLoad = exercises.some((c) => c.showLoad)
       for (const card of exercises) {
         card.loadUnit = exercises[0].loadUnit
+        card.bodyweight = exercises[0].bodyweight
+        card.showLoad = showLoad
         for (const row of card.rows) {
           if (row.logged) continue
           const done = exercises.flatMap((c) => c.rows).find((r) => r.number === row.number && r.logged?.load_unit === card.loadUnit)
@@ -312,6 +329,8 @@ export function buildCards(
       repsUnitName: first.reps_unit_name,
       perSide: first.per_side,
       loadUnit: logged.find((s) => s.load_unit)?.load_unit ?? defaultLoadUnit,
+      bodyweight: first.bodyweight,
+      showLoad: !first.bodyweight || logged.some((s) => s.load_value !== null),
       percentPlan: null,
       newMax: null,
       lastLoad: null,

@@ -27,8 +27,9 @@ export interface ImportAmount {
   per_side?: boolean
 }
 
-// A load may name only its unit: the unit the sets are logged in, e.g. calories on a machine.
-export type ImportLoad = Omit<ImportAmount, 'value'> & { value?: number | null }
+// A load may name only its unit: the unit the sets are logged in, e.g. calories on a machine. On
+// bodyweight (e.g. pull-ups) it is the weight added to it, or nothing: then it needs no unit.
+export type ImportLoad = Omit<ImportAmount, 'value' | 'unit'> & { value?: number | null; unit?: string; bodyweight?: boolean }
 
 export interface ImportExercise {
   exercise: string // by name
@@ -125,7 +126,8 @@ function checkAmount(v: unknown, where: string, unitOnly = false) {
   check(noValue || (typeof a.value === 'number' && a.value >= 0), where, 'value must be a number of at least 0.')
   check(!noValue || a.max === undefined || a.max === null, where, 'max needs a value.')
   check(a.max === undefined || a.max === null || typeof a.max === 'number', where, 'max must be a number.')
-  check(isText(a.unit), where, 'unit is missing.')
+  check(a.bodyweight === undefined || typeof a.bodyweight === 'boolean', where, 'bodyweight must be true or false.')
+  check(isText(a.unit) || (noValue && a.bodyweight === true && a.unit === undefined), where, 'unit is missing.')
   check(a.per_side === undefined || typeof a.per_side === 'boolean', where, 'per_side must be true or false.')
 }
 
@@ -231,7 +233,7 @@ export function unresolvedNames(imports: WithSessions | WithSessions[], exercise
 
   const units = new Map<string, { part: AmountPart; name: string }>()
   for (const [part, a] of amounts(trainings)) {
-    if (!unitIdOf(part, a.unit)) units.set(`${part}:${nameKey(a.unit)}`, { part, name: a.unit.trim() })
+    if (a.unit !== undefined && !unitIdOf(part, a.unit)) units.set(`${part}:${nameKey(a.unit)}`, { part, name: a.unit.trim() })
   }
   return { exercises: [...missing.values()], units: [...units.values()] }
 }
@@ -252,7 +254,8 @@ function toAmount(reps?: ImportAmount, load?: ImportLoad): Amount {
   if (load) {
     a.load_value = load.value ?? null
     a.load_max = load.max ?? null
-    a.load_unit = unitIdOf('load', load.unit)
+    a.load_unit = load.unit === undefined ? null : unitIdOf('load', load.unit)
+    a.load_bodyweight = load.bodyweight ?? false
   }
   return a
 }

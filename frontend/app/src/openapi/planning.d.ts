@@ -175,6 +175,8 @@ export interface components {
             load_max: number | null;
             /** Format: uuid */
             load_unit: string | null;
+            /** @description Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none. */
+            load_bodyweight: boolean;
         };
         AmountUnitNames: {
             reps_unit_name: string;

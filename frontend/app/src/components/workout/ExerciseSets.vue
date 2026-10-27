@@ -9,7 +9,7 @@
         </p>
         <!-- The 1RM loads in % 1RM are calculated from; set or changed in a sheet. -->
         <button
-          v-if="card.percentPlan || max"
+          v-if="!card.bodyweight && (card.percentPlan || max)"
           type="button"
           class="-my-1 min-h-8 text-left text-sm font-medium text-indigo-600 hover:text-indigo-800"
           @click="maxOpen = true"
@@ -27,20 +27,28 @@
     </div>
 
     <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. A WOD's
-         exercises have none (the block has one score), unless sets were logged there before. -->
-    <div v-if="!card.scored || card.rows.length" class="mt-2 grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-x-2 gap-y-1.5">
+         exercises have none (the block has one score), unless sets were logged there before. On
+         bodyweight only the reps, until weight is added ("BW + kg"). -->
+    <div
+      v-if="!card.scored || card.rows.length"
+      :class="['mt-2 grid items-center gap-x-2 gap-y-1.5', card.showLoad ? 'grid-cols-[2rem_1fr_1fr_2.75rem]' : 'grid-cols-[2rem_1fr_2.75rem]']"
+    >
       <span class="text-xs font-medium text-slate-500">Set</span>
       <span class="text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
-      <SelectField
-        :model-value="card.loadUnit"
-        :options="lookups.loadUnits"
-        :searchable="false"
-        size="sm"
-        option-size="touch"
-        :aria-label="`${card.label} load unit`"
-        field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
-        @update:model-value="switchUnit"
-      />
+      <div v-if="card.showLoad" class="flex min-w-0 items-center gap-1">
+        <span v-if="card.bodyweight" class="shrink-0 text-xs font-medium text-slate-500">BW +</span>
+        <SelectField
+          class="min-w-0 flex-1"
+          :model-value="card.loadUnit"
+          :options="loadUnits"
+          :searchable="false"
+          size="sm"
+          option-size="touch"
+          :aria-label="`${card.label} load unit`"
+          field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
+          @update:model-value="switchUnit"
+        />
+      </div>
       <span />
 
       <template v-for="row in card.rows" :key="row.number">
@@ -56,6 +64,7 @@
           :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
         />
         <TextInput
+          v-if="card.showLoad"
           v-model.number="row.load"
           type="number"
           inputmode="decimal"
@@ -93,10 +102,16 @@
         <AppButton variant="success" size="touch" :disabled="savingMax" @click="saveNewMax">Save as 1RM</AppButton>
       </div>
     </div>
-    <AppButton v-if="!card.scored" variant="text" size="touch" class="mt-1 -ml-3" @click="addSet">
-      <PlusIcon class="size-4" aria-hidden="true" />
-      Add set
-    </AppButton>
+    <div v-if="!card.scored" class="mt-1 -ml-3 flex flex-wrap">
+      <AppButton variant="text" size="touch" @click="addSet">
+        <PlusIcon class="size-4" aria-hidden="true" />
+        Add set
+      </AppButton>
+      <AppButton v-if="!card.showLoad" variant="text" size="touch" @click="card.showLoad = true">
+        <PlusIcon class="size-4" aria-hidden="true" />
+        Add weight
+      </AppButton>
+    </div>
   </div>
 </template>
 
@@ -135,6 +150,9 @@ const approxLoad = computed(() => {
   const weight = (v: number) => roundLoad(convertLoad(v, percent, to, maxLoad.value) ?? 0)
   return `${plan.max === null ? weight(plan.value) : `${weight(plan.value)}–${weight(plan.max)}`} ${to.name}`
 })
+
+// Weight added to bodyweight is in kg or lb.
+const loadUnits = computed(() => (card.value.bodyweight ? lookups.loadUnits.filter((u) => u.kg_per_unit) : lookups.loadUnits))
 
 // The load logged last time, as the placeholder of the load inputs when the plan has none.
 const lastLoad = computed(() => suggestedLoad(card.value, (id) => unitOf(id), maxLoad.value))

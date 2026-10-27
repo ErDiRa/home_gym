@@ -34,10 +34,11 @@ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 -- user's live ones before (the catalog's contract).
 INSERT INTO tracking.workout_sets (
     workout_id, exercise_id, block_position, exercise_position, set_number,
-    reps_value, reps_unit, per_side, load_value, load_unit
+    reps_value, reps_unit, per_side, load_value, load_unit, bodyweight
 ) VALUES (
     sqlc.arg(workout_id), sqlc.arg(exercise_id), sqlc.arg(block_position), sqlc.arg(exercise_position), sqlc.arg(set_number),
-    sqlc.narg(reps_value), sqlc.arg(reps_unit), sqlc.arg(per_side), sqlc.narg(load_value), sqlc.narg(load_unit)
+    sqlc.narg(reps_value), sqlc.arg(reps_unit), sqlc.arg(per_side), sqlc.narg(load_value), sqlc.narg(load_unit),
+    sqlc.arg(bodyweight)
 )
 ON CONFLICT (workout_id, block_position, exercise_position, set_number)
 DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
@@ -46,6 +47,7 @@ DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
               per_side = EXCLUDED.per_side,
               load_value = EXCLUDED.load_value,
               load_unit = EXCLUDED.load_unit,
+              bodyweight = EXCLUDED.bodyweight,
               completed_at = now()
 RETURNING *;
 

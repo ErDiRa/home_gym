@@ -302,7 +302,7 @@ components:
     Amount:
       type: object
       description: Planned reps and load. A value is null when not set; a max turns it into a range.
-      required: [reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit]
+      required: [reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight]
       properties:
         reps_value: { type: number, format: double, nullable: true }
         reps_max: { type: number, format: double, nullable: true }
@@ -311,6 +311,7 @@ components:
         load_value: { type: number, format: double, nullable: true }
         load_max: { type: number, format: double, nullable: true }
         load_unit: { type: string, format: uuid, nullable: true }
+        load_bodyweight: { type: boolean, description: "Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none." }
     AmountUnitNames:
       type: object
       required: [reps_unit_name, load_unit_name]

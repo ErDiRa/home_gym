@@ -210,10 +210,11 @@ func (q *Queries) UpsertWorkoutResult(ctx context.Context, arg UpsertWorkoutResu
 const upsertWorkoutSet = `-- name: UpsertWorkoutSet :one
 INSERT INTO tracking.workout_sets (
     workout_id, exercise_id, block_position, exercise_position, set_number,
-    reps_value, reps_unit, per_side, load_value, load_unit
+    reps_value, reps_unit, per_side, load_value, load_unit, bodyweight
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10
+    $6, $7, $8, $9, $10,
+    $11
 )
 ON CONFLICT (workout_id, block_position, exercise_position, set_number)
 DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
@@ -222,8 +223,9 @@ DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
               per_side = EXCLUDED.per_side,
               load_value = EXCLUDED.load_value,
               load_unit = EXCLUDED.load_unit,
+              bodyweight = EXCLUDED.bodyweight,
               completed_at = now()
-RETURNING id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at
+RETURNING id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at, bodyweight
 `
 
 type UpsertWorkoutSetParams struct {
@@ -237,6 +239,7 @@ type UpsertWorkoutSetParams struct {
 	PerSide          bool
 	LoadValue        *float64
 	LoadUnit         *uuid.UUID
+	Bodyweight       bool
 }
 
 // Logs a set, or corrects it when it was logged before. The exercise is checked to be one of the
@@ -253,6 +256,7 @@ func (q *Queries) UpsertWorkoutSet(ctx context.Context, arg UpsertWorkoutSetPara
 		arg.PerSide,
 		arg.LoadValue,
 		arg.LoadUnit,
+		arg.Bodyweight,
 	)
 	var i TrackingWorkoutSet
 	err := row.Scan(
@@ -268,6 +272,7 @@ func (q *Queries) UpsertWorkoutSet(ctx context.Context, arg UpsertWorkoutSetPara
 		&i.LoadValue,
 		&i.LoadUnit,
 		&i.CompletedAt,
+		&i.Bodyweight,
 	)
 	return i, err
 }

@@ -13,7 +13,7 @@ ORDER BY position;
 
 -- name: ListTrainingBlocks :many
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
-       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit,
+       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit, sb.load_bodyweight,
        sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM planning.session_blocks sb
 JOIN planning.sessions s ON s.id = sb.session_id
@@ -22,7 +22,7 @@ ORDER BY sb.session_id, sb.position;
 
 -- name: ListTrainingExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
-       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit,
+       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id
@@ -97,12 +97,12 @@ WHERE training_id = $1 AND id <> ALL(sqlc.arg(keep_ids)::uuid[]);
 -- sqlc.narg marks the parameters that may be NULL (what the block's kind doesn't share).
 INSERT INTO planning.session_blocks (
     session_id, position, kind, name, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
     score_type, time_seconds, interval_seconds, notes
 ) VALUES (
     sqlc.arg(session_id), sqlc.arg(position), sqlc.arg(kind), sqlc.arg(name), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
-    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit),
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(load_bodyweight),
     sqlc.narg(score_type), sqlc.narg(time_seconds), sqlc.narg(interval_seconds), sqlc.arg(notes)
 )
 RETURNING id;
@@ -111,11 +111,11 @@ RETURNING id;
 -- The exercise is checked to be one of the user's live ones before (the catalog's contract).
 INSERT INTO planning.session_exercises (
     block_id, exercise_id, position, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight, tempo, notes
 ) VALUES (
     sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
-    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(tempo), sqlc.arg(notes)
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(load_bodyweight), sqlc.arg(tempo), sqlc.arg(notes)
 );
 
 -- name: UserOwnsCycle :one

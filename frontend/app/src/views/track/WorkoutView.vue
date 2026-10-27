@@ -272,6 +272,7 @@ onMounted(async () => {
         const last = workouts.lastLoads.get(exerciseId)
         return last ? { value: last.load_value, unit: loadUnitOf(last.load_unit) } : null
       },
+      weightUnit: lookups.defaultUnit('load', true),
     })
     blocks.value = cards.blocks
     extras.value = cards.extras
@@ -301,7 +302,7 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
     const reps = num(row.reps)
     const load = num(row.load)
     if (reps === null && load === null) {
-      toast.error(`Enter the ${card.repsUnitName || 'reps'} or the load of set ${row.number} first.`)
+      toast.error(`Enter the ${card.repsUnitName || 'reps'}${card.showLoad ? ' or the load' : ''} of set ${row.number} first.`)
       return
     }
     row.logged = await workouts.logSet(workout.value.id, {
@@ -314,6 +315,7 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
       per_side: card.perSide,
       load_value: load,
       load_unit: load === null ? null : card.loadUnit,
+      bodyweight: card.bodyweight,
     })
     row.reps = reps
     row.load = load
@@ -331,7 +333,7 @@ async function toggleRound(round: Round) {
   const state = roundState(round)
   const { card, row } = round.sets[0]
   if (state !== 'logged' && num(row.reps) === null && num(row.load) === null) {
-    toast.error(`Enter the ${card.repsUnitName || 'reps'} or the load of set ${round.number} first.`)
+    toast.error(`Enter the ${card.repsUnitName || 'reps'}${card.showLoad ? ' or the load' : ''} of set ${round.number} first.`)
     return
   }
   const sets = state === 'logged' ? round.sets : round.sets.filter((s) => !s.row.logged || changed(s.card, s.row))
@@ -343,6 +345,8 @@ const loadUnitOf = (id: string) => lookups.loadUnits.find((u) => u.id === id)
 // A single logged above the exercise's 1RM (or without one yet) is offered as the new 1RM; a
 // set corrected below it withdraws the offer.
 function offerNewMax(card: ExerciseCard, set: LoggedSet) {
+  // Weight added to bodyweight isn't a 1RM.
+  if (card.bodyweight) return
   const max = exercises.currentMax(card.exerciseId)
   const reps = card.repsUnitName === 'reps' ? set.reps_value : null
   const unit = set.load_unit ? loadUnitOf(set.load_unit) : undefined

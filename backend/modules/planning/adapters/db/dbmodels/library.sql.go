@@ -76,7 +76,7 @@ func (q *Queries) GetLibrarySession(ctx context.Context, arg GetLibrarySessionPa
 
 const listSessionBlocks = `-- name: ListSessionBlocks :many
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
-       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit,
+       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit, sb.load_bodyweight,
        sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM planning.session_blocks sb
 WHERE sb.session_id = $1
@@ -96,6 +96,7 @@ type ListSessionBlocksRow struct {
 	LoadValue       *float64
 	LoadMax         *float64
 	LoadUnit        *uuid.UUID
+	LoadBodyweight  bool
 	ScoreType       *string
 	TimeSeconds     *int32
 	IntervalSeconds *int32
@@ -124,6 +125,7 @@ func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([
 			&i.LoadValue,
 			&i.LoadMax,
 			&i.LoadUnit,
+			&i.LoadBodyweight,
 			&i.ScoreType,
 			&i.TimeSeconds,
 			&i.IntervalSeconds,
@@ -141,7 +143,7 @@ func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([
 
 const listSessionExercises = `-- name: ListSessionExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
-       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit,
+       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id
@@ -150,18 +152,19 @@ ORDER BY se.block_id, se.position
 `
 
 type ListSessionExercisesRow struct {
-	BlockID    uuid.UUID
-	ExerciseID uuid.UUID
-	Sets       *int32
-	RepsValue  *float64
-	RepsMax    *float64
-	RepsUnit   *uuid.UUID
-	PerSide    bool
-	LoadValue  *float64
-	LoadMax    *float64
-	LoadUnit   *uuid.UUID
-	Tempo      string
-	Notes      string
+	BlockID        uuid.UUID
+	ExerciseID     uuid.UUID
+	Sets           *int32
+	RepsValue      *float64
+	RepsMax        *float64
+	RepsUnit       *uuid.UUID
+	PerSide        bool
+	LoadValue      *float64
+	LoadMax        *float64
+	LoadUnit       *uuid.UUID
+	LoadBodyweight bool
+	Tempo          string
+	Notes          string
 }
 
 func (q *Queries) ListSessionExercises(ctx context.Context, sessionID uuid.UUID) ([]ListSessionExercisesRow, error) {
@@ -184,6 +187,7 @@ func (q *Queries) ListSessionExercises(ctx context.Context, sessionID uuid.UUID)
 			&i.LoadValue,
 			&i.LoadMax,
 			&i.LoadUnit,
+			&i.LoadBodyweight,
 			&i.Tempo,
 			&i.Notes,
 		); err != nil {

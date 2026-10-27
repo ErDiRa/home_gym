@@ -11,7 +11,7 @@ import (
 )
 
 func TestCheckBlock(t *testing.T) {
-	reps, rpe := uuid.New(), uuid.New()
+	reps, rpe, kg := uuid.New(), uuid.New(), uuid.New()
 	lk := lookups{
 		kinds: map[string]catalog.BlockKind{
 			"single":   {Code: "single", Name: "Single", MinExercises: 1},
@@ -20,7 +20,7 @@ func TestCheckBlock(t *testing.T) {
 			"complex":  {Code: "complex", Name: "Complex", MinExercises: 2, SharedSets: true, SharedReps: true, SharedLoad: true},
 		},
 		repUnits:  map[uuid.UUID]unit{reps: {name: "reps", min: ptr(1.0)}},
-		loadUnits: map[uuid.UUID]unit{rpe: {name: "RPE", min: ptr(1.0), max: ptr(10.0)}},
+		loadUnits: map[uuid.UUID]unit{rpe: {name: "RPE", min: ptr(1.0), max: ptr(10.0)}, kg: {name: "kg", weight: true}},
 	}
 	withReps := Amount{RepsValue: ptr(8.0), RepsUnit: &reps}
 	exercise := func(a Amount) ExerciseInput {
@@ -49,6 +49,9 @@ func TestCheckBlock(t *testing.T) {
 		{"load unit without value", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadUnit: &rpe})}}, ""},
 		{"unknown load unit without value", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadUnit: ptr(uuid.New())})}}, "unknown load unit"},
 		{"load max without value", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadMax: ptr(80.0), LoadUnit: &rpe})}}, "value and a unit"},
+		{"bodyweight", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true})}}, ""},
+		{"bodyweight plus weight", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true, LoadValue: ptr(10.0), LoadUnit: &kg})}}, ""},
+		{"bodyweight plus RPE", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true, LoadValue: ptr(8.0), LoadUnit: &rpe})}}, "needs a weight unit"},
 		{"unknown unit", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: ptr(uuid.New())})}}, "unknown reps unit"},
 	}
 	for _, tt := range tests {
@@ -107,6 +110,22 @@ func TestCheckBlockClearsUnusedSide(t *testing.T) {
 	}
 	if single.Sets != nil {
 		t.Errorf("single block kept shared sets: %d", *single.Sets)
+	}
+
+	// Bodyweight alone keeps no unit; the superset's shared load is cleared on the block.
+	kg := uuid.New()
+	superset.LoadBodyweight, superset.LoadUnit = true, &kg
+	bodyweight := BlockInput{Kind: "single", Exercises: []ExerciseInput{
+		{ExerciseID: uuid.New(), Sets: ptr[int32](3), Amount: Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true, LoadUnit: &kg}},
+	}}
+	if msg := checkBlock(&bodyweight, lk); msg != "" {
+		t.Fatal(msg)
+	}
+	if e := bodyweight.Exercises[0]; !e.LoadBodyweight || e.LoadUnit != nil {
+		t.Errorf("bodyweight alone = %+v, want no unit", e.Amount)
+	}
+	if msg := checkBlock(&superset, lk); msg != "" || superset.LoadBodyweight || superset.LoadUnit != nil {
+		t.Errorf("superset block kept a load: %q %+v", msg, superset.Amount)
 	}
 }
 

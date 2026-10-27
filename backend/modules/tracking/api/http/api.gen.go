@@ -144,6 +144,7 @@ type LastLoad struct {
 // LoggedSet A set as stored.
 type LoggedSet struct {
 	BlockPosition    int32               `json:"block_position"`
+	Bodyweight       bool                `json:"bodyweight"`
 	CompletedAt      time.Time           `json:"completed_at"`
 	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
 	ExercisePosition int32               `json:"exercise_position"`
@@ -187,7 +188,10 @@ type ScoreType string
 
 // SetInput A performed set at its place in the session (block and position in the block, from 1).
 type SetInput struct {
-	BlockPosition    int32               `json:"block_position"`
+	BlockPosition int32 `json:"block_position"`
+
+	// Bodyweight Done on bodyweight: the load is the weight added to it (in a weight unit), if any.
+	Bodyweight       bool                `json:"bodyweight"`
 	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
 	ExercisePosition int32               `json:"exercise_position"`
 	LoadUnit         *openapi_types.UUID `json:"load_unit"`
@@ -281,7 +285,10 @@ type WorkoutResult struct {
 
 // WorkoutSet A set as a workout lists it, with the names for display.
 type WorkoutSet struct {
-	BlockPosition    int32               `json:"block_position"`
+	BlockPosition int32 `json:"block_position"`
+
+	// Bodyweight Done on bodyweight: the load is the weight added to it, if any.
+	Bodyweight       bool                `json:"bodyweight"`
 	CompletedAt      time.Time           `json:"completed_at"`
 	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
 	ExerciseName     string              `json:"exercise_name"`

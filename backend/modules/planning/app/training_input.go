@@ -7,7 +7,9 @@ import (
 )
 
 // Amount is the planned reps and load of a block or exercise. A value is nil when not set;
-// a max turns it into a range (e.g. 8-10 reps). Units are rep_units / load_units ids.
+// a max turns it into a range (e.g. 8-10 reps). Units are rep_units / load_units ids. A load on
+// bodyweight (LoadBodyweight, e.g. pull-ups) is the body's weight plus the load, if any, in a
+// weight unit.
 type Amount struct {
 	RepsValue *float64
 	RepsMax   *float64
@@ -16,12 +18,16 @@ type Amount struct {
 	LoadValue *float64
 	LoadMax   *float64
 	LoadUnit  *uuid.UUID
+
+	LoadBodyweight bool
 }
 
 // clearReps and clearLoad empty the part of an amount that the block's kind keeps on the other
 // side (block or exercises).
 func (a *Amount) clearReps() { a.RepsValue, a.RepsMax, a.RepsUnit, a.PerSide = nil, nil, nil, false }
-func (a *Amount) clearLoad() { a.LoadValue, a.LoadMax, a.LoadUnit = nil, nil, nil }
+func (a *Amount) clearLoad() {
+	a.LoadValue, a.LoadMax, a.LoadUnit, a.LoadBodyweight = nil, nil, nil, false
+}
 
 // ExerciseInput is one exercise in a block.
 type ExerciseInput struct {

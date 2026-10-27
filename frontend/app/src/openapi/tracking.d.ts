@@ -361,6 +361,8 @@ export interface components {
             load_value: number | null;
             /** Format: uuid */
             load_unit: string | null;
+            /** @description Done on bodyweight: the load is the weight added to it (in a weight unit), if any. */
+            bodyweight: boolean;
         };
         /** @description A set as stored. */
         LoggedSet: {
@@ -385,6 +387,7 @@ export interface components {
             load_value: number | null;
             /** Format: uuid */
             load_unit: string | null;
+            bodyweight: boolean;
             /** Format: date-time */
             completed_at: string;
         };
@@ -412,6 +415,8 @@ export interface components {
             /** Format: uuid */
             load_unit: string | null;
             load_unit_name: string;
+            /** @description Done on bodyweight: the load is the weight added to it, if any. */
+            bodyweight: boolean;
             /** Format: date-time */
             completed_at: string;
         };

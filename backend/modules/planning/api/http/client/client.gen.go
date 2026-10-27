@@ -104,13 +104,15 @@ func (e DeleteCycleParamsTrainings) Valid() bool {
 
 // Amount Planned reps and load. A value is null when not set; a max turns it into a range.
 type Amount struct {
-	LoadMax   *float64            `json:"load_max"`
-	LoadUnit  *openapi_types.UUID `json:"load_unit"`
-	LoadValue *float64            `json:"load_value"`
-	PerSide   bool                `json:"per_side"`
-	RepsMax   *float64            `json:"reps_max"`
-	RepsUnit  *openapi_types.UUID `json:"reps_unit"`
-	RepsValue *float64            `json:"reps_value"`
+	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
+	LoadBodyweight bool                `json:"load_bodyweight"`
+	LoadMax        *float64            `json:"load_max"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadValue      *float64            `json:"load_value"`
+	PerSide        bool                `json:"per_side"`
+	RepsMax        *float64            `json:"reps_max"`
+	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
+	RepsValue      *float64            `json:"reps_value"`
 }
 
 // AmountUnitNames defines model for AmountUnitNames.
@@ -309,24 +311,27 @@ type Training struct {
 
 // TrainingBlock defines model for TrainingBlock.
 type TrainingBlock struct {
-	Exercises       []TrainingExercise  `json:"exercises"`
-	Id              openapi_types.UUID  `json:"id"`
-	IntervalSeconds *int32              `json:"interval_seconds"`
-	Kind            string              `json:"kind"`
-	LoadMax         *float64            `json:"load_max"`
-	LoadUnit        *openapi_types.UUID `json:"load_unit"`
-	LoadUnitName    string              `json:"load_unit_name"`
-	LoadValue       *float64            `json:"load_value"`
-	Name            string              `json:"name"`
-	Notes           string              `json:"notes"`
-	PerSide         bool                `json:"per_side"`
-	RepsMax         *float64            `json:"reps_max"`
-	RepsUnit        *openapi_types.UUID `json:"reps_unit"`
-	RepsUnitName    string              `json:"reps_unit_name"`
-	RepsValue       *float64            `json:"reps_value"`
-	ScoreType       *ScoreType          `json:"score_type"`
-	Sets            *int32              `json:"sets"`
-	TimeSeconds     *int32              `json:"time_seconds"`
+	Exercises       []TrainingExercise `json:"exercises"`
+	Id              openapi_types.UUID `json:"id"`
+	IntervalSeconds *int32             `json:"interval_seconds"`
+	Kind            string             `json:"kind"`
+
+	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
+	LoadBodyweight bool                `json:"load_bodyweight"`
+	LoadMax        *float64            `json:"load_max"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadUnitName   string              `json:"load_unit_name"`
+	LoadValue      *float64            `json:"load_value"`
+	Name           string              `json:"name"`
+	Notes          string              `json:"notes"`
+	PerSide        bool                `json:"per_side"`
+	RepsMax        *float64            `json:"reps_max"`
+	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
+	RepsUnitName   string              `json:"reps_unit_name"`
+	RepsValue      *float64            `json:"reps_value"`
+	ScoreType      *ScoreType          `json:"score_type"`
+	Sets           *int32              `json:"sets"`
+	TimeSeconds    *int32              `json:"time_seconds"`
 }
 
 // TrainingBlockInput defines model for TrainingBlockInput.
@@ -335,17 +340,20 @@ type TrainingBlockInput struct {
 	IntervalSeconds *int32                  `json:"interval_seconds"`
 
 	// Kind A block kind's code.
-	Kind      string              `json:"kind"`
-	LoadMax   *float64            `json:"load_max"`
-	LoadUnit  *openapi_types.UUID `json:"load_unit"`
-	LoadValue *float64            `json:"load_value"`
-	Name      string              `json:"name"`
-	Notes     string              `json:"notes"`
-	PerSide   bool                `json:"per_side"`
-	RepsMax   *float64            `json:"reps_max"`
-	RepsUnit  *openapi_types.UUID `json:"reps_unit"`
-	RepsValue *float64            `json:"reps_value"`
-	ScoreType *ScoreType          `json:"score_type"`
+	Kind string `json:"kind"`
+
+	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
+	LoadBodyweight bool                `json:"load_bodyweight"`
+	LoadMax        *float64            `json:"load_max"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadValue      *float64            `json:"load_value"`
+	Name           string              `json:"name"`
+	Notes          string              `json:"notes"`
+	PerSide        bool                `json:"per_side"`
+	RepsMax        *float64            `json:"reps_max"`
+	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
+	RepsValue      *float64            `json:"reps_value"`
+	ScoreType      *ScoreType          `json:"score_type"`
 
 	// Sets Only when the kind shares sets; the rounds of a WOD (optional).
 	Sets        *int32 `json:"sets"`
@@ -374,20 +382,23 @@ type TrainingDetail struct {
 
 // TrainingExercise defines model for TrainingExercise.
 type TrainingExercise struct {
-	ExerciseId   openapi_types.UUID  `json:"exercise_id"`
-	LoadMax      *float64            `json:"load_max"`
-	LoadUnit     *openapi_types.UUID `json:"load_unit"`
-	LoadUnitName string              `json:"load_unit_name"`
-	LoadValue    *float64            `json:"load_value"`
-	Name         string              `json:"name"`
-	Notes        string              `json:"notes"`
-	PerSide      bool                `json:"per_side"`
-	RepsMax      *float64            `json:"reps_max"`
-	RepsUnit     *openapi_types.UUID `json:"reps_unit"`
-	RepsUnitName string              `json:"reps_unit_name"`
-	RepsValue    *float64            `json:"reps_value"`
-	Sets         *int32              `json:"sets"`
-	Tempo        string              `json:"tempo"`
+	ExerciseId openapi_types.UUID `json:"exercise_id"`
+
+	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
+	LoadBodyweight bool                `json:"load_bodyweight"`
+	LoadMax        *float64            `json:"load_max"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadUnitName   string              `json:"load_unit_name"`
+	LoadValue      *float64            `json:"load_value"`
+	Name           string              `json:"name"`
+	Notes          string              `json:"notes"`
+	PerSide        bool                `json:"per_side"`
+	RepsMax        *float64            `json:"reps_max"`
+	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
+	RepsUnitName   string              `json:"reps_unit_name"`
+	RepsValue      *float64            `json:"reps_value"`
+	Sets           *int32              `json:"sets"`
+	Tempo          string              `json:"tempo"`
 
 	// Type Whether an exercise mainly improves mobility or strength.
 	Type ExerciseType `json:"type"`
@@ -395,15 +406,18 @@ type TrainingExercise struct {
 
 // TrainingExerciseInput defines model for TrainingExerciseInput.
 type TrainingExerciseInput struct {
-	ExerciseId openapi_types.UUID  `json:"exercise_id"`
-	LoadMax    *float64            `json:"load_max"`
-	LoadUnit   *openapi_types.UUID `json:"load_unit"`
-	LoadValue  *float64            `json:"load_value"`
-	Notes      string              `json:"notes"`
-	PerSide    bool                `json:"per_side"`
-	RepsMax    *float64            `json:"reps_max"`
-	RepsUnit   *openapi_types.UUID `json:"reps_unit"`
-	RepsValue  *float64            `json:"reps_value"`
+	ExerciseId openapi_types.UUID `json:"exercise_id"`
+
+	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
+	LoadBodyweight bool                `json:"load_bodyweight"`
+	LoadMax        *float64            `json:"load_max"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadValue      *float64            `json:"load_value"`
+	Notes          string              `json:"notes"`
+	PerSide        bool                `json:"per_side"`
+	RepsMax        *float64            `json:"reps_max"`
+	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
+	RepsValue      *float64            `json:"reps_value"`
 
 	// Sets null when the block's kind shares sets
 	Sets *int32 `json:"sets"`

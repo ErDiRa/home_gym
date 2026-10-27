@@ -17,21 +17,27 @@
     </ul>
     <p v-if="first.planned" class="mt-1 text-sm text-slate-600">{{ first.planned }}</p>
 
-    <!-- One row per round: reps and load for every movement, and a button that logs, saves or
-         undoes the whole round. -->
-    <div class="mt-2 grid grid-cols-[2rem_1fr_1fr_2.75rem] items-center gap-x-2 gap-y-1.5">
+    <!-- One row per round: reps and load for every movement (on bodyweight only the reps, until
+         weight is added), and a button that logs, saves or undoes the whole round. -->
+    <div
+      :class="['mt-2 grid items-center gap-x-2 gap-y-1.5', first.showLoad ? 'grid-cols-[2rem_1fr_1fr_2.75rem]' : 'grid-cols-[2rem_1fr_2.75rem]']"
+    >
       <span class="text-xs font-medium text-slate-500">Set</span>
       <span class="text-xs font-medium text-slate-500">{{ first.repsUnitName || 'reps' }}{{ first.perSide ? ' / side' : '' }}</span>
-      <SelectField
-        :model-value="first.loadUnit"
-        :options="lookups.loadUnits"
-        :searchable="false"
-        size="sm"
-        option-size="touch"
-        :aria-label="`Block ${block.letter} load unit`"
-        field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
-        @update:model-value="switchUnit"
-      />
+      <div v-if="first.showLoad" class="flex min-w-0 items-center gap-1">
+        <span v-if="first.bodyweight" class="shrink-0 text-xs font-medium text-slate-500">BW +</span>
+        <SelectField
+          class="min-w-0 flex-1"
+          :model-value="first.loadUnit"
+          :options="loadUnits"
+          :searchable="false"
+          size="sm"
+          option-size="touch"
+          :aria-label="`Block ${block.letter} load unit`"
+          field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
+          @update:model-value="switchUnit"
+        />
+      </div>
       <span />
 
       <template v-for="round in rounds" :key="round.number">
@@ -48,6 +54,7 @@
           @update:model-value="set(round, 'reps', $event)"
         />
         <TextInput
+          v-if="first.showLoad"
           :model-value="round.sets[0].row.load"
           type="number"
           inputmode="decimal"
@@ -74,10 +81,16 @@
         </AppButton>
       </template>
     </div>
-    <AppButton variant="text" size="touch" class="mt-1 -ml-3" @click="addRound">
-      <PlusIcon class="size-4" aria-hidden="true" />
-      Add set
-    </AppButton>
+    <div class="mt-1 -ml-3 flex flex-wrap">
+      <AppButton variant="text" size="touch" @click="addRound">
+        <PlusIcon class="size-4" aria-hidden="true" />
+        Add set
+      </AppButton>
+      <AppButton v-if="!first.showLoad" variant="text" size="touch" @click="addWeight">
+        <PlusIcon class="size-4" aria-hidden="true" />
+        Add weight
+      </AppButton>
+    </div>
   </div>
 </template>
 
@@ -103,6 +116,12 @@ const exercises = useExercisesStore()
 
 const first = computed(() => block.value.exercises[0])
 const rounds = computed(() => roundsOf(block.value))
+
+// Weight added to bodyweight is in kg or lb; adding it shows the load inputs of every movement.
+const loadUnits = computed(() => (first.value.bodyweight ? lookups.loadUnits.filter((u) => u.kg_per_unit) : lookups.loadUnits))
+function addWeight() {
+  for (const card of block.value.exercises) card.showLoad = true
+}
 
 // The weight the first movement was last logged with, as the placeholder when the plan has none.
 const lastLoad = computed(() => {

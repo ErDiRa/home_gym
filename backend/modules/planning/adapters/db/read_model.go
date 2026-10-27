@@ -208,7 +208,7 @@ func (n catalogNames) blocks(blocks []app.Block) []planninghttp.TrainingBlock {
 		return planninghttp.TrainingBlock{
 			Id: b.ID, Kind: b.Kind, Name: b.Name, Sets: b.Sets,
 			RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, RepsUnitName: unitName(n.repUnits, b.RepsUnit), PerSide: b.PerSide,
-			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, LoadUnitName: unitName(n.loadUnits, b.LoadUnit),
+			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, LoadUnitName: unitName(n.loadUnits, b.LoadUnit), LoadBodyweight: b.LoadBodyweight,
 			ScoreType: (*planninghttp.ScoreType)(b.ScoreType), TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds,
 			Notes: b.Notes,
 			Exercises: mapSlice(b.Exercises, func(e app.Exercise) planninghttp.TrainingExercise {
@@ -216,7 +216,7 @@ func (n catalogNames) blocks(blocks []app.Block) []planninghttp.TrainingBlock {
 				return planninghttp.TrainingExercise{
 					ExerciseId: e.ExerciseID, Name: ex.Name, Type: planninghttp.ExerciseType(ex.Type), Sets: e.Sets,
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, RepsUnitName: unitName(n.repUnits, e.RepsUnit), PerSide: e.PerSide,
-					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadUnitName: unitName(n.loadUnits, e.LoadUnit),
+					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadUnitName: unitName(n.loadUnits, e.LoadUnit), LoadBodyweight: e.LoadBodyweight,
 					Tempo: e.Tempo, Notes: e.Notes,
 				}
 			}),

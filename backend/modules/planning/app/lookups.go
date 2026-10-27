@@ -16,6 +16,7 @@ import (
 type unit struct {
 	name     string
 	min, max *float64
+	weight   bool // a load unit in kg or lb, which a load on bodyweight adds
 }
 
 // lookups holds the rows a training is validated against: the kinds by code and the live units
@@ -51,7 +52,7 @@ func liveUnits(units []catalog.Unit) map[uuid.UUID]unit {
 	out := make(map[uuid.UUID]unit, len(units))
 	for _, u := range units {
 		if !u.Deleted {
-			out[u.ID] = unit{name: u.Name, min: u.MinValue, max: u.MaxValue}
+			out[u.ID] = unit{name: u.Name, min: u.MinValue, max: u.MaxValue, weight: u.KgPerUnit != nil}
 		}
 	}
 	return out

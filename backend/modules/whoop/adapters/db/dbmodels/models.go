@@ -178,23 +178,25 @@ type PlanningSessionBlock struct {
 	TimeSeconds     *int32
 	IntervalSeconds *int32
 	Notes           string
+	LoadBodyweight  bool
 }
 
 type PlanningSessionExercise struct {
-	ID         uuid.UUID
-	BlockID    uuid.UUID
-	ExerciseID uuid.UUID
-	Position   int32
-	Sets       *int32
-	RepsValue  *float64
-	RepsMax    *float64
-	RepsUnit   *uuid.UUID
-	PerSide    bool
-	LoadValue  *float64
-	LoadMax    *float64
-	LoadUnit   *uuid.UUID
-	Tempo      string
-	Notes      string
+	ID             uuid.UUID
+	BlockID        uuid.UUID
+	ExerciseID     uuid.UUID
+	Position       int32
+	Sets           *int32
+	RepsValue      *float64
+	RepsMax        *float64
+	RepsUnit       *uuid.UUID
+	PerSide        bool
+	LoadValue      *float64
+	LoadMax        *float64
+	LoadUnit       *uuid.UUID
+	Tempo          string
+	Notes          string
+	LoadBodyweight bool
 }
 
 type PlanningTraining struct {
@@ -302,6 +304,7 @@ type TrackingWorkoutSet struct {
 	LoadValue        *float64
 	LoadUnit         *uuid.UUID
 	CompletedAt      time.Time
+	Bodyweight       bool
 }
 
 type WhoopWhoopConnection struct {

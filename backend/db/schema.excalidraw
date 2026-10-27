@@ -2902,7 +2902,7 @@
    "groupIds": [
     "table-session_blocks"
    ],
-   "height": 322,
+   "height": 340,
    "id": "el-076",
    "isDeleted": false,
    "link": null,
@@ -2935,21 +2935,21 @@
    "groupIds": [
     "table-session_blocks"
    ],
-   "height": 306,
+   "height": 324,
    "id": "el-077",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK session_id  uuid → sessions\n   position  int\nFK kind  text → block_kinds\n   name  text\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   score_type  text?\n   time_seconds  int?\n   interval_seconds  int?\n   notes  text",
+   "originalText": "PK id  uuid\nFK session_id  uuid → sessions\n   position  int\nFK kind  text → block_kinds\n   name  text\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   score_type  text?\n   time_seconds  int?\n   interval_seconds  int?\n   notes  text\n   load_bodyweight  boolean",
    "roughness": 0,
    "roundness": null,
    "seed": 1077,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK session_id  uuid → sessions\n   position  int\nFK kind  text → block_kinds\n   name  text\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   score_type  text?\n   time_seconds  int?\n   interval_seconds  int?\n   notes  text",
+   "text": "PK id  uuid\nFK session_id  uuid → sessions\n   position  int\nFK kind  text → block_kinds\n   name  text\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   score_type  text?\n   time_seconds  int?\n   interval_seconds  int?\n   notes  text\n   load_bodyweight  boolean",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -3062,7 +3062,7 @@
    "groupIds": [
     "table-session_exercises"
    ],
-   "height": 268,
+   "height": 286,
    "id": "el-080",
    "isDeleted": false,
    "link": null,
@@ -3095,21 +3095,21 @@
    "groupIds": [
     "table-session_exercises"
    ],
-   "height": 252,
+   "height": 270,
    "id": "el-081",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text",
+   "originalText": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean",
    "roughness": 0,
    "roundness": null,
    "seed": 1081,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text",
+   "text": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -3394,7 +3394,7 @@
    "groupIds": [
     "table-workout_sets"
    ],
-   "height": 232,
+   "height": 250,
    "id": "el-088",
    "isDeleted": false,
    "link": null,
@@ -3427,21 +3427,21 @@
    "groupIds": [
     "table-workout_sets"
    ],
-   "height": 216,
+   "height": 234,
    "id": "el-089",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz",
+   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean",
    "roughness": 0,
    "roundness": null,
    "seed": 1089,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz",
+   "text": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -5383,7 +5383,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 27.0,
+   "height": 36.0,
    "id": "el-134",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5397,7 +5397,7 @@
     ],
     [
      220,
-     -27.0
+     -36.0
     ]
    ],
    "roughness": 0,
@@ -5420,7 +5420,7 @@
    "versionNonce": 2134,
    "width": 220,
    "x": 1560,
-   "y": 920.0
+   "y": 929.0
   },
   {
    "angle": 0,
@@ -5456,7 +5456,7 @@
    "verticalAlign": "middle",
    "width": 32,
    "x": 1630.0,
-   "y": 897.5
+   "y": 902.0
   },
   {
    "angle": 0,
@@ -5477,7 +5477,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 239.0,
+   "height": 230.0,
    "id": "el-136",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5491,7 +5491,7 @@
     ],
     [
      220,
-     239.0
+     230.0
     ]
    ],
    "roughness": 0,
@@ -5514,7 +5514,7 @@
    "versionNonce": 2136,
    "width": 220,
    "x": 1560,
-   "y": 920.0
+   "y": 929.0
   },
   {
    "angle": 0,
@@ -5550,7 +5550,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1630.0,
-   "y": 1030.5
+   "y": 1035.0
   },
   {
    "angle": 0,
@@ -5571,7 +5571,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 447.0,
+   "height": 438.0,
    "id": "el-138",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5585,7 +5585,7 @@
     ],
     [
      220,
-     447.0
+     438.0
     ]
    ],
    "roughness": 0,
@@ -5608,7 +5608,7 @@
    "versionNonce": 2138,
    "width": 220,
    "x": 1560,
-   "y": 920.0
+   "y": 929.0
   },
   {
    "angle": 0,
@@ -5644,7 +5644,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1630.0,
-   "y": 1134.5
+   "y": 1139.0
   },
   {
    "angle": 0,
@@ -5665,7 +5665,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 70,
+   "height": 52,
    "id": "el-140",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5679,7 +5679,7 @@
     ],
     [
      -6.7999999999999545,
-     -70
+     -52
     ]
    ],
    "roughness": 0,
@@ -5738,7 +5738,7 @@
    "verticalAlign": "middle",
    "width": 60,
    "x": 1373.4,
-   "y": 1122.0
+   "y": 1131.0
   },
   {
    "angle": 0,
@@ -5759,7 +5759,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 313.0,
+   "height": 304.0,
    "id": "el-142",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5773,7 +5773,7 @@
     ],
     [
      -180,
-     313.0
+     304.0
     ]
    ],
    "roughness": 0,
@@ -5796,7 +5796,7 @@
    "versionNonce": 2142,
    "width": 180,
    "x": 1260,
-   "y": 1315.0
+   "y": 1324.0
   },
   {
    "angle": 0,
@@ -5832,7 +5832,7 @@
    "verticalAlign": "middle",
    "width": 81,
    "x": 1130.0,
-   "y": 1462.5
+   "y": 1467.0
   },
   {
    "angle": 0,
@@ -5853,7 +5853,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 156.0,
+   "height": 165.0,
    "id": "el-144",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5867,7 +5867,7 @@
     ],
     [
      206.4000000000001,
-     -156.0
+     -165.0
     ]
    ],
    "roughness": 0,
@@ -5890,7 +5890,7 @@
    "versionNonce": 2144,
    "width": 206.4000000000001,
    "x": 1573.6,
-   "y": 1315.0
+   "y": 1324.0
   },
   {
    "angle": 0,
@@ -5926,7 +5926,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1636.8,
-   "y": 1228.0
+   "y": 1232.5
   },
   {
    "angle": 0,
@@ -5947,7 +5947,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 52.0,
+   "height": 43.0,
    "id": "el-146",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5961,7 +5961,7 @@
     ],
     [
      206.4000000000001,
-     52.0
+     43.0
     ]
    ],
    "roughness": 0,
@@ -5984,7 +5984,7 @@
    "versionNonce": 2146,
    "width": 206.4000000000001,
    "x": 1573.6,
-   "y": 1315.0
+   "y": 1324.0
   },
   {
    "angle": 0,
@@ -6020,7 +6020,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1636.8,
-   "y": 1332.0
+   "y": 1336.5
   },
   {
    "angle": 0,
@@ -6417,7 +6417,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 63.0,
+   "height": 72.0,
    "id": "el-156",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6431,7 +6431,7 @@
     ],
     [
      -1220,
-     -63.0
+     -72.0
     ]
    ],
    "roughness": 0,
@@ -6454,7 +6454,7 @@
    "versionNonce": 2156,
    "width": 1220,
    "x": 2300,
-   "y": 1691.0
+   "y": 1700.0
   },
   {
    "angle": 0,
@@ -6490,7 +6490,7 @@
    "verticalAlign": "middle",
    "width": 81,
    "x": 1650.0,
-   "y": 1650.5
+   "y": 1655.0
   },
   {
    "angle": 0,
@@ -6511,7 +6511,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 532.0,
+   "height": 541.0,
    "id": "el-158",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6525,7 +6525,7 @@
     ],
     [
      -220,
-     -532.0
+     -541.0
     ]
    ],
    "roughness": 0,
@@ -6548,7 +6548,7 @@
    "versionNonce": 2158,
    "width": 220,
    "x": 2300,
-   "y": 1691.0
+   "y": 1700.0
   },
   {
    "angle": 0,
@@ -6584,7 +6584,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 2150.0,
-   "y": 1416.0
+   "y": 1420.5
   },
   {
    "angle": 0,
@@ -6605,7 +6605,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 324.0,
+   "height": 333.0,
    "id": "el-160",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6619,7 +6619,7 @@
     ],
     [
      -220,
-     -324.0
+     -333.0
     ]
    ],
    "roughness": 0,
@@ -6642,7 +6642,7 @@
    "versionNonce": 2160,
    "width": 220,
    "x": 2300,
-   "y": 1691.0
+   "y": 1700.0
   },
   {
    "angle": 0,
@@ -6678,7 +6678,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 2150.0,
-   "y": 1520.0
+   "y": 1524.5
   },
   {
    "angle": 0,
@@ -6981,7 +6981,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 164.0,
+   "height": 155.0,
    "id": "el-168",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6995,7 +6995,7 @@
     ],
     [
      684.4000000000001,
-     -164.0
+     -155.0
     ]
    ],
    "roughness": 0,
@@ -7054,7 +7054,7 @@
    "verticalAlign": "middle",
    "width": 102,
    "x": 1917.8,
-   "y": 1764.0
+   "y": 1768.5
   },
   {
    "angle": 0,

@@ -5,6 +5,20 @@
       <span v-if="hint" class="font-normal text-slate-400"> · {{ hint }}</span>
     </legend>
     <div class="flex flex-wrap items-center gap-1">
+      <!-- On bodyweight (e.g. pull-ups) the load is the weight added to it, if any. -->
+      <template v-if="part === 'load'">
+        <AppButton
+          variant="secondary"
+          size="sm"
+          :pressed="amount.load_bodyweight"
+          :aria-label="`${label} on bodyweight`"
+          title="On bodyweight, plus the weight entered, if any"
+          @click="toggleBodyweight"
+        >
+          BW
+        </AppButton>
+        <span v-if="amount.load_bodyweight" class="text-sm text-slate-400" aria-hidden="true">+</span>
+      </template>
       <TextInput
         v-model.number="value"
         type="number"
@@ -36,6 +50,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppButton from '../button/AppButton.vue'
 import AppCheckbox from '../form/AppCheckbox.vue'
 import TextInput from '../form/TextInput.vue'
 import UnitSelect from './UnitSelect.vue'
@@ -44,7 +59,7 @@ import type { Amount } from '../../types'
 
 // Edits the reps or the load of an amount in place: a value, an optional upper end (a range
 // such as 8-10) and a unit; reps can also be per side. Reps are required unless optional (the
-// exercises of a WOD).
+// exercises of a WOD). A load can be on bodyweight, its value then the weight added to it.
 const props = defineProps<{ part: AmountPart; label: string; hint?: string; optional?: boolean }>()
 const amount = defineModel<Amount>({ required: true })
 const lookups = useLookupsStore()
@@ -54,7 +69,8 @@ const value = computed({
   get: () => (props.part === 'reps' ? amount.value.reps_value : amount.value.load_value),
   set: (v) => {
     // Typing a value picks the default unit, so the common case needs no unit click.
-    if (v !== null && unit.value === null) unit.value = lookups.defaultUnit(props.part)
+    // Weight added to bodyweight is in a weight unit.
+    if (v !== null && unit.value === null) unit.value = lookups.defaultUnit(props.part, amount.value.load_bodyweight)
     if (props.part === 'reps') amount.value.reps_value = v
     else amount.value.load_value = v
   },
@@ -78,4 +94,13 @@ const unit = computed({
     }
   },
 })
+
+// Bodyweight alone needs no unit; weight added to it is in a weight unit (kg or lb).
+function toggleBodyweight() {
+  const a = amount.value
+  a.load_bodyweight = !a.load_bodyweight
+  if (!a.load_bodyweight) return
+  if (a.load_value === null) a.load_unit = null
+  else if (!lookups.loadUnits.find((u) => u.id === a.load_unit)?.kg_per_unit) a.load_unit = lookups.defaultUnit('load', true)
+}
 </script>

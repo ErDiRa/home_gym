@@ -342,7 +342,7 @@ func sessionInputFromAPI(s TrainingSessionInput) app.SessionInput {
 			Kind: b.Kind, Name: b.Name, Sets: b.Sets,
 			Amount: app.Amount{
 				RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, PerSide: b.PerSide,
-				LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit,
+				LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, LoadBodyweight: b.LoadBodyweight,
 			},
 			Score:     app.Score{ScoreType: (*string)(b.ScoreType), TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds},
 			Notes:     b.Notes,
@@ -353,7 +353,7 @@ func sessionInputFromAPI(s TrainingSessionInput) app.SessionInput {
 				ExerciseID: e.ExerciseId, Sets: e.Sets,
 				Amount: app.Amount{
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
-					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit,
+					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight,
 				},
 				Tempo: e.Tempo, Notes: e.Notes,
 			}

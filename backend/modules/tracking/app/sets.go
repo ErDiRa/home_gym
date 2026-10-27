@@ -21,8 +21,9 @@ type SetInput struct {
 	RepsValue        *float64 // nil when only the load was logged
 	RepsUnit         *uuid.UUID
 	PerSide          bool
-	LoadValue        *float64 // nil without load, e.g. bodyweight
+	LoadValue        *float64 // nil without load
 	LoadUnit         *uuid.UUID
+	Bodyweight       bool // done on bodyweight: the load is the weight added to it, if any
 }
 
 // LogSet stores a set of one of the user's workouts, or corrects it. Sets can be logged until the
@@ -71,7 +72,7 @@ func (s *Service) checkWorkout(ctx context.Context, userID, workoutID uuid.UUID)
 }
 
 // checkSet validates a set: whatever was entered of it is kept, so reps and load are each
-// optional but not both; the reps unit is always given (the plan's). Values must lie within their
+// optional but not both (on bodyweight, the load is the weight added to it, in a weight unit); the reps unit is always given (the plan's). Values must lie within their
 // unit's bounds (e.g. RPE 1-10), like the planned amounts of a training.
 func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 	switch {
@@ -108,6 +109,9 @@ func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 	loadUnit, ok := liveUnit(units.Load, *in.LoadUnit)
 	if !ok {
 		return errs.Invalid("unknown load unit")
+	}
+	if in.Bodyweight && loadUnit.KgPerUnit == nil {
+		return errs.Invalid("weight added to bodyweight needs a weight unit such as kg or lb")
 	}
 	if msg := checkBounds("load", *in.LoadValue, loadUnit); msg != "" {
 		return errs.Invalid(msg)

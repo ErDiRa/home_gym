@@ -207,13 +207,13 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) (u
 const insertSessionBlock = `-- name: InsertSessionBlock :one
 INSERT INTO planning.session_blocks (
     session_id, position, kind, name, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
     score_type, time_seconds, interval_seconds, notes
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9,
-    $10, $11, $12,
-    $13, $14, $15, $16
+    $10, $11, $12, $13,
+    $14, $15, $16, $17
 )
 RETURNING id
 `
@@ -231,6 +231,7 @@ type InsertSessionBlockParams struct {
 	LoadValue       *float64
 	LoadMax         *float64
 	LoadUnit        *uuid.UUID
+	LoadBodyweight  bool
 	ScoreType       *string
 	TimeSeconds     *int32
 	IntervalSeconds *int32
@@ -252,6 +253,7 @@ func (q *Queries) InsertSessionBlock(ctx context.Context, arg InsertSessionBlock
 		arg.LoadValue,
 		arg.LoadMax,
 		arg.LoadUnit,
+		arg.LoadBodyweight,
 		arg.ScoreType,
 		arg.TimeSeconds,
 		arg.IntervalSeconds,
@@ -265,28 +267,29 @@ func (q *Queries) InsertSessionBlock(ctx context.Context, arg InsertSessionBlock
 const insertSessionExercise = `-- name: InsertSessionExercise :exec
 INSERT INTO planning.session_exercises (
     block_id, exercise_id, position, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, tempo, notes
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight, tempo, notes
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7, $8,
-    $9, $10, $11, $12, $13
+    $9, $10, $11, $12, $13, $14
 )
 `
 
 type InsertSessionExerciseParams struct {
-	BlockID    uuid.UUID
-	ExerciseID uuid.UUID
-	Position   int32
-	Sets       *int32
-	RepsValue  *float64
-	RepsMax    *float64
-	RepsUnit   *uuid.UUID
-	PerSide    bool
-	LoadValue  *float64
-	LoadMax    *float64
-	LoadUnit   *uuid.UUID
-	Tempo      string
-	Notes      string
+	BlockID        uuid.UUID
+	ExerciseID     uuid.UUID
+	Position       int32
+	Sets           *int32
+	RepsValue      *float64
+	RepsMax        *float64
+	RepsUnit       *uuid.UUID
+	PerSide        bool
+	LoadValue      *float64
+	LoadMax        *float64
+	LoadUnit       *uuid.UUID
+	LoadBodyweight bool
+	Tempo          string
+	Notes          string
 }
 
 // The exercise is checked to be one of the user's live ones before (the catalog's contract).
@@ -303,6 +306,7 @@ func (q *Queries) InsertSessionExercise(ctx context.Context, arg InsertSessionEx
 		arg.LoadValue,
 		arg.LoadMax,
 		arg.LoadUnit,
+		arg.LoadBodyweight,
 		arg.Tempo,
 		arg.Notes,
 	)
@@ -333,7 +337,7 @@ func (q *Queries) InsertWeekSession(ctx context.Context, arg InsertWeekSessionPa
 
 const listTrainingBlocks = `-- name: ListTrainingBlocks :many
 SELECT sb.id, sb.session_id, sb.kind, sb.name, sb.sets,
-       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit,
+       sb.reps_value, sb.reps_max, sb.reps_unit, sb.per_side, sb.load_value, sb.load_max, sb.load_unit, sb.load_bodyweight,
        sb.score_type, sb.time_seconds, sb.interval_seconds, sb.notes
 FROM planning.session_blocks sb
 JOIN planning.sessions s ON s.id = sb.session_id
@@ -354,6 +358,7 @@ type ListTrainingBlocksRow struct {
 	LoadValue       *float64
 	LoadMax         *float64
 	LoadUnit        *uuid.UUID
+	LoadBodyweight  bool
 	ScoreType       *string
 	TimeSeconds     *int32
 	IntervalSeconds *int32
@@ -382,6 +387,7 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 			&i.LoadValue,
 			&i.LoadMax,
 			&i.LoadUnit,
+			&i.LoadBodyweight,
 			&i.ScoreType,
 			&i.TimeSeconds,
 			&i.IntervalSeconds,
@@ -399,7 +405,7 @@ func (q *Queries) ListTrainingBlocks(ctx context.Context, trainingID uuid.UUID) 
 
 const listTrainingExercises = `-- name: ListTrainingExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
-       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit,
+       se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id
@@ -409,18 +415,19 @@ ORDER BY se.block_id, se.position
 `
 
 type ListTrainingExercisesRow struct {
-	BlockID    uuid.UUID
-	ExerciseID uuid.UUID
-	Sets       *int32
-	RepsValue  *float64
-	RepsMax    *float64
-	RepsUnit   *uuid.UUID
-	PerSide    bool
-	LoadValue  *float64
-	LoadMax    *float64
-	LoadUnit   *uuid.UUID
-	Tempo      string
-	Notes      string
+	BlockID        uuid.UUID
+	ExerciseID     uuid.UUID
+	Sets           *int32
+	RepsValue      *float64
+	RepsMax        *float64
+	RepsUnit       *uuid.UUID
+	PerSide        bool
+	LoadValue      *float64
+	LoadMax        *float64
+	LoadUnit       *uuid.UUID
+	LoadBodyweight bool
+	Tempo          string
+	Notes          string
 }
 
 func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUID) ([]ListTrainingExercisesRow, error) {
@@ -443,6 +450,7 @@ func (q *Queries) ListTrainingExercises(ctx context.Context, trainingID uuid.UUI
 			&i.LoadValue,
 			&i.LoadMax,
 			&i.LoadUnit,
+			&i.LoadBodyweight,
 			&i.Tempo,
 			&i.Notes,
 		); err != nil {

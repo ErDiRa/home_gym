@@ -383,7 +383,7 @@ components:
     SetInput:
       type: object
       description: A performed set at its place in the session (block and position in the block, from 1).
-      required: [exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit]
+      required: [exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, bodyweight]
       properties:
         exercise_id: { type: string, format: uuid }
         block_position: { type: integer, format: int32 }
@@ -394,10 +394,11 @@ components:
         per_side: { type: boolean }
         load_value: { type: number, format: double, nullable: true, description: "null without load; never both null" }
         load_unit: { type: string, format: uuid, nullable: true }
+        bodyweight: { type: boolean, description: "Done on bodyweight: the load is the weight added to it (in a weight unit), if any." }
     LoggedSet:
       type: object
       description: A set as stored.
-      required: [id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at]
+      required: [id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, bodyweight, completed_at]
       properties:
         id: { type: string, format: uuid }
         workout_id: { type: string, format: uuid }
@@ -410,11 +411,12 @@ components:
         per_side: { type: boolean }
         load_value: { type: number, format: double, nullable: true }
         load_unit: { type: string, format: uuid, nullable: true }
+        bodyweight: { type: boolean }
         completed_at: { type: string, format: date-time }
     WorkoutSet:
       type: object
       description: A set as a workout lists it, with the names for display.
-      required: [id, exercise_id, exercise_name, block_position, exercise_position, set_number, reps_value, reps_unit, reps_unit_name, per_side, load_value, load_unit, load_unit_name, completed_at]
+      required: [id, exercise_id, exercise_name, block_position, exercise_position, set_number, reps_value, reps_unit, reps_unit_name, per_side, load_value, load_unit, load_unit_name, bodyweight, completed_at]
       properties:
         id: { type: string, format: uuid }
         exercise_id: { type: string, format: uuid }
@@ -429,6 +431,7 @@ components:
         load_value: { type: number, format: double, nullable: true }
         load_unit: { type: string, format: uuid, nullable: true }
         load_unit_name: { type: string }
+        bodyweight: { type: boolean, description: "Done on bodyweight: the load is the weight added to it, if any." }
         completed_at: { type: string, format: date-time }
     ResultInput:
       type: object

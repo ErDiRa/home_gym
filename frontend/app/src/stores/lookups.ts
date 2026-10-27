@@ -65,11 +65,12 @@ export const useLookupsStore = defineStore('lookups', () => {
     return unit
   }
 
-  // The unit a new value starts in: reps for reps, the last load unit for load.
-  function defaultUnit(part: AmountPart): string | null {
-    if (part === 'load' && lastLoadUnit.value && loadUnits.value.some((u) => u.id === lastLoadUnit.value))
-      return lastLoadUnit.value
-    return unitsOf(part)[0]?.id ?? null
+  // The unit a new value starts in: reps for reps, the last load unit for load; with weight, only
+  // a weight unit (kg or lb), as weight added to bodyweight is.
+  function defaultUnit(part: AmountPart, weight = false): string | null {
+    const units = unitsOf(part).filter((u) => !weight || u.kg_per_unit)
+    if (part === 'load' && lastLoadUnit.value && units.some((u) => u.id === lastLoadUnit.value)) return lastLoadUnit.value
+    return units[0]?.id ?? null
   }
 
   return {

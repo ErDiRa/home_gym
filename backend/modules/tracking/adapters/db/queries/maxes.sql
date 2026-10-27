@@ -7,11 +7,12 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id;
 
 -- name: UserOwnsSet :one
--- Whether the set was logged for the exercise in one of the user's live workouts.
+-- Whether the set was logged for the exercise in one of the user's live workouts (not on bodyweight,
+-- whose load is only the weight added to it).
 SELECT EXISTS (
     SELECT 1 FROM tracking.workout_sets ws
     JOIN tracking.workouts w ON w.id = ws.workout_id AND w.user_id = sqlc.arg(user_id) AND w.deleted_at IS NULL
-    WHERE ws.id = sqlc.arg(id) AND ws.exercise_id = sqlc.arg(exercise_id)
+    WHERE ws.id = sqlc.arg(id) AND ws.exercise_id = sqlc.arg(exercise_id) AND NOT ws.bodyweight
 );
 
 -- name: DeleteExerciseMax :execrows

@@ -61,6 +61,16 @@ describe('parseImport', () => {
     ['an amount without unit', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.unit), 'Mon, block A, Squat, reps: unit is missing.'],
     ['reps without value', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.value), 'Mon, block A, Squat, reps: value must be a number of at least 0.'],
     [
+      'a load without unit and value not on bodyweight',
+      changed((d) => (d.sessions[0].blocks[0].exercises[0].load = {})),
+      'Mon, block A, Squat, load: unit is missing.',
+    ],
+    [
+      'weight on bodyweight without unit',
+      changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { bodyweight: true, value: 10 })),
+      'Mon, block A, Squat, load: unit is missing.',
+    ],
+    [
       'a load max without value',
       changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { max: 80, unit: 'kg' })),
       'Mon, block A, Squat, load: max needs a value.',
@@ -113,6 +123,21 @@ describe('toImportedTraining', () => {
     const text = changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { unit: 'kg' }))
     const squat = toImportedTraining(parseImport(text, kinds), names).sessions[0].blocks[0].exercises[0]
     expect(squat).toMatchObject({ load_value: null, load_max: null, load_unit: 'unit-kg' })
+  })
+
+  it('keeps a load on bodyweight, alone or with weight added', () => {
+    const alone = changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { bodyweight: true }))
+    expect(toImportedTraining(parseImport(alone, kinds), names).sessions[0].blocks[0].exercises[0]).toMatchObject({
+      load_bodyweight: true,
+      load_value: null,
+      load_unit: null,
+    })
+    const weighted = changed((d) => (d.sessions[0].blocks[0].exercises[0].load = { bodyweight: true, value: 10, unit: 'kg' }))
+    expect(toImportedTraining(parseImport(weighted, kinds), names).sessions[0].blocks[0].exercises[0]).toMatchObject({
+      load_bodyweight: true,
+      load_value: 10,
+      load_unit: 'unit-kg',
+    })
   })
 
   it('keeps the cycle named in the file, trimmed', () => {

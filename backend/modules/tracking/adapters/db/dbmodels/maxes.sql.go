@@ -68,7 +68,7 @@ const userOwnsSet = `-- name: UserOwnsSet :one
 SELECT EXISTS (
     SELECT 1 FROM tracking.workout_sets ws
     JOIN tracking.workouts w ON w.id = ws.workout_id AND w.user_id = $1 AND w.deleted_at IS NULL
-    WHERE ws.id = $2 AND ws.exercise_id = $3
+    WHERE ws.id = $2 AND ws.exercise_id = $3 AND NOT ws.bodyweight
 )
 `
 
@@ -78,7 +78,8 @@ type UserOwnsSetParams struct {
 	ExerciseID uuid.UUID
 }
 
-// Whether the set was logged for the exercise in one of the user's live workouts.
+// Whether the set was logged for the exercise in one of the user's live workouts (not on bodyweight,
+// whose load is only the weight added to it).
 func (q *Queries) UserOwnsSet(ctx context.Context, arg UserOwnsSetParams) (bool, error) {
 	row := q.db.QueryRow(ctx, userOwnsSet, arg.UserID, arg.ID, arg.ExerciseID)
 	var exists bool

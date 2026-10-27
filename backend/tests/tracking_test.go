@@ -232,6 +232,17 @@ func TestLastLoads(t *testing.T) {
 	if l := *resp.JSON200; len(l) != 1 || l[0].ExerciseId != exercise || l[0].LoadValue != 60 || l[0].LoadUnitName != "kg" {
 		t.Errorf("last loads = %s", body(resp.Body))
 	}
+
+	// Weight added to bodyweight is kept as such and isn't suggested as a load.
+	five, ten := 5.0, 10.0
+	set := trackingclient.SetInput{ExerciseId: exercise, BlockPosition: 1, ExercisePosition: 1, SetNumber: 3, RepsValue: &five, RepsUnit: &reps, LoadValue: &ten, LoadUnit: &kg, Bodyweight: true}
+	logged, err := u.Tracking.LogSetWithResponse(ctx, finished, set)
+	if err != nil || logged.StatusCode() != http.StatusOK || !logged.JSON200.Bodyweight {
+		t.Fatalf("log set on bodyweight = %v %s", err, body(logged.Body))
+	}
+	if resp, _ := u.Tracking.ListLastLoadsWithResponse(ctx); len(*resp.JSON200) != 1 || (*resp.JSON200)[0].LoadValue != 60 {
+		t.Errorf("last loads with a set on bodyweight = %s", body(resp.Body))
+	}
 }
 
 // The week offers the active trainings; a cycle's shows its cycle and goals.

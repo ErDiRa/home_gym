@@ -71,6 +71,7 @@ export const emptyAmount = (): Amount => ({
   load_value: null,
   load_max: null,
   load_unit: null,
+  load_bodyweight: false,
 })
 
 // Copies just the amount fields, leaving behind unit names and the row's other fields.
@@ -82,6 +83,7 @@ const pickAmount = (a: Amount): Amount => ({
   load_value: a.load_value,
   load_max: a.load_max,
   load_unit: a.load_unit,
+  load_bodyweight: a.load_bodyweight,
 })
 
 export const DEFAULT_SETS = 3
@@ -302,6 +304,7 @@ function amountProblem(a: Amount, part: AmountPart, optional = false): string {
   if (value === null) return part === 'reps' && !optional ? 'Reps are required.' : ''
   const unit = useLookupsStore().unitsOf(part).find((u) => u.id === unitId)
   if (!unit) return `Choose a ${part} unit.`
+  if (part === 'load' && a.load_bodyweight && !unit.kg_per_unit) return 'Weight added to bodyweight needs a weight unit such as kg or lb.'
   if (max !== null && max <= value) return `The upper end of the ${part} range must be higher than ${value}.`
   for (const v of [value, max]) {
     if (v !== null && !withinBounds(v, unit)) return `${part === 'reps' ? 'Reps' : 'Load'} in ${unit.name} ${boundsText(unit)}.`

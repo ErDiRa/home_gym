@@ -92,7 +92,7 @@ func groupBlocks(blocks []dbmodels.ListTrainingBlocksRow, exercises []dbmodels.L
 			ExerciseID: e.ExerciseID, Sets: e.Sets, Tempo: e.Tempo, Notes: e.Notes,
 			Amount: app.Amount{
 				RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
-				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit,
+				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight,
 			},
 		})
 	}
@@ -103,7 +103,7 @@ func groupBlocks(blocks []dbmodels.ListTrainingBlocksRow, exercises []dbmodels.L
 			Score: app.Score{ScoreType: b.ScoreType, TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds},
 			Amount: app.Amount{
 				RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, PerSide: b.PerSide,
-				LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit,
+				LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, LoadBodyweight: b.LoadBodyweight,
 			},
 			Exercises: orEmpty(exercisesByBlock[b.ID]),
 		})
@@ -231,7 +231,7 @@ func insertBlocks(ctx context.Context, q *dbmodels.Queries, sessionID uuid.UUID,
 		blockID, err := q.InsertSessionBlock(ctx, dbmodels.InsertSessionBlockParams{
 			SessionID: sessionID, Position: int32(j + 1), Kind: b.Kind, Name: b.Name, Sets: b.Sets,
 			RepsValue: b.RepsValue, RepsMax: b.RepsMax, RepsUnit: b.RepsUnit, PerSide: b.PerSide,
-			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit,
+			LoadValue: b.LoadValue, LoadMax: b.LoadMax, LoadUnit: b.LoadUnit, LoadBodyweight: b.LoadBodyweight,
 			ScoreType: b.ScoreType, TimeSeconds: b.TimeSeconds, IntervalSeconds: b.IntervalSeconds, Notes: b.Notes,
 		})
 		if err != nil {
@@ -241,7 +241,7 @@ func insertBlocks(ctx context.Context, q *dbmodels.Queries, sessionID uuid.UUID,
 			if err := q.InsertSessionExercise(ctx, dbmodels.InsertSessionExerciseParams{
 				BlockID: blockID, ExerciseID: e.ExerciseID, Position: int32(k + 1), Sets: e.Sets,
 				RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
-				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, Tempo: e.Tempo, Notes: e.Notes,
+				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight, Tempo: e.Tempo, Notes: e.Notes,
 			}); err != nil {
 				return err
 			}

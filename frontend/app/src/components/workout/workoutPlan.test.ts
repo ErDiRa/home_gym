@@ -37,6 +37,7 @@ const session: TrainingSession = {
       load_value: null,
       load_max: null,
       load_unit: null,
+      load_bodyweight: false,
       reps_unit_name: '',
       load_unit_name: '',
       score_type: null,
@@ -57,6 +58,7 @@ const session: TrainingSession = {
           load_value: 70,
           load_max: 75,
           load_unit: 'pct',
+          load_bodyweight: false,
           reps_unit_name: 'reps',
           load_unit_name: '% 1RM',
         },
@@ -102,6 +104,7 @@ describe('buildCards with % 1RM', () => {
       per_side: false,
       load_value: 185,
       load_unit: 'lb',
+      bodyweight: false,
       completed_at: '',
       exercise_name: 'Back squat',
       reps_unit_name: 'reps',
@@ -128,6 +131,13 @@ describe('the load logged last time', () => {
     expect(card.rows.map((r) => r.load)).toEqual([null, null, null]) // only a placeholder
     expect(suggestedLoad(card, unitOf, null)).toBe(135)
     expect(suggestedLoad({ ...card, loadUnit: 'kg' }, unitOf, null)).toBe(61) // 61.2 kg
+  })
+
+  it('is not suggested on bodyweight', () => {
+    const plan = structuredClone(unloadedSession)
+    plan.blocks[0].exercises[0].load_bodyweight = true
+    const card = buildCards(plan, [], [], () => single, 'pct', { ...withLast(20, kg), weightUnit: 'kg' }).blocks[0].exercises[0]
+    expect(card.lastLoad).toBeNull()
   })
 
   it('is not suggested when the plan has a load', () => {
@@ -175,6 +185,7 @@ const cleanSet: WorkoutSet = {
   per_side: false,
   load_value: 65,
   load_unit: 'kg',
+  bodyweight: false,
   completed_at: '',
   exercise_name: 'Power clean',
   reps_unit_name: 'reps',
@@ -216,5 +227,40 @@ describe('a complex', () => {
     const block = buildCards(complexSession, [], [], () => single, 'kg', context(null)).blocks[0]
     expect(block.complex).toBe(false)
     expect(progressOf(block)).toEqual({ logged: 0, total: 6 }) // every exercise's own sets
+  })
+})
+
+describe('an exercise on bodyweight', () => {
+  const onBodyweight = (load: { load_value: number | null; load_unit: string | null; load_unit_name: string }) => {
+    const plan = structuredClone(unloadedSession)
+    Object.assign(plan.blocks[0].exercises[0], { load_bodyweight: true, load_max: null, ...load })
+    return plan
+  }
+  const context = { ...withLast(20, kg), weightUnit: 'kg' }
+
+  it('logs only the reps without weight added', () => {
+    const card = buildCards(onBodyweight({ load_value: null, load_unit: null, load_unit_name: '' }), [], [], () => single, 'pct', context)
+      .blocks[0].exercises[0]
+    expect(card.bodyweight).toBe(true)
+    expect(card.showLoad).toBe(false)
+    expect(card.planned).toBe('3 × 5 reps · bodyweight')
+    expect(card.loadUnit).toBe('kg') // where weight added in the workout starts, not % 1RM
+  })
+
+  it('shows the weight planned on top', () => {
+    const card = buildCards(onBodyweight({ load_value: 10, load_unit: 'kg', load_unit_name: 'kg' }), [], [], () => single, 'kg', context)
+      .blocks[0].exercises[0]
+    expect(card.showLoad).toBe(true)
+    expect(card.planned).toBe('3 × 5 reps · bodyweight + 10 kg')
+    expect(card.rows.map((r) => r.load)).toEqual([10, 10, 10])
+  })
+
+  it('shows the weight logged on top', () => {
+    const logged: WorkoutSet = { ...cleanSet, exercise_id: 'squat', set_number: 1, reps_value: 5, load_value: 5, bodyweight: true }
+    const card = buildCards(onBodyweight({ load_value: null, load_unit: null, load_unit_name: '' }), [logged], [], () => single, 'kg', context)
+      .blocks[0].exercises[0]
+    expect(card.bodyweight).toBe(true)
+    expect(card.showLoad).toBe(true)
+    expect(card.rows.map((r) => r.load)).toEqual([5, null, null])
   })
 })

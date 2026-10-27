@@ -168,7 +168,7 @@ const listLastLoads = `-- name: ListLastLoads :many
 SELECT DISTINCT ON (ws.exercise_id) ws.exercise_id, ws.load_value, ws.load_unit, w.completed_at
 FROM tracking.workout_sets ws
 JOIN tracking.workouts w ON w.id = ws.workout_id
-WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL AND ws.load_value IS NOT NULL
+WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL AND ws.load_value IS NOT NULL AND NOT ws.bodyweight
 ORDER BY ws.exercise_id, w.completed_at DESC, ws.block_position DESC, ws.exercise_position DESC, ws.set_number DESC
 `
 
@@ -180,7 +180,7 @@ type ListLastLoadsRow struct {
 }
 
 // The load a user last logged per exercise: the last set with a load (in session order) of the
-// newest finished workout that has one.
+// newest finished workout that has one. Weight added to bodyweight isn't such a load.
 func (q *Queries) ListLastLoads(ctx context.Context, userID uuid.UUID) ([]ListLastLoadsRow, error) {
 	rows, err := q.db.Query(ctx, listLastLoads, userID)
 	if err != nil {
@@ -246,7 +246,7 @@ func (q *Queries) ListWorkoutResults(ctx context.Context, workoutID uuid.UUID) (
 }
 
 const listWorkoutSets = `-- name: ListWorkoutSets :many
-SELECT id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at FROM tracking.workout_sets
+SELECT id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at, bodyweight FROM tracking.workout_sets
 WHERE workout_id = $1
 ORDER BY block_position, exercise_position, set_number
 `
@@ -274,6 +274,7 @@ func (q *Queries) ListWorkoutSets(ctx context.Context, workoutID uuid.UUID) ([]T
 			&i.LoadValue,
 			&i.LoadUnit,
 			&i.CompletedAt,
+			&i.Bodyweight,
 		); err != nil {
 			return nil, err
 		}
