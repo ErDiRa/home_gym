@@ -132,6 +132,16 @@ type FinishWorkoutRequest struct {
 // GoalStatus defines model for GoalStatus.
 type GoalStatus string
 
+// LastLoad The load of the last set with one of the newest finished workout that logged the exercise.
+type LastLoad struct {
+	// DoneAt When that workout was finished.
+	DoneAt       time.Time          `json:"done_at"`
+	ExerciseId   openapi_types.UUID `json:"exercise_id"`
+	LoadUnit     openapi_types.UUID `json:"load_unit"`
+	LoadUnitName string             `json:"load_unit_name"`
+	LoadValue    float64            `json:"load_value"`
+}
+
 // LoggedSet A set as stored.
 type LoggedSet struct {
 	BlockPosition    int32               `json:"block_position"`
@@ -459,6 +469,11 @@ type ClientInterface interface {
 	// Corresponds with GET /stats/exercises (the `ExerciseStats` operationId).
 	ExerciseStats(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListLastLoads The load last logged of each exercise, from the user's finished workouts.
+	//
+	// Corresponds with GET /stats/last-loads (the `ListLastLoads` operationId).
+	ListLastLoads(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetWeek The tracker's week of the chosen active training (else the first).
 	//
 	// Corresponds with GET /week (the `GetWeek` operationId).
@@ -607,6 +622,21 @@ func (c *Client) AddExerciseMax(ctx context.Context, id ID, body AddExerciseMaxJ
 // Corresponds with GET /stats/exercises (the `ExerciseStats` operationId).
 func (c *Client) ExerciseStats(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExerciseStatsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListLastLoads The load last logged of each exercise, from the user's finished workouts.
+//
+// Corresponds with GET /stats/last-loads (the `ListLastLoads` operationId).
+func (c *Client) ListLastLoads(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListLastLoadsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -955,6 +985,33 @@ func NewExerciseStatsRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/stats/exercises")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListLastLoadsRequest constructs an http.Request for the ListLastLoads method
+func NewListLastLoadsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/last-loads")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1516,6 +1573,13 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /stats/exercises (the `ExerciseStats` operationId).
 	ExerciseStatsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExerciseStatsResponse, error)
 
+	// ListLastLoadsWithResponse The load last logged of each exercise, from the user's finished workouts.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /stats/last-loads (the `ListLastLoads` operationId).
+	ListLastLoadsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLastLoadsResponse, error)
+
 	// GetWeekWithResponse The tracker's week of the chosen active training (else the first).
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1816,6 +1880,54 @@ func (r ExerciseStatsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExerciseStatsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListLastLoadsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]LastLoad
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListLastLoadsResponse) GetJSON200() *[]LastLoad {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListLastLoadsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r ListLastLoadsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListLastLoadsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListLastLoadsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListLastLoadsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2470,6 +2582,19 @@ func (c *ClientWithResponses) ExerciseStatsWithResponse(ctx context.Context, req
 	return ParseExerciseStatsResponse(rsp)
 }
 
+// ListLastLoadsWithResponse The load last logged of each exercise, from the user's finished workouts.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/last-loads (the `ListLastLoads` operationId).
+func (c *ClientWithResponses) ListLastLoadsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLastLoadsResponse, error) {
+	rsp, err := c.ListLastLoads(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListLastLoadsResponse(rsp)
+}
+
 // GetWeekWithResponse The tracker's week of the chosen active training (else the first).
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2785,6 +2910,39 @@ func ParseExerciseStatsResponse(rsp *http.Response) (*ExerciseStatsResponse, err
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []ExerciseStat
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListLastLoadsResponse parses an HTTP response from a ListLastLoadsWithResponse call
+func ParseListLastLoadsResponse(rsp *http.Response) (*ListLastLoadsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListLastLoadsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []LastLoad
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

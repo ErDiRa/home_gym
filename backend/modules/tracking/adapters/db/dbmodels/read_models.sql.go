@@ -164,6 +164,48 @@ func (q *Queries) ListExerciseMaxes(ctx context.Context, userID uuid.UUID) ([]Li
 	return items, nil
 }
 
+const listLastLoads = `-- name: ListLastLoads :many
+SELECT DISTINCT ON (ws.exercise_id) ws.exercise_id, ws.load_value, ws.load_unit, w.completed_at
+FROM tracking.workout_sets ws
+JOIN tracking.workouts w ON w.id = ws.workout_id
+WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL AND ws.load_value IS NOT NULL
+ORDER BY ws.exercise_id, w.completed_at DESC, ws.block_position DESC, ws.exercise_position DESC, ws.set_number DESC
+`
+
+type ListLastLoadsRow struct {
+	ExerciseID  uuid.UUID
+	LoadValue   *float64
+	LoadUnit    *uuid.UUID
+	CompletedAt *time.Time
+}
+
+// The load a user last logged per exercise: the last set with a load (in session order) of the
+// newest finished workout that has one.
+func (q *Queries) ListLastLoads(ctx context.Context, userID uuid.UUID) ([]ListLastLoadsRow, error) {
+	rows, err := q.db.Query(ctx, listLastLoads, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLastLoadsRow{}
+	for rows.Next() {
+		var i ListLastLoadsRow
+		if err := rows.Scan(
+			&i.ExerciseID,
+			&i.LoadValue,
+			&i.LoadUnit,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkoutResults = `-- name: ListWorkoutResults :many
 SELECT id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at FROM tracking.workout_results
 WHERE workout_id = $1

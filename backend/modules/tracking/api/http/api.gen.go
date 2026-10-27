@@ -131,6 +131,16 @@ type FinishWorkoutRequest struct {
 // GoalStatus defines model for GoalStatus.
 type GoalStatus string
 
+// LastLoad The load of the last set with one of the newest finished workout that logged the exercise.
+type LastLoad struct {
+	// DoneAt When that workout was finished.
+	DoneAt       time.Time          `json:"done_at"`
+	ExerciseId   openapi_types.UUID `json:"exercise_id"`
+	LoadUnit     openapi_types.UUID `json:"load_unit"`
+	LoadUnitName string             `json:"load_unit_name"`
+	LoadValue    float64            `json:"load_value"`
+}
+
 // LoggedSet A set as stored.
 type LoggedSet struct {
 	BlockPosition    int32               `json:"block_position"`
@@ -371,6 +381,9 @@ type ServerInterface interface {
 	// ExerciseStats The exercises done in workouts, most often first, with their rating.
 	// (GET /stats/exercises)
 	ExerciseStats(w http.ResponseWriter, r *http.Request)
+	// ListLastLoads The load last logged of each exercise, from the user's finished workouts.
+	// (GET /stats/last-loads)
+	ListLastLoads(w http.ResponseWriter, r *http.Request)
 	// GetWeek The tracker's week of the chosen active training (else the first).
 	// (GET /week)
 	GetWeek(w http.ResponseWriter, r *http.Request, params GetWeekParams)
@@ -427,6 +440,12 @@ func (_ Unimplemented) AddExerciseMax(w http.ResponseWriter, r *http.Request, id
 // ExerciseStats The exercises done in workouts, most often first, with their rating.
 // (GET /stats/exercises)
 func (_ Unimplemented) ExerciseStats(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListLastLoads The load last logged of each exercise, from the user's finished workouts.
+// (GET /stats/last-loads)
+func (_ Unimplemented) ListLastLoads(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -567,6 +586,20 @@ func (siw *ServerInterfaceWrapper) ExerciseStats(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExerciseStats(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListLastLoads operation middleware
+func (siw *ServerInterfaceWrapper) ListLastLoads(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListLastLoads(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1034,6 +1067,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/stats/exercises", wrapper.ExerciseStats)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/stats/last-loads", wrapper.ListLastLoads)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/week", wrapper.GetWeek)
 	})
 	r.Group(func(r chi.Router) {
@@ -1255,6 +1291,41 @@ func (response ExerciseStats200JSONResponse) VisitExerciseStatsResponse(w http.R
 type ExerciseStats401JSONResponse struct{ UnauthorizedJSONResponse }
 
 func (response ExerciseStats401JSONResponse) VisitExerciseStatsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLastLoadsRequestObject struct {
+}
+
+type ListLastLoadsResponseObject interface {
+	VisitListLastLoadsResponse(w http.ResponseWriter) error
+}
+
+type ListLastLoads200JSONResponse []LastLoad
+
+func (response ListLastLoads200JSONResponse) VisitListLastLoadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLastLoads401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListLastLoads401JSONResponse) VisitListLastLoadsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1879,6 +1950,9 @@ type StrictServerInterface interface {
 	// ExerciseStats The exercises done in workouts, most often first, with their rating.
 	// (GET /stats/exercises)
 	ExerciseStats(ctx context.Context, request ExerciseStatsRequestObject) (ExerciseStatsResponseObject, error)
+	// ListLastLoads The load last logged of each exercise, from the user's finished workouts.
+	// (GET /stats/last-loads)
+	ListLastLoads(ctx context.Context, request ListLastLoadsRequestObject) (ListLastLoadsResponseObject, error)
 	// GetWeek The tracker's week of the chosen active training (else the first).
 	// (GET /week)
 	GetWeek(ctx context.Context, request GetWeekRequestObject) (GetWeekResponseObject, error)
@@ -2050,6 +2124,30 @@ func (sh *strictHandler) ExerciseStats(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ExerciseStatsResponseObject); ok {
 		if err := validResponse.VisitExerciseStatsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListLastLoads operation middleware
+func (sh *strictHandler) ListLastLoads(w http.ResponseWriter, r *http.Request) {
+	var request ListLastLoadsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListLastLoads(ctx, request.(ListLastLoadsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListLastLoads")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListLastLoadsResponseObject); ok {
+		if err := validResponse.VisitListLastLoadsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

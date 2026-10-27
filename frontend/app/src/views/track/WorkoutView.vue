@@ -252,6 +252,8 @@ onMounted(async () => {
       exercises.loadExercises(),
       exercises.loadRatings(),
       exercises.loadMaxes(),
+      // Without the last loads the sets just suggest none.
+      workouts.loadLastLoads().catch(() => {}),
       // Without WHOOP (not configured or failing) the workout just shows no WHOOP card.
       whoop.loadStatus().catch(() => {}),
     ])
@@ -265,6 +267,10 @@ onMounted(async () => {
       maxOf: (exerciseId) => {
         const max = exercises.currentMax(exerciseId)
         return max ? { value: max.load_value, unit: loadUnitOf(max.load_unit) } : null
+      },
+      lastOf: (exerciseId) => {
+        const last = workouts.lastLoads.get(exerciseId)
+        return last ? { value: last.load_value, unit: loadUnitOf(last.load_unit) } : null
       },
     })
     blocks.value = cards.blocks

@@ -107,6 +107,8 @@ export type LibrarySessionDetail = Planning['LibrarySessionDetail']
 // current max.
 export type ExerciseMax = Tracking['ExerciseMax']
 export type ExerciseMaxInput = Tracking['ExerciseMaxInput']
+// The load last logged of an exercise, which the tracker suggests where the plan has none.
+export type LastLoad = Tracking['LastLoad']
 // How the user rated an exercise (1-5), with their notes.
 export type ExerciseRating = Catalog['ExerciseRating']
 

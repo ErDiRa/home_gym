@@ -189,6 +189,51 @@ func TestMaxes(t *testing.T) {
 	}
 }
 
+// The load last logged of an exercise is its last set with a load of the newest finished workout;
+// workouts in progress don't count.
+func TestLastLoads(t *testing.T) {
+	t.Parallel()
+	u := newUser(t)
+	ctx := t.Context()
+	exercise, reps := createExercise(t, u, exerciseInput("Bench press")), repsUnit(t, u)
+	activeTraining(t, u, exercise, reps)
+	units, _ := u.Catalog.ListLoadUnitsWithResponse(ctx)
+	var kg uuid.UUID
+	for _, unit := range *units.JSON200 {
+		if unit.Name == "kg" {
+			kg = unit.Id
+		}
+	}
+	slots := week(t, u, nil).Planned
+	logLoads := func(slot uuid.UUID, loads ...float64) uuid.UUID {
+		started, err := u.Tracking.StartWorkoutWithResponse(ctx, trackingclient.StartWorkoutRequest{WeekSessionId: slot})
+		if err != nil || started.JSON201 == nil {
+			t.Fatalf("start = %v %s", err, body(started.Body))
+		}
+		for i, load := range loads {
+			set := trackingclient.SetInput{ExerciseId: exercise, BlockPosition: 1, ExercisePosition: 1, SetNumber: int32(i + 1), RepsUnit: &reps, LoadValue: &load, LoadUnit: &kg}
+			if resp, err := u.Tracking.LogSetWithResponse(ctx, started.JSON201.Id, set); err != nil || resp.StatusCode() != http.StatusOK {
+				t.Fatalf("log set = %v %s", err, body(resp.Body))
+			}
+		}
+		return started.JSON201.Id
+	}
+
+	finished := logLoads(slots[0].Id, 70, 60)
+	if resp, _ := u.Tracking.FinishWorkoutWithResponse(ctx, finished, trackingclient.FinishWorkoutRequest{}); resp.StatusCode() != http.StatusOK {
+		t.Fatalf("finish = %s", body(resp.Body))
+	}
+	logLoads(slots[1].Id, 80)
+
+	resp, err := u.Tracking.ListLastLoadsWithResponse(ctx)
+	if err != nil || resp.StatusCode() != http.StatusOK {
+		t.Fatalf("last loads = %v %s", err, body(resp.Body))
+	}
+	if l := *resp.JSON200; len(l) != 1 || l[0].ExerciseId != exercise || l[0].LoadValue != 60 || l[0].LoadUnitName != "kg" {
+		t.Errorf("last loads = %s", body(resp.Body))
+	}
+}
+
 // The week offers the active trainings; a cycle's shows its cycle and goals.
 func TestWeekWithCycle(t *testing.T) {
 	t.Parallel()

@@ -76,6 +76,20 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ExerciseStat" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /stats/last-loads:
+    get:
+      operationId: ListLastLoads
+      tags: [exercises]
+      summary: The load last logged of each exercise, from the user's finished workouts.
+      responses:
+        "200":
+          description: One per exercise.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LastLoad" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
   /week:
     get:
       operationId: GetWeek
@@ -315,6 +329,16 @@ components:
         muscle_groups: { type: array, items: { type: string } }
         times_performed: { type: integer, format: int64 }
         rating: { type: integer, format: int32, nullable: true }
+    LastLoad:
+      type: object
+      description: The load of the last set with one of the newest finished workout that logged the exercise.
+      required: [exercise_id, load_value, load_unit, load_unit_name, done_at]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        load_value: { type: number, format: double }
+        load_unit: { type: string, format: uuid }
+        load_unit_name: { type: string }
+        done_at: { type: string, format: date-time, description: "When that workout was finished." }
     ExerciseMaxInput:
       type: object
       required: [load_value, load_unit, achieved_on, notes]

@@ -75,6 +75,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stats/last-loads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The load last logged of each exercise, from the user's finished workouts. */
+        get: operations["ListLastLoads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/week": {
         parameters: {
             query?: never;
@@ -242,6 +259,21 @@ export interface components {
             times_performed: number;
             /** Format: int32 */
             rating: number | null;
+        };
+        /** @description The load of the last set with one of the newest finished workout that logged the exercise. */
+        LastLoad: {
+            /** Format: uuid */
+            exercise_id: string;
+            /** Format: double */
+            load_value: number;
+            /** Format: uuid */
+            load_unit: string;
+            load_unit_name: string;
+            /**
+             * Format: date-time
+             * @description When that workout was finished.
+             */
+            done_at: string;
         };
         ExerciseMaxInput: {
             /** Format: double */
@@ -661,6 +693,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExerciseStat"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    ListLastLoads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One per exercise. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastLoad"][];
                 };
             };
             401: components["responses"]["Unauthorized"];

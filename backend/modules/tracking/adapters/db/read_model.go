@@ -195,6 +195,38 @@ func (m *ReadModel) ExerciseStats(ctx context.Context, userID uuid.UUID) ([]trac
 	return out, nil
 }
 
+// LastLoads lists the load the user last logged of each of their live exercises.
+func (m *ReadModel) LastLoads(ctx context.Context, userID uuid.UUID) ([]trackinghttp.LastLoad, error) {
+	rows, err := m.q.ListLastLoads(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ExerciseID
+	}
+	exercises, err := m.catalog.Exercises(ctx, userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	_, loadUnits, err := m.unitNames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []trackinghttp.LastLoad{}
+	for _, r := range rows {
+		// The query only takes sets with a load, which always have a unit.
+		if e, ok := exercises[r.ExerciseID]; !ok || e.Deleted || r.LoadValue == nil || r.LoadUnit == nil || r.CompletedAt == nil {
+			continue
+		}
+		out = append(out, trackinghttp.LastLoad{
+			ExerciseId: r.ExerciseID, LoadValue: *r.LoadValue, LoadUnit: *r.LoadUnit, LoadUnitName: loadUnits[*r.LoadUnit],
+			DoneAt: *r.CompletedAt,
+		})
+	}
+	return out, nil
+}
+
 // unitNames returns the names of the rep and load units by id.
 func (m *ReadModel) unitNames(ctx context.Context) (rep, load map[uuid.UUID]string, err error) {
 	units, err := m.catalog.Units(ctx)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, progressOf, roundsOf, roundState, type LoadContext } from './workoutPlan'
+import { buildCards, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -110,6 +110,30 @@ describe('buildCards with % 1RM', () => {
     const card = cardOf([logged], context(120))
     expect(card.loadUnit).toBe('lb')
     expect(card.rows.map((r) => r.load)).toEqual([185, 185, 185]) // 84 kg = 185.2 lb
+  })
+})
+
+// The squat planned without a load: 3 × 5.
+const unloadedSession: TrainingSession = {
+  ...session,
+  blocks: [{ ...session.blocks[0], exercises: [{ ...session.blocks[0].exercises[0], load_value: null, load_max: null, load_unit: null }] }],
+}
+const withLast = (value: number, unit: Unit): LoadContext => ({ ...context(null), lastOf: () => ({ value, unit }) })
+const unitOf = (id: string) => units.get(id)
+
+describe('the load logged last time', () => {
+  it('is suggested in its unit when the plan has no load', () => {
+    const card = buildCards(unloadedSession, [], [], () => single, 'kg', withLast(135, lb)).blocks[0].exercises[0]
+    expect(card.loadUnit).toBe('lb')
+    expect(card.rows.map((r) => r.load)).toEqual([null, null, null]) // only a placeholder
+    expect(suggestedLoad(card, unitOf, null)).toBe(135)
+    expect(suggestedLoad({ ...card, loadUnit: 'kg' }, unitOf, null)).toBe(61) // 61.2 kg
+  })
+
+  it('is not suggested when the plan has a load', () => {
+    const card = buildCards(session, [], [], () => single, 'kg', withLast(100, kg)).blocks[0].exercises[0]
+    expect(card.lastLoad).toBeNull()
+    expect(suggestedLoad(card, unitOf, null)).toBeNull()
   })
 })
 

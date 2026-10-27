@@ -53,7 +53,7 @@
           inputmode="decimal"
           min="0"
           step="any"
-          placeholder="–"
+          :placeholder="lastLoad === null ? '–' : `${lastLoad}`"
           :aria-label="`Block ${block.letter} set ${round.number} load`"
           size="touch"
           :tone="roundState(round) === 'logged' ? 'success' : 'default'"
@@ -91,7 +91,7 @@ import ExerciseActions from './ExerciseActions.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { convertLoad, roundLoad } from '../exercise/maxes'
-import { num, roundsOf, roundState, type BlockCard, type Round } from './workoutPlan'
+import { num, roundsOf, roundState, suggestedLoad, type BlockCard, type Round } from './workoutPlan'
 
 // A complex: its movements done one after the other with the same weight, logged as one row per
 // round. Every movement keeps its own sets; a round's inputs write to all of them. Logging is up
@@ -103,6 +103,13 @@ const exercises = useExercisesStore()
 
 const first = computed(() => block.value.exercises[0])
 const rounds = computed(() => roundsOf(block.value))
+
+// The weight the first movement was last logged with, as the placeholder when the plan has none.
+const lastLoad = computed(() => {
+  const unitOf = (id: string | null) => lookups.loadUnits.find((u) => u.id === id)
+  const max = exercises.currentMax(first.value.exerciseId)
+  return suggestedLoad(first.value, unitOf, max ? { value: max.load_value, unit: unitOf(max.load_unit) } : null)
+})
 
 // v-model.number's rule by hand: an empty or unparsable input is none.
 function set(round: Round, field: 'reps' | 'load', value: unknown) {

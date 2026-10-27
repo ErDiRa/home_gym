@@ -7,19 +7,22 @@ import {
   finishWorkout,
   getWeek,
   getWorkout,
+  listLastLoads,
   listWorkouts,
   logResult,
   logSet,
   startWorkout,
 } from '../api'
 import { nextWeek, startOf, toIso, weekStart } from '../dates'
-import type { Week } from '../types'
+import type { LastLoad, Week } from '../types'
 
-// The tracker's data: the week shown, and the api functions for workouts, their sets and the
-// scores of their WOD blocks.
+// The tracker's data: the week shown, the load last logged of each exercise, and the api functions
+// for workouts, their sets and the scores of their WOD blocks.
 export const useWorkoutsStore = defineStore('workouts', () => {
   const week = ref<Week | null>(null)
   const loading = ref(false)
+
+  const lastLoads = ref(new Map<string, LastLoad>())
 
   let request = 0
 
@@ -38,10 +41,16 @@ export const useWorkoutsStore = defineStore('workouts', () => {
     }
   }
 
+  async function loadLastLoads() {
+    lastLoads.value = new Map((await listLastLoads()).map((l) => [l.exercise_id, l]))
+  }
+
   return {
     week,
     loading,
     loadWeek,
+    lastLoads,
+    loadLastLoads,
     listWorkouts,
     getWorkout,
     startWorkout,

@@ -33,6 +33,7 @@ export interface ExerciseCard {
   loadUnit: string | null // the unit the load inputs are in
   percentPlan: { value: number; max: number | null } | null // a load planned in % 1RM (a range with max)
   newMax: LoggedSet | null // a logged single above the current 1RM, offered to be saved as the new one
+  lastLoad: MaxLoad | null // the load last logged in another workout, suggested when the plan has none
   scored: boolean // in a WOD block: no set rows, the block has one score
   rows: SetRow[]
 }
@@ -165,17 +166,20 @@ function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, loa
   return rows
 }
 
-// What loads convert with: the load units by id and the user's current 1RM of an exercise.
+// What loads convert with: the load units by id and the user's current 1RM of an exercise; lastOf
+// gives the load last logged of an exercise, if any.
 export interface LoadContext {
   unitOf: (id: string) => Unit | undefined
   maxOf: (exerciseId: string) => MaxLoad | null
+  lastOf?: (exerciseId: string) => MaxLoad | null
 }
 
 // Builds the cards of a workout from the session's plan (null when the session is gone) and the sets
 // and scores logged so far. kindOf gives a block kind by code; defaultLoadUnit is where load
 // starts when the plan has none. A load planned in % 1RM is done in the unit of the exercise's
 // 1RM, calculated from it, when there is one (loads); a planned load in another unit than the
-// logged sets' is converted too, where it can be.
+// logged sets' is converted too, where it can be. Without a planned load (or with only its unit) the
+// load last logged of the exercise is suggested, and its unit is where load starts.
 export function buildCards(
   session: TrainingSession | null,
   sets: WorkoutSet[],
@@ -206,7 +210,8 @@ export function buildCards(
       const planUnit = load.load_unit ? loads?.unitOf(load.load_unit) : undefined
       const max = loads?.maxOf(e.exercise_id) ?? null
       const startUnit = planUnit?.percent_of_max && max?.unit ? max.unit.id : load.load_unit
-      const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? startUnit ?? defaultLoadUnit
+      const last = load.load_value === null ? (loads?.lastOf?.(e.exercise_id) ?? null) : null
+      const loadUnit = logged.find((s) => s.load_unit)?.load_unit ?? startUnit ?? last?.unit?.id ?? defaultLoadUnit
       let plannedLoad: number | null = null
       if (load.load_value !== null && load.load_unit === loadUnit) plannedLoad = load.load_value
       else if (load.load_value !== null && loadUnit) {
@@ -238,6 +243,7 @@ export function buildCards(
         loadUnit,
         percentPlan: planUnit?.percent_of_max && load.load_value !== null ? { value: load.load_value, max: load.load_max } : null,
         newMax: null,
+        lastLoad: scored ? null : last,
         scored,
         // Sets logged in a WOD block before it became one still show.
         rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad),
@@ -308,6 +314,7 @@ export function buildCards(
       loadUnit: logged.find((s) => s.load_unit)?.load_unit ?? defaultLoadUnit,
       percentPlan: null,
       newMax: null,
+      lastLoad: null,
       scored: false,
       rows: rowsFor(0, logged, null, null),
     })
@@ -339,6 +346,15 @@ export function sessionSummary(session: TrainingSession): SummaryLine[] {
 
 // A number input's value: v-model.number leaves '' in an emptied input, which counts as none.
 export const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+// The suggested load of a card's sets in the unit of its inputs, e.g. 60 for the 60 kg logged last
+// time; null when there is none or it doesn't convert. max is the 1RM, for % 1RM.
+export function suggestedLoad(card: ExerciseCard, unitOf: (id: string) => Unit | undefined, max: MaxLoad | null): number | null {
+  const last = card.lastLoad
+  if (!last || !card.loadUnit) return null
+  const converted = convertLoad(last.value, last.unit, unitOf(card.loadUnit), max)
+  return converted === null ? null : roundLoad(converted)
+}
 
 // Whether a logged row was edited since it was saved.
 export function changed(card: ExerciseCard, row: SetRow): boolean {

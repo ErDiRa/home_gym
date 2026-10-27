@@ -61,7 +61,8 @@
           inputmode="decimal"
           min="0"
           step="any"
-          placeholder="–"
+          :placeholder="lastLoad === null ? '–' : `${lastLoad}`"
+          :title="lastLoad === null ? undefined : `Last time: ${lastLoad} ${unitOf(card.loadUnit)?.name ?? ''}`"
           :aria-label="`${card.label} set ${row.number} load`"
           size="touch"
           :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
@@ -111,7 +112,7 @@ import ExerciseActions from './ExerciseActions.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { convertLoad, formatLoad, roundLoad } from '../exercise/maxes'
-import { changed, num, type ExerciseCard, type SetRow } from './workoutPlan'
+import { changed, num, suggestedLoad, type ExerciseCard, type SetRow } from './workoutPlan'
 
 // An exercise of the workout with its sets. Logging is up to the parent, which owns the card;
 // doneOn is the workout's day, the day a 1RM saved from it was lifted.
@@ -134,6 +135,9 @@ const approxLoad = computed(() => {
   const weight = (v: number) => roundLoad(convertLoad(v, percent, to, maxLoad.value) ?? 0)
   return `${plan.max === null ? weight(plan.value) : `${weight(plan.value)}–${weight(plan.max)}`} ${to.name}`
 })
+
+// The load logged last time, as the placeholder of the load inputs when the plan has none.
+const lastLoad = computed(() => suggestedLoad(card.value, (id) => unitOf(id), maxLoad.value))
 
 // Another load unit converts the values in the inputs where it can (kg ⇄ lb, % 1RM ⇄ a weight
 // with the 1RM); logged sets then show as edited until saved in the new unit.
