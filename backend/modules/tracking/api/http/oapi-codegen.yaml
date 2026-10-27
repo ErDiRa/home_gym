@@ -1,0 +1,8 @@
+# oapi-codegen config: the tracking module's models, chi routes and strict server interface
+# (StrictServerInterface, implemented by Server) from openapi.yaml. Run `go generate`.
+package: http
+output: api.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true

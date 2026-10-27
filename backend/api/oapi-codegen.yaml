@@ -1,8 +1,0 @@
-# oapi-codegen config: generates the models, the chi routes and the strict server interface the
-# handlers implement from openapi.yaml. Run `go generate ./internal/api` (or `task api:gen`).
-package: api
-output: api.gen.go # relative to internal/api, where go generate runs
-generate:
-  models: true
-  chi-server: true
-  strict-server: true

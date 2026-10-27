@@ -21,10 +21,6 @@ services:
     volumes:
       # PostgreSQL 18+ images keep data under /var/lib/postgresql
       - pgdata:/var/lib/postgresql
-      # Run once, on first initialisation of an empty volume: the schema (incl. block kinds and
-      # units) and the shared lookups. No dev users or exercises; users are created manually.
-      - ../backend/db/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/000001_init_schema.up.sql:ro
-      - ../backend/db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

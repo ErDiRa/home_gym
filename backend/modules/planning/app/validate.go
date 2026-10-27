@@ -1,0 +1,316 @@
+package app
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/erdira/homegym/backend/common/errs"
+	catalog "github.com/erdira/homegym/backend/modules/catalog/api/module/client"
+)
+
+// validate trims and validates a training against the lookups, in place. It returns a
+// errs.Invalid error for the first problem.
+func validate(in *Input, lk lookups) error {
+	in.Name, in.Description = strings.TrimSpace(in.Name), strings.TrimSpace(in.Description)
+	if in.Name == "" || tooLong(in.Name, 100) {
+		return errs.Invalid("name is required (max 100 characters)")
+	}
+	start, err := time.Parse(time.DateOnly, in.StartDate)
+	if err != nil {
+		return errs.Invalid("start_date is required (YYYY-MM-DD)")
+	}
+	if start.Weekday() != time.Monday {
+		return errs.Invalid("start_date must be a Monday")
+	}
+	in.start = start
+	if in.Weeks < 1 || in.Weeks > maxWeeks {
+		return errs.Invalid(fmt.Sprintf("weeks must be 1-%d", maxWeeks))
+	}
+	// A session id sent twice would update the same row twice and lose one of the sessions.
+	seenSessions := map[uuid.UUID]bool{}
+	for i := range in.Sessions {
+		s := &in.Sessions[i]
+		if err := validateSession(s, lk); err != nil {
+			return err
+		}
+		if s.ID != nil {
+			if seenSessions[*s.ID] {
+				return errs.Invalid("a session appears twice")
+			}
+			seenSessions[*s.ID] = true
+		}
+	}
+	return checkSchedule(in)
+}
+
+// validateSession trims and validates a session of a training or a library template, in place.
+func validateSession(s *SessionInput, lk lookups) error {
+	s.Name, s.Notes = strings.TrimSpace(s.Name), strings.TrimSpace(s.Notes)
+	if s.Name == "" || tooLong(s.Name, 100) {
+		return errs.Invalid("every session needs a name (max 100 characters)")
+	}
+	for j := range s.Blocks {
+		if msg := checkBlock(&s.Blocks[j], lk); msg != "" {
+			return errs.Invalid(fmt.Sprintf("%s, block %s: %s", s.Name, blockLetter(j), msg))
+		}
+	}
+	return nil
+}
+
+// checkSchedule validates the week plan: one list per week, each with at most maxSlots
+// sessions of the training (by index), and no slot id twice.
+func checkSchedule(in *Input) error {
+	if len(in.Schedule) != int(in.Weeks) {
+		return errs.Invalid(fmt.Sprintf("the schedule needs one list of sessions per week (%d)", in.Weeks))
+	}
+	seenSlots := map[uuid.UUID]bool{}
+	for w, week := range in.Schedule {
+		if len(week) > maxSlots {
+			return errs.Invalid(fmt.Sprintf("week %d: at most %d sessions a week", w+1, maxSlots))
+		}
+		for _, slot := range week {
+			if slot.Session < 0 || slot.Session >= len(in.Sessions) {
+				return errs.Invalid(fmt.Sprintf("week %d: unknown session", w+1))
+			}
+			if slot.ID != nil {
+				if seenSlots[*slot.ID] {
+					return errs.Invalid("a slot of the schedule appears twice")
+				}
+				seenSlots[*slot.ID] = true
+			}
+		}
+	}
+	return nil
+}
+
+// checkBlock trims and validates a block against its kind, clearing sets, reps and load on the
+// side (block or exercises) the kind doesn't use, and the score unless the kind is scored. It
+// returns a message for the first problem.
+func checkBlock(b *BlockInput, lk lookups) string {
+	b.Name, b.Notes = strings.TrimSpace(b.Name), strings.TrimSpace(b.Notes)
+	kind, ok := lk.kinds[b.Kind]
+	if !ok {
+		return "unknown block kind"
+	}
+	if tooLong(b.Name, 100) {
+		return "the name can have at most 100 characters"
+	}
+	n := int32(len(b.Exercises))
+	if n < kind.MinExercises || (kind.MaxExercises != nil && n > *kind.MaxExercises) {
+		return exerciseCountRule(kind)
+	}
+
+	if kind.Scored {
+		if msg := checkScore(&b.Score); msg != "" {
+			return msg
+		}
+	} else {
+		b.Score = Score{}
+	}
+
+	// What the kind shares is validated on the block; the rest is cleared there and validated
+	// per exercise below. The shared sets of a scored block are its rounds, which it may leave
+	// open (e.g. an AMRAP).
+	if kind.SharedSets {
+		if !validSets(b.Sets) && !(kind.Scored && b.Sets == nil) {
+			if kind.Scored {
+				return "rounds must be 1-100"
+			}
+			return "sets must be 1-100"
+		}
+	} else {
+		b.Sets = nil
+	}
+
+	if kind.SharedReps {
+		if msg := checkReps(&b.Amount, lk); msg != "" {
+			return msg
+		}
+	} else {
+		b.clearReps()
+	}
+	if kind.SharedLoad {
+		if msg := checkLoad(&b.Amount, lk); msg != "" {
+			return msg
+		}
+	} else {
+		b.clearLoad()
+	}
+	for k := range b.Exercises {
+		e := &b.Exercises[k]
+		e.Tempo, e.Notes = strings.TrimSpace(e.Tempo), strings.TrimSpace(e.Notes)
+		if e.ExerciseID == uuid.Nil {
+			return "every exercise needs an exercise_id"
+		}
+		if tooLong(e.Tempo, 20) {
+			return fmt.Sprintf("exercise %d: the tempo can have at most 20 characters", k+1)
+		}
+		if kind.SharedSets {
+			e.Sets = nil
+		} else if !validSets(e.Sets) {
+			return fmt.Sprintf("exercise %d: sets must be 1-100", k+1)
+		}
+		if kind.SharedReps {
+			e.clearReps()
+		} else if kind.Scored && e.RepsValue == nil && e.RepsMax == nil && e.RepsUnit == nil {
+			// In a WOD an exercise may go without a target, e.g. max calories on the rower.
+			e.clearReps()
+		} else if msg := checkReps(&e.Amount, lk); msg != "" {
+			return fmt.Sprintf("exercise %d: %s", k+1, msg)
+		}
+		if kind.SharedLoad {
+			e.clearLoad()
+		} else if msg := checkLoad(&e.Amount, lk); msg != "" {
+			return fmt.Sprintf("exercise %d: %s", k+1, msg)
+		}
+	}
+	return ""
+}
+
+// maxScoreTime bounds a scored block's time cap, duration and interval (4 hours, in seconds).
+const maxScoreTime = 4 * 60 * 60
+
+// checkScore validates the format of a scored block and its times, in place: the time is a cap
+// (for time) or a duration, required for an AMRAP and an EMOM; only an EMOM has an interval,
+// one minute unless set, and it must fit into the duration.
+func checkScore(sc *Score) string {
+	if sc.ScoreType == nil {
+		return "choose how the WOD is scored"
+	}
+	timeRequired := false
+	switch *sc.ScoreType {
+	case ScoreAMRAP, ScoreEMOM:
+		timeRequired = true
+	case ScoreForTime, ScoreMaxReps, ScoreMaxCalories:
+	default:
+		return "unknown score type"
+	}
+	if sc.TimeSeconds == nil {
+		if timeRequired {
+			return fmt.Sprintf("%s needs a duration", scoreName(*sc.ScoreType))
+		}
+	} else if *sc.TimeSeconds < 1 || *sc.TimeSeconds > maxScoreTime {
+		return "the time must be between 0:01 and 4:00:00"
+	}
+
+	if *sc.ScoreType != ScoreEMOM {
+		sc.IntervalSeconds = nil
+		return ""
+	}
+	if sc.IntervalSeconds == nil {
+		sc.IntervalSeconds = ptrTo[int32](60)
+	}
+	if *sc.IntervalSeconds < 1 || *sc.IntervalSeconds > *sc.TimeSeconds {
+		return "the interval must be at least a second and fit into the duration"
+	}
+	return ""
+}
+
+// scoreName names a score format in messages.
+func scoreName(scoreType string) string {
+	switch scoreType {
+	case ScoreAMRAP:
+		return "an AMRAP"
+	case ScoreEMOM:
+		return "an EMOM"
+	default:
+		return "the WOD"
+	}
+}
+
+// ptrTo returns a pointer to v.
+func ptrTo[T any](v T) *T { return &v }
+
+// validSets reports whether sets is set and within the column's CHECK (1-100).
+func validSets(sets *int32) bool { return sets != nil && *sets >= 1 && *sets <= 100 }
+
+// exerciseCountRule describes how many exercises a kind of block takes.
+func exerciseCountRule(kind catalog.BlockKind) string {
+	switch {
+	case kind.MaxExercises == nil:
+		return fmt.Sprintf("a %s block needs at least %d %s", kind.Name, kind.MinExercises, plural(kind.MinExercises, "exercise"))
+	case *kind.MaxExercises == kind.MinExercises:
+		return fmt.Sprintf("a %s block takes exactly %d %s", kind.Name, kind.MinExercises, plural(kind.MinExercises, "exercise"))
+	default:
+		return fmt.Sprintf("a %s block takes %d to %d exercises", kind.Name, kind.MinExercises, *kind.MaxExercises)
+	}
+}
+
+// plural adds an "s" to word unless n is 1.
+func plural(n int32, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}
+
+// checkReps validates the required reps of an amount.
+func checkReps(a *Amount, lk lookups) string {
+	if a.RepsValue == nil {
+		return "reps are required"
+	}
+	return checkRange("reps", a.RepsValue, a.RepsMax, a.RepsUnit, lk.repUnits)
+}
+
+// checkLoad validates the optional load of an amount: a value with a unit, only a unit (what the
+// sets are logged in, e.g. calories on a machine) or nothing (e.g. bodyweight).
+func checkLoad(a *Amount, lk lookups) string {
+	if a.LoadValue == nil && a.LoadMax == nil {
+		if a.LoadUnit == nil {
+			return ""
+		}
+		if _, ok := lk.loadUnits[*a.LoadUnit]; !ok {
+			return "unknown load unit"
+		}
+		return ""
+	}
+	return checkRange("load", a.LoadValue, a.LoadMax, a.LoadUnit, lk.loadUnits)
+}
+
+// checkRange validates a value with an optional max in one of units.
+func checkRange(what string, value, max *float64, unitID *uuid.UUID, units map[uuid.UUID]unit) string {
+	if value == nil || unitID == nil {
+		return what + " needs a value and a unit"
+	}
+	u, ok := units[*unitID]
+	if !ok {
+		return "unknown " + what + " unit"
+	}
+	if max != nil && *max <= *value {
+		return what + ": the upper end of a range must be higher than the value"
+	}
+	for _, v := range []*float64{value, max} {
+		if v == nil {
+			continue
+		}
+		// Within the column's range and within the unit's own bounds (e.g. RPE 1-10).
+		if *v < 0 || *v >= maxAmount || (u.min != nil && *v < *u.min) || (u.max != nil && *v > *u.max) {
+			return fmt.Sprintf("%s in %s must be %s", what, u.name, boundsText(u))
+		}
+	}
+	return ""
+}
+
+// boundsText describes the values a unit allows, e.g. "between 1 and 10".
+func boundsText(u unit) string {
+	lo, hi := 0.0, float64(maxAmount-1)
+	if u.min != nil {
+		lo = *u.min
+	}
+	if u.max != nil {
+		hi = *u.max
+	}
+	return fmt.Sprintf("between %g and %g", lo, hi)
+}
+
+// blockLetter labels a block by its position in the session: A, B, ... Z, then 27, 28...
+func blockLetter(i int) string {
+	if i < 26 {
+		return string(rune('A' + i))
+	}
+	return strconv.Itoa(i + 1)
+}

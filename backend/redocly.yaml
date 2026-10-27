@@ -1,0 +1,11 @@
+# Lint config for the modules' OpenAPI specs: npx @redocly/cli lint --config redocly.yaml modules/*/api/http/openapi.yaml
+extends:
+  - recommended
+rules:
+  # Operation ids and the routes say enough; summaries only where they add something.
+  operation-summary: off
+  tag-description: off
+  info-license: off
+  # The WHOOP OAuth routes redirect (302), and logout can't fail.
+  operation-2xx-response: off
+  operation-4xx-response: off

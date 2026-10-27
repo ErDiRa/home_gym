@@ -1,5 +1,9 @@
 version: "3"
 
+vars:
+  # The dev Postgres user (backend/docker-compose.yml)
+  DB_USER: erdira
+
 tasks:
   default:
     desc: List available tasks
@@ -32,19 +36,61 @@ tasks:
       - docker compose down -v
 
   backend:fresh:
-    desc: Wipe the database, recreate it from the schema, apply the seeds and start the backend
+    desc: Wipe the database, let the backend recreate it, then apply the dev seeds
     dir: backend
     cmds:
       - docker compose down -v
-      # Schema and db/seed/*.sql run on first init of the empty volume; --wait blocks until healthy
       - docker compose up -d --wait db
       - docker compose up -d backend
+      # The backend migrates on start and only then answers /healthz
+      - until curl -sf localhost:8080/healthz >/dev/null; do sleep 1; done
+      - docker compose exec -T db sh /seed/seed.sh
+
+  test:
+    desc: Run the backend unit tests (no database)
+    dir: backend
+    cmds:
+      - go test ./...
+
+  test:db:
+    desc: Create the test database (my_accessories_test) in the dev Postgres if it's missing
+    dir: backend
+    cmds:
+      - docker compose up -d --wait db
+      - >-
+        docker compose exec -T db psql -U {{.DB_USER}} -d postgres -tAc
+        "SELECT 1 FROM pg_database WHERE datname = 'my_accessories_test'" | grep -q 1
+        || docker compose exec -T db createdb -U {{.DB_USER}} my_accessories_test
+
+  test:integration:
+    desc: Run the integration tests (the modules' Postgres adapters against the test database)
+    deps: [test:db]
+    dir: backend
+    env:
+      TEST_DB_SOURCE: postgres://{{.DB_USER}}:nopassword@localhost:5432/my_accessories_test?sslmode=disable
+    cmds:
+      - go test -tags integration -count=1 ./...
+
+  test:component:
+    desc: Run the component tests (the whole service against the test database)
+    deps: [test:db]
+    dir: backend
+    env:
+      TEST_DB_SOURCE: postgres://{{.DB_USER}}:nopassword@localhost:5432/my_accessories_test?sslmode=disable
+    cmds:
+      - go test -tags component -count=1 ./tests/...
 
   api:gen:
-    desc: Regenerate the API code from backend/api/openapi.yaml (Go server + models, frontend types)
+    desc: Regenerate the API code from the OpenAPI specs (Go servers, clients and models; frontend types)
     cmds:
-      - cd backend && go generate ./internal/api
+      - cd backend && go generate ./...
       - cd frontend/app && npm run gen:api
+
+  db:gen:
+    desc: Regenerate the database code (sqlc) of every module, in the backend container
+    dir: backend
+    cmds:
+      - for f in modules/*/adapters/db/sqlc.yaml; do docker exec -w /app workout_backend sqlc generate -f "$f"; done
 
   app:dev:
     desc: Run the frontend in dev mode (Vite on :5173)
@@ -76,11 +122,10 @@ tasks:
     requires:
       vars: [SERVER]
     cmds:
-      # --relative keeps the repo layout, so the compose file's ../backend/db mounts resolve
+      # The app creates and migrates the database itself, so only the stack's own files are needed
       - >-
         rsync -av --relative
         deploy/docker-compose.yml deploy/Caddyfile deploy/.env.example
-        backend/db/migrations/000001_init_schema.up.sql backend/db/seed/seed-lookups.sql
         {{.SERVER}}:/opt/homegym/
 
   prod:up:

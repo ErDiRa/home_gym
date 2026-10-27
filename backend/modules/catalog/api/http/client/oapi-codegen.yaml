@@ -1,0 +1,6 @@
+# oapi-codegen config: a Go client of the catalog module's API, for the component tests.
+package: client
+output: client/client.gen.go
+generate:
+  models: true
+  client: true

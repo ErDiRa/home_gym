@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import type { components } from './openapi'
+import type { components } from './openapi/identity'
 
 // The signed-in user, as returned by /api/auth/login and /api/auth/me.
 export type User = components['schemas']['Account']

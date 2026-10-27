@@ -1,0 +1,429 @@
+openapi: 3.0.3
+info:
+  title: HomeGym API – catalog
+  version: "1.0"
+  description: |
+    What trainings are planned with: each user's exercises (with their links, videos and ratings) and
+    the lists shared by all users (joints, muscle groups, focuses, block kinds, the units of reps and
+    load). Every route needs the session cookie; a user sees only their own exercises and ratings.
+    Errors are `{"error": "message"}`.
+
+    This module's part of the API contract: the Go server (package http) and client (http/client)
+    and the frontend's src/openapi/catalog.d.ts are generated from it (`task api:gen`).
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+
+paths:
+  /exercises:
+    get:
+      operationId: ListExercises
+      tags: [exercises]
+      summary: The user's exercises with the names of their links.
+      responses:
+        "200":
+          description: The exercises.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Exercise" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: CreateExercise
+      tags: [exercises]
+      requestBody: { $ref: "#/components/requestBodies/ExerciseInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseSaved" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /exercises/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: GetExercise
+      tags: [exercises]
+      summary: One exercise with the ids of its links, for the exercise form.
+      responses:
+        "200":
+          description: The exercise.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: UpdateExercise
+      tags: [exercises]
+      requestBody: { $ref: "#/components/requestBodies/ExerciseInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseSaved" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /exercises/{id}/feedback:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: RateExercise
+      tags: [exercises]
+      summary: Rate an exercise 1-5 with notes, replacing an earlier rating.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RatingInput" }
+      responses:
+        "200":
+          description: The rating.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseFeedback" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /exercise-ratings:
+    get:
+      operationId: ListExerciseRatings
+      tags: [exercises]
+      summary: How the user rated their exercises.
+      responses:
+        "200":
+          description: The ratings.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExerciseRating" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /joints:
+    get:
+      operationId: ListJoints
+      tags: [lookups]
+      responses:
+        "200":
+          description: The entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Option" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /muscle-groups:
+    get:
+      operationId: ListMuscleGroups
+      tags: [lookups]
+      responses:
+        "200":
+          description: The entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Option" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /focuses:
+    get:
+      operationId: ListFocuses
+      tags: [lookups]
+      responses:
+        "200":
+          description: The focuses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Focus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: CreateFocus
+      tags: [lookups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FocusInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Focus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /block-kinds:
+    get:
+      operationId: ListBlockKinds
+      tags: [lookups]
+      responses:
+        "200":
+          description: The block kinds with their rules.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BlockKind" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rep-units:
+    get:
+      operationId: ListRepUnits
+      tags: [lookups]
+      responses:
+        "200":
+          description: The rep units.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Unit" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: CreateRepUnit
+      tags: [lookups]
+      requestBody: { $ref: "#/components/requestBodies/UnitInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Unit" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /load-units:
+    get:
+      operationId: ListLoadUnits
+      tags: [lookups]
+      responses:
+        "200":
+          description: The load units.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LoadUnit" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: CreateLoadUnit
+      tags: [lookups]
+      requestBody: { $ref: "#/components/requestBodies/UnitInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoadUnit" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  requestBodies:
+    ExerciseInput:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ExerciseInput" }
+    UnitInput:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/UnitInput" }
+  responses:
+    BadRequest:
+      description: Invalid input or a reference to something unknown.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Not signed in, or wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Missing (or another user's).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Clashes with existing data, e.g. a name taken.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: "Safe to show to the user." }
+    ExerciseType:
+      type: string
+      description: Whether an exercise mainly improves mobility or strength.
+      enum: [mobility, strength]
+    Focus:
+      type: object
+      description: A training focus; the short alias is shown as a tag.
+      required: [id, name, alias]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        alias: { type: string }
+    FocusInput:
+      type: object
+      required: [name, alias]
+      properties:
+        name: { type: string }
+        alias: { type: string }
+    Option:
+      type: object
+      description: An entry of a reference list (joints, muscle groups).
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Exercise:
+      type: object
+      description: An exercise as listed, with its links by name.
+      required: [id, name, description, type, video_urls, created_at, updated_at, joints, muscle_groups, focuses]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        type: { $ref: "#/components/schemas/ExerciseType" }
+        video_urls: { type: array, items: { type: string }, description: "In display order." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        joints: { type: array, items: { type: string } }
+        muscle_groups: { type: array, items: { type: string } }
+        focuses: { type: array, items: { $ref: "#/components/schemas/Focus" } }
+    ExerciseSaved:
+      type: object
+      description: An exercise as created or updated.
+      required: [id, name, description, type, video_urls, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        type: { $ref: "#/components/schemas/ExerciseType" }
+        video_urls: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ExerciseInput:
+      type: object
+      required: [name, type, description, video_urls, joint_ids, muscle_group_ids, focus_ids]
+      properties:
+        name: { type: string }
+        type: { $ref: "#/components/schemas/ExerciseType" }
+        description: { type: string }
+        video_urls: { type: array, items: { type: string }, description: "In display order; blank ones are dropped, at most 10." }
+        joint_ids: { type: array, items: { type: string, format: uuid } }
+        muscle_group_ids: { type: array, items: { type: string, format: uuid } }
+        focus_ids: { type: array, items: { type: string, format: uuid } }
+    ExerciseDetail:
+      type: object
+      description: One exercise with the ids of its links, for the form.
+      required: [id, name, type, description, video_urls, joint_ids, muscle_group_ids, focus_ids]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: "#/components/schemas/ExerciseType" }
+        description: { type: string }
+        video_urls: { type: array, items: { type: string } }
+        joint_ids: { type: array, items: { type: string, format: uuid } }
+        muscle_group_ids: { type: array, items: { type: string, format: uuid } }
+        focus_ids: { type: array, items: { type: string, format: uuid } }
+    RatingInput:
+      type: object
+      required: [rating, notes]
+      properties:
+        rating: { type: integer, format: int32, minimum: 1, maximum: 5 }
+        notes: { type: string }
+    ExerciseFeedback:
+      type: object
+      description: A rating as stored.
+      required: [id, user_id, exercise_id, rating, notes, updated_at, deleted_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        exercise_id: { type: string, format: uuid }
+        rating: { type: integer, format: int32 }
+        notes: { type: string }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    ExerciseRating:
+      type: object
+      description: How the user rated an exercise (1-5), with their notes.
+      required: [exercise_id, rating, notes, updated_at]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        rating: { type: integer, format: int32 }
+        notes: { type: string }
+        updated_at: { type: string, format: date-time }
+    BlockKind:
+      type: object
+      description: |
+        The kind of a training block (single, superset, complex, wod) with its rules: how many
+        exercises it takes, whether sets, reps and load are set once on the block (shared), and
+        whether it is done for one score (scored, a WOD).
+      required: [code, name, description, min_exercises, max_exercises, shared_sets, shared_reps, shared_load, scored]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        min_exercises: { type: integer, format: int32 }
+        max_exercises: { type: integer, format: int32, nullable: true, description: "null = no limit" }
+        shared_sets: { type: boolean }
+        shared_reps: { type: boolean }
+        shared_load: { type: boolean }
+        scored: { type: boolean, description: "Its shared sets are rounds, and optional." }
+    UnitInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        min_value: { type: number, format: double, nullable: true }
+        max_value: { type: number, format: double, nullable: true }
+    Unit:
+      type: object
+      description: A unit planned reps are measured in; min/max bound the values planned in it.
+      required: [id, name, min_value, max_value]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        min_value: { type: number, format: double, nullable: true }
+        max_value: { type: number, format: double, nullable: true }
+    LoadUnit:
+      type: object
+      description: A unit planned load is measured in.
+      required: [id, name, min_value, max_value, kg_per_unit, percent_of_max]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        min_value: { type: number, format: double, nullable: true }
+        max_value: { type: number, format: double, nullable: true }
+        kg_per_unit: { type: number, format: double, nullable: true, description: "A weight unit's size in kg (kg 1, lb 0.45359237); null for other units." }
+        percent_of_max: { type: boolean, description: "Whether the unit is a percentage of the 1RM." }

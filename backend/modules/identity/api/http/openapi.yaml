@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: HomeGym API – identity
+  version: "1.0"
+  description: |
+    Signing in. The session is a JWT in the HttpOnly `token` cookie, which every other module's
+    routes require. Errors are `{"error": "message"}`.
+
+    This module's part of the API contract: the Go server (package http) and client (http/client)
+    and the frontend's src/openapi/identity.d.ts are generated from it (`task api:gen`).
+servers:
+  - url: /api
+# Public: login and logout need no session, and me reads the cookie itself.
+security: []
+tags:
+  - name: auth
+
+paths:
+  /auth/login:
+    post:
+      operationId: Login
+      tags: [auth]
+      summary: Sign in; sets the token cookie (a session cookie unless remember).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Signed in.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      operationId: Logout
+      tags: [auth]
+      summary: Clear the token cookie.
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+  /auth/me:
+    get:
+      operationId: Me
+      tags: [auth]
+      summary: The signed-in user; extends the session (at most 7 days after login).
+      parameters:
+        - name: token
+          in: cookie
+          description: The session token set by login.
+          schema: { type: string }
+      responses:
+        "200":
+          description: The user.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Account" }
+        "401":
+          description: Not signed in; the cookie is cleared when the account was deleted since login.
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  headers:
+    SetCookie:
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid input.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: Safe to show to the user. }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+        remember: { type: boolean, description: Keep the cookie for the token's lifetime instead of the browser session. }
+    Account:
+      type: object
+      required: [id, email]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }

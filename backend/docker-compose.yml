@@ -10,18 +10,9 @@ services:
     volumes:
       # PostgreSQL 18+ images keep data under /var/lib/postgresql
       - pgdata:/var/lib/postgresql
-      # Migrations run once, on first initialisation of an empty volume
-      - ./db/migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/000001_init_schema.up.sql:ro
-      # Dev seed (me@example.com / test); runs after the schema in name order (files are mounted
-      # individually because a file can't be mounted into a read-only directory mount)
-      - ./db/seed/seed-user.sql:/docker-entrypoint-initdb.d/997_seed-user.sql:ro
-      - ./db/seed/seed-lookups.sql:/docker-entrypoint-initdb.d/998_seed-lookups.sql:ro
-      - ./db/seed/seed-exercises.sql:/docker-entrypoint-initdb.d/999_seed-exercises.sql:ro
-      # Private, git-ignored seeds from db/seed/local (e.g. the exercise archive); skipped when empty
-      - ./db/seed/seed-local.sh:/docker-entrypoint-initdb.d/999_seed-local.sh:ro
-      - ./db/seed/local:/seed-local:ro
-      # Sample trainings and workouts; sorts after the exercise seeds it needs
-      - ./db/seed/seed-trainings.sql:/docker-entrypoint-initdb.d/999_seed-trainings.sql:ro
+      # Dev seed data (db/seed/seed.sh), applied by `task backend:fresh` once the backend has
+      # created the schemas; the backend migrates the database itself, nothing runs on initdb
+      - ./db/seed:/seed:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

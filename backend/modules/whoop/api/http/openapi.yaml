@@ -1,0 +1,226 @@
+openapi: 3.0.3
+info:
+  title: HomeGym API – whoop
+  version: "1.0"
+  description: |
+    The connection to a user's WHOOP account (OAuth) and the WHOOP activity linked to a finished
+    workout of the tracking module, with the recovery of that day. Optional: off while the server
+    has no WHOOP app configured. Every route needs the session cookie and acts on the user's own data
+    only. Errors are `{"error": "message"}`.
+
+    This module's part of the API contract: the Go server (package http) and client (http/client)
+    and the frontend's src/openapi/whoop.d.ts are generated from it (`task api:gen`).
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+
+paths:
+  /whoop:
+    get:
+      operationId: WhoopStatus
+      tags: [whoop]
+      summary: Whether WHOOP can be connected (the server is configured) and whether it is.
+      responses:
+        "200":
+          description: The status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WhoopStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      operationId: DisconnectWhoop
+      tags: [whoop]
+      responses:
+        "204": { description: "Disconnected." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /whoop/connect:
+    get:
+      operationId: ConnectWhoop
+      tags: [whoop]
+      summary: Send the browser to WHOOP to allow access; WHOOP returns it to the callback.
+      responses:
+        "302":
+          description: To WHOOP's authorization page, with the state in the whoop_state cookie.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /whoop/callback:
+    get:
+      operationId: WhoopCallback
+      tags: [whoop]
+      summary: Complete the connection; back to /track/settings (?whoop=error when it failed).
+      parameters:
+        - { name: state, in: query, schema: { type: string } }
+        - { name: code, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+        - { name: whoop_state, in: cookie, schema: { type: string } }
+      responses:
+        "302":
+          description: Back to the settings page.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /workouts/{id}/whoop/candidates:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: ListWhoopCandidates
+      tags: [whoop]
+      summary: The WHOOP activities in [from, to) (the workout's local day), to pick one to link.
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: The activities.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WhoopCandidate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/whoop:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: GetWorkoutWhoop
+      tags: [whoop]
+      responses:
+        "200":
+          description: The WHOOP data linked to the workout, or null.
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - $ref: "#/components/schemas/WhoopData"
+                nullable: true
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: LinkWhoop
+      tags: [whoop]
+      summary: Link a WHOOP activity to a workout, fetching its data (again).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LinkWhoopRequest" }
+      responses:
+        "200":
+          description: The linked data.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WhoopData" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: UnlinkWhoop
+      tags: [whoop]
+      responses:
+        "204": { description: "Unlinked." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    From:
+      name: from
+      in: query
+      required: true
+      description: Start of the period (inclusive), an instant.
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      required: true
+      description: End of the period (exclusive), an instant.
+      schema: { type: string, format: date-time }
+  headers:
+    SetCookie:
+      schema: { type: string }
+    Location:
+      schema: { type: string }
+  responses:
+    BadRequest:
+      description: Invalid input or a reference to something unknown.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Not signed in, or wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Missing (or another user's).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: "Safe to show to the user." }
+    WhoopStatus:
+      type: object
+      required: [configured, connected]
+      properties:
+        configured: { type: boolean }
+        connected: { type: boolean }
+    WhoopCandidate:
+      type: object
+      description: A WHOOP activity to pick; strain and heart rate are null until WHOOP has scored it.
+      required: [id, sport_name, start, end, strain, avg_hr]
+      properties:
+        id: { type: string, format: uuid }
+        sport_name: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        strain: { type: number, format: double, nullable: true }
+        avg_hr: { type: integer, format: int32, nullable: true }
+    LinkWhoopRequest:
+      type: object
+      required: [whoop_workout_id]
+      properties:
+        whoop_workout_id: { type: string, format: uuid }
+    WhoopData:
+      type: object
+      description: The WHOOP activity linked to a workout with the recovery of that day; the numbers are null while WHOOP hasn't scored it.
+      required: [workout_id, whoop_workout_id, sport_name, start_at, end_at, score_state, strain, avg_hr, max_hr, kilojoule, zone_ms, recovery_score, resting_hr, hrv_ms, fetched_at]
+      properties:
+        workout_id: { type: string, format: uuid }
+        whoop_workout_id: { type: string, format: uuid }
+        sport_name: { type: string }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        score_state: { type: string }
+        strain: { type: number, format: double, nullable: true }
+        avg_hr: { type: integer, format: int32, nullable: true }
+        max_hr: { type: integer, format: int32, nullable: true }
+        kilojoule: { type: number, format: double, nullable: true }
+        zone_ms: { type: array, items: { type: integer, format: int32 }, nullable: true, description: "Zones 0 to 5." }
+        recovery_score: { type: integer, format: int32, nullable: true }
+        resting_hr: { type: integer, format: int32, nullable: true }
+        hrv_ms: { type: number, format: double, nullable: true }
+        fetched_at: { type: string, format: date-time }

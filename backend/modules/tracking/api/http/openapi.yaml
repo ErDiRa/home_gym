@@ -1,0 +1,526 @@
+openapi: 3.0.3
+info:
+  title: HomeGym API – tracking
+  version: "1.0"
+  description: |
+    What a user did: the week of the tracker (the plan of an active training next to the workouts
+    finished), workouts started from a planned slot with their sets and WOD scores, the 1RM history
+    of the user's exercises and stats over them. Every route needs the session cookie and acts on the
+    user's own data only. Errors are `{"error": "message"}`.
+
+    This module's part of the API contract: the Go server (package http) and client (http/client)
+    and the frontend's src/openapi/tracking.d.ts are generated from it (`task api:gen`).
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+
+paths:
+  /exercises/{id}/maxes:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: AddExerciseMax
+      tags: [exercises]
+      summary: Add a 1RM to an exercise's history; the newest is the current max.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExerciseMaxInput" }
+      responses:
+        "201":
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseMax" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /exercise-maxes:
+    get:
+      operationId: ListExerciseMaxes
+      tags: [exercises]
+      summary: The 1RM history of all the user's exercises, newest first per exercise.
+      responses:
+        "200":
+          description: The 1RMs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExerciseMax" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /exercise-maxes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    delete:
+      operationId: DeleteExerciseMax
+      tags: [exercises]
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /stats/exercises:
+    get:
+      operationId: ExerciseStats
+      tags: [exercises]
+      summary: The exercises done in workouts, most often first, with their rating.
+      responses:
+        "200":
+          description: The stats.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExerciseStat" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /week:
+    get:
+      operationId: GetWeek
+      tags: [workouts]
+      summary: The tracker's week of the chosen active training (else the first).
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: The client's local Monday.
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: training
+          in: query
+          description: The active training to show; the first when missing.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The week.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Week" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /workouts:
+    get:
+      operationId: ListWorkouts
+      tags: [workouts]
+      summary: The workouts finished in [from, to) (at most a year), newest first.
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: The workouts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WorkoutSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: StartWorkout
+      tags: [workouts]
+      summary: Start a workout of a slot of the week plan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartWorkoutRequest" }
+      responses:
+        "200":
+          description: The slot's workout already in progress.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "201":
+          description: Started.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /workouts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: GetWorkout
+      tags: [workouts]
+      responses:
+        "200":
+          description: The workout with its sets and scores.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: DeleteWorkout
+      tags: [workouts]
+      summary: Discard a workout in progress or remove a finished one.
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/finish:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: FinishWorkout
+      tags: [workouts]
+      summary: Finish a workout (a finished one only gets the notes), optionally dated to another day.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinishWorkoutRequest" }
+      responses:
+        "200":
+          description: The finished workout.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/sets:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    put:
+      operationId: LogSet
+      tags: [workouts]
+      summary: Log a set, or correct the one logged at the same place.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetInput" }
+      responses:
+        "200":
+          description: The set as stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoggedSet" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/sets/{setID}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: setID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: DeleteSet
+      tags: [workouts]
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/results:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    put:
+      operationId: LogResult
+      tags: [workouts]
+      summary: Log the score of a WOD block, or correct the one logged for it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResultInput" }
+      responses:
+        "200":
+          description: The score as stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkoutResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/results/{resultID}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: resultID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: DeleteResult
+      tags: [workouts]
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    From:
+      name: from
+      in: query
+      required: true
+      description: Start of the period (inclusive), an instant.
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      required: true
+      description: End of the period (exclusive), an instant.
+      schema: { type: string, format: date-time }
+  responses:
+    BadRequest:
+      description: Invalid input or a reference to something unknown.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Not signed in, or wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Missing (or another user's).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: "Safe to show to the user." }
+    ExerciseStat:
+      type: object
+      required: [exercise_id, name, joints, muscle_groups, times_performed, rating]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        name: { type: string }
+        joints: { type: array, items: { type: string } }
+        muscle_groups: { type: array, items: { type: string } }
+        times_performed: { type: integer, format: int64 }
+        rating: { type: integer, format: int32, nullable: true }
+    ExerciseMaxInput:
+      type: object
+      required: [load_value, load_unit, achieved_on, notes]
+      properties:
+        load_value: { type: number, format: double }
+        load_unit: { type: string, format: uuid, description: "A weight unit." }
+        achieved_on: { type: string, description: "YYYY-MM-DD, not in the future." }
+        workout_set_id: { type: string, format: uuid, nullable: true, description: "The user's own logged set of that exercise it was saved from." }
+        notes: { type: string }
+    ExerciseMax:
+      type: object
+      description: An entry of the 1RM history of an exercise, always in a weight unit.
+      required: [id, exercise_id, load_value, load_unit, load_unit_name, achieved_on, workout_set_id, notes, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        exercise_id: { type: string, format: uuid }
+        load_value: { type: number, format: double }
+        load_unit: { type: string, format: uuid }
+        load_unit_name: { type: string }
+        achieved_on: { type: string, format: date }
+        workout_set_id: { type: string, format: uuid, nullable: true, description: "The logged single it was saved from; null when entered by hand." }
+        notes: { type: string }
+        created_at: { type: string, format: date-time }
+    ScoreType:
+      type: string
+      description: How a WOD block is scored.
+      enum: [for_time, amrap, max_reps, max_calories, emom]
+    GoalStatus:
+      type: string
+      enum: [open, achieved, missed]
+    StartWorkoutRequest:
+      type: object
+      required: [week_session_id]
+      properties:
+        week_session_id: { type: string, format: uuid, description: "The slot of the week plan." }
+    FinishWorkoutRequest:
+      type: object
+      required: [notes]
+      properties:
+        notes: { type: string }
+        completed_at: { type: string, format: date-time, nullable: true, description: "When it was done, if not now (not in the future, within a year)." }
+    SetInput:
+      type: object
+      description: A performed set at its place in the session (block and position in the block, from 1).
+      required: [exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        block_position: { type: integer, format: int32 }
+        exercise_position: { type: integer, format: int32 }
+        set_number: { type: integer, format: int32 }
+        reps_value: { type: number, format: double, nullable: true, description: "null when only the load was logged" }
+        reps_unit: { type: string, format: uuid, nullable: true }
+        per_side: { type: boolean }
+        load_value: { type: number, format: double, nullable: true, description: "null without load; never both null" }
+        load_unit: { type: string, format: uuid, nullable: true }
+    LoggedSet:
+      type: object
+      description: A set as stored.
+      required: [id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        workout_id: { type: string, format: uuid }
+        exercise_id: { type: string, format: uuid }
+        block_position: { type: integer, format: int32 }
+        exercise_position: { type: integer, format: int32 }
+        set_number: { type: integer, format: int32 }
+        reps_value: { type: number, format: double, nullable: true }
+        reps_unit: { type: string, format: uuid }
+        per_side: { type: boolean }
+        load_value: { type: number, format: double, nullable: true }
+        load_unit: { type: string, format: uuid, nullable: true }
+        completed_at: { type: string, format: date-time }
+    WorkoutSet:
+      type: object
+      description: A set as a workout lists it, with the names for display.
+      required: [id, exercise_id, exercise_name, block_position, exercise_position, set_number, reps_value, reps_unit, reps_unit_name, per_side, load_value, load_unit, load_unit_name, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        exercise_id: { type: string, format: uuid }
+        exercise_name: { type: string }
+        block_position: { type: integer, format: int32 }
+        exercise_position: { type: integer, format: int32 }
+        set_number: { type: integer, format: int32 }
+        reps_value: { type: number, format: double, nullable: true }
+        reps_unit: { type: string, format: uuid }
+        reps_unit_name: { type: string }
+        per_side: { type: boolean }
+        load_value: { type: number, format: double, nullable: true }
+        load_unit: { type: string, format: uuid, nullable: true }
+        load_unit_name: { type: string }
+        completed_at: { type: string, format: date-time }
+    ResultInput:
+      type: object
+      description: |
+        The score of a WOD block as done, at its place in the session (from 1). score_type is the
+        format as planned and decides which values are kept: for_time time_seconds (or reps when
+        capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
+      required: [block_position, score_type, time_seconds, rounds, reps, calories, rx, notes]
+      properties:
+        block_position: { type: integer, format: int32 }
+        score_type: { $ref: "#/components/schemas/ScoreType" }
+        time_seconds: { type: integer, format: int32, nullable: true }
+        rounds: { type: integer, format: int32, nullable: true }
+        reps: { type: integer, format: int32, nullable: true }
+        calories: { type: integer, format: int32, nullable: true }
+        rx: { type: boolean, description: "false when scaled" }
+        notes: { type: string }
+    WorkoutResult:
+      type: object
+      required: [id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        workout_id: { type: string, format: uuid }
+        block_position: { type: integer, format: int32 }
+        score_type: { $ref: "#/components/schemas/ScoreType" }
+        time_seconds: { type: integer, format: int32, nullable: true }
+        rounds: { type: integer, format: int32, nullable: true }
+        reps: { type: integer, format: int32, nullable: true }
+        calories: { type: integer, format: int32, nullable: true }
+        rx: { type: boolean }
+        notes: { type: string }
+        completed_at: { type: string, format: date-time }
+    Workout:
+      type: object
+      description: A session done, started from a slot of a week. The ids become null when the training, slot or session is deleted later.
+      required: [id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, sets, results]
+      properties:
+        id: { type: string, format: uuid }
+        training_id: { type: string, format: uuid, nullable: true }
+        week_session_id: { type: string, format: uuid, nullable: true }
+        session_id: { type: string, format: uuid, nullable: true }
+        session_name: { type: string }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true, description: "null while in progress" }
+        notes: { type: string }
+        sets: { type: array, items: { $ref: "#/components/schemas/WorkoutSet" } }
+        results: { type: array, items: { $ref: "#/components/schemas/WorkoutResult" } }
+    WorkoutSummary:
+      type: object
+      description: A finished workout as listed.
+      required: [id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, set_count]
+      properties:
+        id: { type: string, format: uuid }
+        training_id: { type: string, format: uuid, nullable: true }
+        week_session_id: { type: string, format: uuid, nullable: true }
+        session_id: { type: string, format: uuid, nullable: true }
+        session_name: { type: string }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        notes: { type: string }
+        set_count: { type: integer, format: int64 }
+    ActiveTraining:
+      type: object
+      description: An active training as the tracker offers it.
+      required: [id, name, start_date, end_date, weeks, cycle_id, cycle_name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        weeks: { type: integer, format: int32 }
+        cycle_id: { type: string, format: uuid, nullable: true }
+        cycle_name: { type: string, nullable: true }
+    PlannedSlot:
+      type: object
+      description: A slot of the week plan with its session's name.
+      required: [id, session_id, name]
+      properties:
+        id: { type: string, format: uuid }
+        session_id: { type: string, format: uuid }
+        name: { type: string }
+    WeekCycleGoal:
+      type: object
+      required: [title, target, status]
+      properties:
+        title: { type: string }
+        target: { type: string }
+        status: { $ref: "#/components/schemas/GoalStatus" }
+    WeekCycle:
+      type: object
+      description: The cycle of the training shown, with the week of the cycle.
+      required: [id, name, start_date, end_date, weeks, week_number, goals]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        weeks: { type: integer, format: int32 }
+        week_number: { type: integer, format: int32, nullable: true, description: "Of the cycle, from 1; null outside its weeks." }
+        goals: { type: array, items: { $ref: "#/components/schemas/WeekCycleGoal" } }
+    Week:
+      type: object
+      description: A week as the tracker shows it.
+      required: [trainings, training, week_number, planned, done, cycle]
+      properties:
+        trainings: { type: array, items: { $ref: "#/components/schemas/ActiveTraining" }, description: "By name; of a cycle, only the ones running this week." }
+        training:
+          description: The chosen one; null when none is active.
+          type: object
+          allOf: [{ $ref: "#/components/schemas/ActiveTraining" }]
+          nullable: true
+        week_number: { type: integer, format: int32, nullable: true, description: "Of the training, from 1; null outside its weeks." }
+        planned: { type: array, items: { $ref: "#/components/schemas/PlannedSlot" }, description: "The week's slots, in order." }
+        done: { type: array, items: { $ref: "#/components/schemas/WorkoutSummary" } }
+        cycle:
+          description: Of the chosen training; null when it isn't part of one.
+          type: object
+          allOf: [{ $ref: "#/components/schemas/WeekCycle" }]
+          nullable: true

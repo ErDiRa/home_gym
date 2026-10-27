@@ -22,8 +22,8 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 
 ## Tech stack
 
-- **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries
-- **API:** API first: an [OpenAPI](https://www.openapis.org) spec from which [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) generates the Go server interface and models, and [openapi-typescript](https://openapi-ts.dev) the frontend types (client: openapi-fetch)
+- **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries. A modular monolith: five modules (identity, catalog, planning, tracking, whoop) in one binary, each with its own Postgres schema and its own layers (api, app, adapters); modules call each other through small Go contracts, never over the network or each other's tables
+- **API:** API first: one [OpenAPI](https://www.openapis.org) spec per module, from which [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) generates the Go server interface, models and a client, and [openapi-typescript](https://openapi-ts.dev) the frontend types (client: openapi-fetch)
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (one app: dashboard and tracker)
 - **Dev setup:** Docker Compose (Postgres + API with hot reload via [air](https://github.com/air-verse/air)), [Task](https://taskfile.dev) as the task runner
 
@@ -32,7 +32,7 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 Requirements: Docker, Node.js 20+, [Task](https://taskfile.dev/installation/) (optional, but the commands below use it).
 
 ```sh
-# Create the database from the schema and seed data, then start the API on :8080
+# Create the database (the API migrates it on start), load the seed data; the API runs on :8080
 task backend:fresh
 
 # Start the app on http://localhost:5173
@@ -86,32 +86,45 @@ task prod:up                          # or: cd deploy && docker compose pull && 
 task prod:logs
 ```
 
-DNS for `DOMAIN` must point at the server and ports 80/443 must be open. The first start of an empty database volume loads the schema and the lookups (`seed-lookups.sql`), no dev users or exercises. Create a user with:
+DNS for `DOMAIN` must point at the server and ports 80/443 must be open. The app creates and migrates the database itself when it starts: each module its own schema, including the lists exercises pick from (joints, muscle groups, focuses); no dev users or exercises. Create a user with:
 
 ```sh
 cd deploy && docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
 ```sql
-INSERT INTO users (email, first_name, last_name, password_hash)
+INSERT INTO identity.users (email, first_name, last_name, password_hash)
 VALUES ('you@example.com', 'First', 'Last', crypt('password', gen_salt('bf', 12)));
 ```
 
-Schema changes ship as migrations in `backend/db/migrations`, embedded in the image: the app applies pending ones when it starts (a database created before the migration runner is baselined at version 1 first).
+Schema changes ship as migrations of the module that owns the tables (`backend/modules/<module>/adapters/db/migrations`), embedded in the image: on start the app applies each module's pending ones in its schema (versions in `<module>.schema_migrations`).
+
+**Upgrading a database from before the modules** (all tables in `public`): the first start of this version moves every table into its module's schema in one transaction (`backend/legacy`), then migrates as usual. Take a backup first:
+
+```sh
+cd deploy && docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backup-$(date +%F).dump
+```
 
 ## Project layout
 
 ```text
 backend/
-  api/openapi.yaml    the API contract
-  cmd/api/            entrypoint
-  internal/api/       generated from the spec: models, routes, server interface (don't edit by hand)
-  internal/handlers/  implement the generated interface (thin adapters over the services)
-  internal/web/       serves the built frontend in production
-  internal/service/   business logic, one package per domain (training, workout, ...):
-                      one file per usecase, its SQL in queries.sql and the
-                      sqlc-generated code in repos/ (don't edit by hand)
-  db/migrations/      schema
+  cmd/api/            entrypoint: config from the environment, then backend.New(...).Run
+  svc.go              wires the modules: migrations, contracts, routes under /api, the built frontend
+  modules/            the modules, one directory each:
+    identity/         users and sessions (login, JWT cookie)
+    catalog/          exercises, ratings and the shared lists (joints, focuses, units, block kinds)
+    planning/         cycles, trainings with their week plans, the session library
+    tracking/         the week, workouts with sets and WOD scores, 1RMs, stats
+    whoop/            the WHOOP connection and the activity linked to a workout
+      module.go       the module's wiring (migrations, contract, routes)
+      app/            business logic: usecases, validation, the interfaces it needs
+      adapters/db/    migrations, sqlc queries and generated code, repositories, read model
+      api/http/       openapi.yaml, the generated server and client, the handlers
+      api/module/     the contract other modules call (client/ is its interface)
+  common/             plumbing without application logic: errors, logging, HTTP, db, the module registry
+  legacy/             moves a database from before the modules into the module schemas
+  tests/              component tests (the whole service against Postgres)
   db/seed/            dev seed data
 frontend/
   app/                the app: dashboard (exercises, sessions, cycles, trainings) and tracker (mobile first)
@@ -165,15 +178,17 @@ Complete examples are `training-week.json` and `training-week-into-cycle.json` i
 | Command                                         | What it does                                                  |
 | ----------------------------------------------- | ------------------------------------------------------------- |
 | `task --list`                                   | Show all tasks                                                |
-| `task backend:fresh`                            | Wipe the database and recreate it from schema and seeds       |
-| `cd backend && go test ./...`                   | Run the Go tests                                              |
-| `docker exec -it workout_backend sqlc generate` | Regenerate database code after changing queries or the schema |
-| `task api:gen`                                  | Regenerate the API code (Go and TypeScript) after changing `backend/api/openapi.yaml` |
+| `task backend:fresh`                            | Wipe the database, let the API recreate it, load the seeds    |
+| `task test`                                     | Run the Go unit tests (no database)                           |
+| `task test:integration`                         | Run the adapters' tests against the test database             |
+| `task test:component`                           | Run the component tests: the whole service against the test database |
+| `task db:gen`                                   | Regenerate every module's database code after changing queries or migrations |
+| `task api:gen`                                  | Regenerate the API code (Go and TypeScript) after changing a module's `openapi.yaml` |
 | `cd frontend/app && npm run build`              | Type-check and build the app                                  |
 | `cd frontend/app && npm run test`               | Run the frontend tests (vitest)                               |
 
-There are no migrations yet: during v1 development the schema in `backend/db/migrations/000001_init_schema.up.sql` is edited directly, so run `task backend:fresh` after pulling schema changes.
+Schema changes are new migrations of the module that owns the tables (`backend/modules/<module>/adapters/db/migrations`, next number); the API applies them on start.
 
 Users are created directly in the database; there is no sign-up.
 
-Private seed data goes into `backend/db/seed/local/` (git-ignored): every `*.sql` file there is loaded after the exercise seeds when the database is created.
+Private seed data goes into `backend/db/seed/local/` (git-ignored): every `*.sql` file there is loaded after the exercise seeds by `task backend:fresh`.
