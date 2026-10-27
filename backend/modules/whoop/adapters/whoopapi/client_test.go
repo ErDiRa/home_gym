@@ -40,11 +40,11 @@ func TestActivityAndRecovery(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			w.Write([]byte(scoredWorkout))
+			_, _ = w.Write([]byte(scoredWorkout))
 		},
 		"/developer/v2/recovery": func(w http.ResponseWriter, r *http.Request) {
 			recoveryStart = r.URL.Query().Get("start")
-			w.Write([]byte(`{"records":[{"score":{"recovery_score":67.6,"resting_heart_rate":52,"hrv_rmssd_milli":61.3}}]}`))
+			_, _ = w.Write([]byte(`{"records":[{"score":{"recovery_score":67.6,"resting_heart_rate":52,"hrv_rmssd_milli":61.3}}]}`))
 		},
 	})
 
@@ -76,9 +76,9 @@ func TestPendingActivity(t *testing.T) {
 	id := uuid.New()
 	c := newTestClient(t, map[string]http.HandlerFunc{
 		"/developer/v2/activity/workout/" + id.String(): func(w http.ResponseWriter, _ *http.Request) {
-			w.Write([]byte(`{"id":"` + id.String() + `","start":"2026-10-20T17:00:00Z","end":"2026-10-20T18:00:00Z","sport_name":"functional-fitness","score_state":"PENDING_SCORE"}`))
+			_, _ = w.Write([]byte(`{"id":"` + id.String() + `","start":"2026-10-20T17:00:00Z","end":"2026-10-20T18:00:00Z","sport_name":"functional-fitness","score_state":"PENDING_SCORE"}`))
 		},
-		"/developer/v2/recovery": func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"records":[]}`)) },
+		"/developer/v2/recovery": func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"records":[]}`)) },
 	})
 	a, err := c.Activity(context.Background(), "valid", id)
 	if err != nil || a.ScoreState != "PENDING_SCORE" || a.Strain != nil || a.ZoneMs != nil {
@@ -93,13 +93,13 @@ func TestRefresh(t *testing.T) {
 	var form string
 	c := newTestClient(t, map[string]http.HandlerFunc{
 		"/oauth/oauth2/token": func(w http.ResponseWriter, r *http.Request) {
-			r.ParseForm()
+			_ = r.ParseForm()
 			form = r.Form.Get("grant_type") + " " + r.Form.Get("refresh_token") + " " + r.Form.Get("client_id")
 			if r.Form.Get("refresh_token") == "revoked" {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			w.Write([]byte(`{"access_token":"new","refresh_token":"refresh-2","expires_in":3600}`))
+			_, _ = w.Write([]byte(`{"access_token":"new","refresh_token":"refresh-2","expires_in":3600}`))
 		},
 	})
 	tokens, err := c.Refresh(context.Background(), "refresh-1")
