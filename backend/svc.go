@@ -20,7 +20,6 @@ import (
 	"github.com/erdira/homegym/backend/common/module"
 	"github.com/erdira/homegym/backend/common/module/contracts"
 	"github.com/erdira/homegym/backend/common/web"
-	"github.com/erdira/homegym/backend/legacy"
 	"github.com/erdira/homegym/backend/modules/catalog"
 	"github.com/erdira/homegym/backend/modules/identity"
 	"github.com/erdira/homegym/backend/modules/planning"
