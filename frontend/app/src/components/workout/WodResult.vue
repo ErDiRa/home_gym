@@ -3,7 +3,7 @@
     <div class="flex items-baseline justify-between gap-2">
       <p class="text-sm font-semibold text-slate-800">Score</p>
       <p v-if="wod.result" class="text-sm font-semibold text-emerald-700">
-        {{ scoreText(wod.result, wod.intervals) }} · {{ wod.result.rx ? 'Rx' : 'Scaled' }}
+        {{ scoreText(wod.result, wod.intervals) }}
       </p>
     </div>
 
@@ -47,8 +47,7 @@
       </label>
     </div>
 
-    <SegmentedControl v-model="rx" :options="rxOptions" label="Done as prescribed or scaled" class="mt-3" />
-    <TextInput v-model="wod.draft.notes" size="touch" maxlength="1000" placeholder="Notes, e.g. what was scaled" aria-label="Score notes" class="mt-3" />
+    <TextInput v-model="wod.draft.notes" size="touch" maxlength="1000" placeholder="Notes" aria-label="Score notes" class="mt-3" />
 
     <AppButton
       size="touch"
@@ -66,28 +65,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ArrowPathIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import AppCheckbox from '../form/AppCheckbox.vue'
 import DurationInput from '../form/DurationInput.vue'
-import SegmentedControl from '../form/SegmentedControl.vue'
 import TextInput from '../form/TextInput.vue'
 import { scoreText } from '../training/wod'
 import { scoreChanged, type WodCard } from './workoutPlan'
 
-// The score of a WOD block: inputs for its format, Rx or scaled, and a note. The button logs it,
+// The score of a WOD block: inputs for its format and a note. The button logs it,
 // saves an edit (amber) or undoes it (green), like a set; saving is up to the parent.
 const wod = defineModel<WodCard>({ required: true })
 const emit = defineEmits<{ toggle: [] }>()
 
 const countInput = { type: 'number', inputmode: 'numeric', min: 0, step: 1, size: 'touch' } as const
-const rxOptions = [
-  { value: 'rx', label: 'Rx', title: 'Done as prescribed' },
-  { value: 'scaled', label: 'Scaled', title: 'Load, reps or movements scaled' },
-]
-const rx = computed({
-  get: () => (wod.value.draft.rx ? 'rx' : 'scaled'),
-  set: (v: string) => (wod.value.draft.rx = v === 'rx'),
-})
 </script>

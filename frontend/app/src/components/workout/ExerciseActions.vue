@@ -2,9 +2,8 @@
   <!-- The user's own rating of the exercise, set any time: filled with the stars once rated. -->
   <AppButton
     variant="ghost"
-    size="touch"
-    class="-mt-2 gap-0.5! px-2!"
-    :class="aligned ? 'w-14 justify-start!' : { '-mr-2': !videoUrls.length }"
+    :size="compact ? 'sm' : 'touch'"
+    :class="compact ? ['gap-0.5! px-1!', aligned && 'w-11 justify-start!'] : ['-mt-2 gap-0.5! px-2!', aligned ? 'w-14 justify-start!' : { '-mr-2': !videoUrls.length }]"
     :aria-label="rating ? `Rated ${rating} of 5, change the rating of ${name}` : `Rate ${name}`"
     @click="ratingOpen = true"
   >
@@ -16,16 +15,16 @@
   <AppButton
     v-if="videoUrls.length"
     variant="ghost"
-    size="touch"
+    :size="compact ? 'sm' : 'touch'"
     icon
-    class="-mt-2 -mr-2"
+    :class="compact ? '' : '-mt-2 -mr-2'"
     :aria-label="videoUrls.length > 1 ? `Videos for ${name}` : `Video for ${name}`"
     @click="videosOpen = true"
   >
-    <VideoCameraIcon class="size-6" aria-hidden="true" />
+    <VideoCameraIcon :class="compact ? 'size-5' : 'size-6'" aria-hidden="true" />
   </AppButton>
   <!-- In a list of exercises the video button's place stays, so the stars line up. -->
-  <span v-else-if="aligned" class="-mr-2 size-11 shrink-0" aria-hidden="true" />
+  <span v-else-if="aligned" class="shrink-0" :class="compact ? 'size-8' : '-mr-2 size-11'" aria-hidden="true" />
   <ExerciseVideoSheet :open="videosOpen" :name="name" :urls="videoUrls" @close="videosOpen = false" />
 </template>
 
@@ -40,8 +39,8 @@ import { useExercisesStore } from '../../stores/exercises'
 
 // The buttons beside an exercise of a workout: its rating and its videos, each opening a sheet.
 // aligned gives the rating a fixed width and keeps the place of a missing video button, so the
-// stars of exercises listed one below the other line up.
-const props = defineProps<{ exerciseId: string; name: string; aligned?: boolean }>()
+// stars of exercises listed one below the other line up. compact makes both small, for a line of text.
+const props = defineProps<{ exerciseId: string; name: string; aligned?: boolean; compact?: boolean }>()
 const exercises = useExercisesStore()
 
 // The exercise's videos; only http(s) links count.

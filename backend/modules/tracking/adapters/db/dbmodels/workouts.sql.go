@@ -148,10 +148,10 @@ func (q *Queries) GetSlotWorkoutInProgress(ctx context.Context, arg GetSlotWorko
 
 const upsertWorkoutResult = `-- name: UpsertWorkoutResult :one
 INSERT INTO tracking.workout_results (
-    workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes
+    workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes
 ) VALUES (
     $1, $2, $3, $4,
-    $5, $6, $7, $8, $9
+    $5, $6, $7, $8
 )
 ON CONFLICT (workout_id, block_position)
 DO UPDATE SET score_type = EXCLUDED.score_type,
@@ -159,10 +159,9 @@ DO UPDATE SET score_type = EXCLUDED.score_type,
               rounds = EXCLUDED.rounds,
               reps = EXCLUDED.reps,
               calories = EXCLUDED.calories,
-              rx = EXCLUDED.rx,
               notes = EXCLUDED.notes,
               completed_at = now()
-RETURNING id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at
+RETURNING id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes, completed_at
 `
 
 type UpsertWorkoutResultParams struct {
@@ -173,7 +172,6 @@ type UpsertWorkoutResultParams struct {
 	Rounds        *int32
 	Reps          *int32
 	Calories      *int32
-	Rx            bool
 	Notes         string
 }
 
@@ -187,7 +185,6 @@ func (q *Queries) UpsertWorkoutResult(ctx context.Context, arg UpsertWorkoutResu
 		arg.Rounds,
 		arg.Reps,
 		arg.Calories,
-		arg.Rx,
 		arg.Notes,
 	)
 	var i TrackingWorkoutResult
@@ -200,7 +197,6 @@ func (q *Queries) UpsertWorkoutResult(ctx context.Context, arg UpsertWorkoutResu
 		&i.Rounds,
 		&i.Reps,
 		&i.Calories,
-		&i.Rx,
 		&i.Notes,
 		&i.CompletedAt,
 	)

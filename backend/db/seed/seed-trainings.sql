@@ -181,10 +181,10 @@ $$;
 -- Logs the score of a WOD block of a workout; the values that count depend on the format.
 CREATE FUNCTION pg_temp.result(
     workout uuid, block int, score_type text, time_seconds int DEFAULT NULL, rounds int DEFAULT NULL,
-    reps int DEFAULT NULL, calories int DEFAULT NULL, rx boolean DEFAULT true, notes text DEFAULT ''
+    reps int DEFAULT NULL, calories int DEFAULT NULL, notes text DEFAULT ''
 ) RETURNS void LANGUAGE sql AS $$
-    INSERT INTO workout_results (workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at)
-    SELECT workout, block, score_type, time_seconds, rounds, reps, calories, rx, notes, w.completed_at
+    INSERT INTO workout_results (workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes, completed_at)
+    SELECT workout, block, score_type, time_seconds, rounds, reps, calories, notes, w.completed_at
     FROM workouts w WHERE w.id = workout
 $$;
 
@@ -404,7 +404,7 @@ BEGIN
     PERFORM pg_temp.result(w, 3, 'max_calories', calories => 48);
     w := pg_temp.workout(pg_temp.slot(t, 1, 2), (pg_temp.this_monday() - 5)::timestamptz + interval '18 hours');
     PERFORM pg_temp.result(w, 1, 'emom', rounds => 9, notes => 'Missed the last minute of box jumps');
-    PERFORM pg_temp.result(w, 2, 'amrap', rounds => 14, reps => 7, rx => false, notes => 'Banded pull-ups');
+    PERFORM pg_temp.result(w, 2, 'amrap', rounds => 14, reps => 7, notes => 'Banded pull-ups');
     PERFORM pg_temp.result(w, 3, 'for_time', time_seconds => 11 * 60 + 5);
     PERFORM pg_temp.result(w, 4, 'max_reps', reps => 31);
     w := pg_temp.workout(pg_temp.slot(t, 1, 3), (pg_temp.this_monday() - 3)::timestamptz + interval '18 hours');

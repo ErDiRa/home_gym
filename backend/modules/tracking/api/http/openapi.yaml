@@ -459,7 +459,7 @@ components:
         The score of a WOD block as done, at its place in the session (from 1). score_type is the
         format as planned and decides which values are kept: for_time time_seconds (or reps when
         capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
-      required: [block_position, score_type, time_seconds, rounds, reps, calories, rx, notes]
+      required: [block_position, score_type, time_seconds, rounds, reps, calories, notes]
       properties:
         block_position: { type: integer, format: int32 }
         score_type: { $ref: "#/components/schemas/ScoreType" }
@@ -467,11 +467,10 @@ components:
         rounds: { type: integer, format: int32, nullable: true }
         reps: { type: integer, format: int32, nullable: true }
         calories: { type: integer, format: int32, nullable: true }
-        rx: { type: boolean, description: "false when scaled" }
         notes: { type: string }
     WorkoutResult:
       type: object
-      required: [id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at]
+      required: [id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes, completed_at]
       properties:
         id: { type: string, format: uuid }
         workout_id: { type: string, format: uuid }
@@ -481,7 +480,6 @@ components:
         rounds: { type: integer, format: int32, nullable: true }
         reps: { type: integer, format: int32, nullable: true }
         calories: { type: integer, format: int32, nullable: true }
-        rx: { type: boolean }
         notes: { type: string }
         completed_at: { type: string, format: date-time }
     Workout:

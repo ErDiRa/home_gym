@@ -227,8 +227,8 @@ func TestLogResult(t *testing.T) {
 		in   ResultInput
 		want ResultInput // with BlockPosition 2
 	}{
-		{"for time", ResultInput{ScoreType: scoreForTime, TimeSeconds: ptr[int32](522), Rounds: ptr[int32](3), Rx: true},
-			ResultInput{ScoreType: scoreForTime, TimeSeconds: ptr[int32](522), Rx: true}},
+		{"for time", ResultInput{ScoreType: scoreForTime, TimeSeconds: ptr[int32](522), Rounds: ptr[int32](3)},
+			ResultInput{ScoreType: scoreForTime, TimeSeconds: ptr[int32](522)}},
 		{"for time capped", ResultInput{ScoreType: scoreForTime, Reps: ptr[int32](143)},
 			ResultInput{ScoreType: scoreForTime, Reps: ptr[int32](143)}},
 		{"amrap", ResultInput{ScoreType: scoreAMRAP, Rounds: ptr[int32](5), Reps: ptr[int32](12), TimeSeconds: ptr[int32](720), Notes: "  scaled pull-ups "},
@@ -291,7 +291,7 @@ func equalResult(a, b ResultInput) bool {
 	eq := func(x, y *int32) bool { return (x == nil && y == nil) || (x != nil && y != nil && *x == *y) }
 	return a.BlockPosition == b.BlockPosition && a.ScoreType == b.ScoreType &&
 		eq(a.TimeSeconds, b.TimeSeconds) && eq(a.Rounds, b.Rounds) && eq(a.Reps, b.Reps) && eq(a.Calories, b.Calories) &&
-		a.Rx == b.Rx && a.Notes == b.Notes
+		a.Notes == b.Notes
 }
 
 func TestAddMax(t *testing.T) {

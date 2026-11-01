@@ -98,7 +98,7 @@ func (r *Repo) DeleteSet(ctx context.Context, workoutID, setID uuid.UUID) error 
 func (r *Repo) LogResult(ctx context.Context, workoutID uuid.UUID, in app.ResultInput) (app.Result, error) {
 	res, err := r.q.UpsertWorkoutResult(ctx, dbmodels.UpsertWorkoutResultParams{
 		WorkoutID: workoutID, BlockPosition: in.BlockPosition, ScoreType: in.ScoreType,
-		TimeSeconds: in.TimeSeconds, Rounds: in.Rounds, Reps: in.Reps, Calories: in.Calories, Rx: in.Rx, Notes: in.Notes,
+		TimeSeconds: in.TimeSeconds, Rounds: in.Rounds, Reps: in.Reps, Calories: in.Calories, Notes: in.Notes,
 	})
 	return app.Result(res), err
 }

@@ -52,14 +52,25 @@ export interface ScoreDraft {
   reps: number | null
   calories: number | null
   capped: boolean
-  rx: boolean
   notes: string
+}
+
+// One line of a WOD in plan order, e.g. "18 Hang Cleans"; first marks an exercise's first line,
+// which carries its rating and video buttons.
+export interface WodLine {
+  key: string
+  exerciseId: string
+  name: string
+  reps: string // e.g. "18" or "8–10 per side", with the unit unless it is plain reps
+  load: string
+  first: boolean
 }
 
 export interface WodCard {
   blockPosition: number
   scoreType: ScoreType
   intervals: number | null // of an EMOM, e.g. 10; null when unknown
+  lines: WodLine[]
   draft: ScoreDraft
   result: WorkoutResult | null // as saved once logged
   saving: boolean
@@ -76,7 +87,7 @@ export interface BlockCard {
   wod: WodCard | null // set for a WOD block
 }
 
-// The inputs of a score: what was logged, else empty and Rx.
+// The inputs of a score: what was logged, else empty.
 export function scoreDraft(result: WorkoutResult | null): ScoreDraft {
   return {
     time_seconds: result?.time_seconds ?? null,
@@ -84,7 +95,6 @@ export function scoreDraft(result: WorkoutResult | null): ScoreDraft {
     reps: result?.reps ?? null,
     calories: result?.calories ?? null,
     capped: result?.score_type === 'for_time' && result.time_seconds === null,
-    rx: result?.rx ?? true,
     notes: result?.notes ?? '',
   }
 }
@@ -114,7 +124,6 @@ export function scoreChanged(wod: WodCard): boolean {
     r.rounds !== v.rounds ||
     r.reps !== v.reps ||
     r.calories !== v.calories ||
-    r.rx !== wod.draft.rx ||
     r.notes !== wod.draft.notes.trim()
   )
 }
@@ -216,6 +225,8 @@ export function buildCards(
   const blocks = (session?.blocks ?? []).map((b, i): BlockCard => {
     const kind = kindOf(b.kind)
     const scored = !!kind?.scored && b.score_type !== null
+    // What a WOD shows of each exercise, to group the repeated ones into movements.
+    const parts: { amount: string; weight: string; plannedLoad: number | null; loadUnit: string | null; bodyweight: boolean }[] = []
     const exercises = b.exercises.map((e, j): ExerciseCard => {
       const key = placeKey(i + 1, j + 1)
       // The server clears what the block's kind shares on the exercises, so whichever side is
@@ -244,11 +255,19 @@ export function buildCards(
 
       // A WOD's exercises are done in its rounds, so they show their reps without sets, if any.
       const text: string[] = []
+      parts[j] = {
+        amount: reps.reps_value !== null ? `${range(reps.reps_value, reps.reps_max)}${reps.per_side ? '/side' : ''}` : '',
+        weight: '',
+        plannedLoad,
+        loadUnit,
+        bodyweight,
+      }
       if (reps.reps_value !== null || !scored) {
         const amount = `${range(reps.reps_value ?? 0, reps.reps_max)} ${reps.reps_unit_name}${reps.per_side ? ' per side' : ''}`
         text.push(scored ? amount : `${planned} × ${amount}`)
       }
       const weight = load.load_value !== null ? `${range(load.load_value, load.load_max)} ${load.load_unit_name}` : ''
+      parts[j].weight = bodyweight ? (weight ? `BW + ${weight}` : 'BW') : weight
       if (bodyweight) text.push(weight ? `bodyweight + ${weight}` : 'bodyweight')
       else if (weight) text.push(weight)
       else if (load.load_unit !== null) text.push(`in ${load.load_unit_name}`) // logged in this unit, e.g. "in cal"
@@ -320,6 +339,7 @@ export function buildCards(
             blockPosition: i + 1,
             scoreType: b.score_type!,
             intervals: emomRounds(b),
+            lines: scored ? wodLines(exercises, parts) : [],
             draft: scoreDraft(result),
             result,
             saving: false,
@@ -362,6 +382,17 @@ export function buildCards(
   }
   extras.sort((a, b) => a.blockPosition - b.blockPosition || a.position - b.position)
   return { blocks, extras, extraResults }
+}
+
+// The exercises of a WOD block in plan order, one line each.
+function wodLines(cards: ExerciseCard[], parts: { amount: string; weight: string }[]): WodLine[] {
+  const seen = new Set<string>()
+  return cards.map((c, j) => {
+    const first = !seen.has(c.exerciseId)
+    seen.add(c.exerciseId)
+    const unit = c.repsUnitName && c.repsUnitName !== 'reps' ? ` ${c.repsUnitName}` : ''
+    return { key: c.key, exerciseId: c.exerciseId, name: c.name, reps: parts[j].amount ? `${parts[j].amount}${unit}` : '', load: parts[j].weight, first }
+  })
 }
 
 // One line of a session card's summary: an exercise with its label, and where it sits in a

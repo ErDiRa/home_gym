@@ -141,7 +141,6 @@ type Result struct {
 	Rounds        *int32
 	Reps          *int32
 	Calories      *int32
-	Rx            bool
 	Notes         string
 	CompletedAt   time.Time
 }

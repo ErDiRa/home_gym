@@ -458,8 +458,6 @@ export interface components {
             reps: number | null;
             /** Format: int32 */
             calories: number | null;
-            /** @description false when scaled */
-            rx: boolean;
             notes: string;
         };
         WorkoutResult: {
@@ -478,7 +476,6 @@ export interface components {
             reps: number | null;
             /** Format: int32 */
             calories: number | null;
-            rx: boolean;
             notes: string;
             /** Format: date-time */
             completed_at: string;

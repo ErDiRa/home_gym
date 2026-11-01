@@ -207,7 +207,7 @@ func (q *Queries) ListLastLoads(ctx context.Context, userID uuid.UUID) ([]ListLa
 }
 
 const listWorkoutResults = `-- name: ListWorkoutResults :many
-SELECT id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes, completed_at FROM tracking.workout_results
+SELECT id, workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes, completed_at FROM tracking.workout_results
 WHERE workout_id = $1
 ORDER BY block_position
 `
@@ -231,7 +231,6 @@ func (q *Queries) ListWorkoutResults(ctx context.Context, workoutID uuid.UUID) (
 			&i.Rounds,
 			&i.Reps,
 			&i.Calories,
-			&i.Rx,
 			&i.Notes,
 			&i.CompletedAt,
 		); err != nil {

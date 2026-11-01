@@ -41,8 +41,9 @@
           </span>
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-semibold text-slate-800">{{ block.title }}</span>
-            <span v-if="block.hint || block.notes" class="block text-xs text-slate-500">
-              {{ [block.hint, block.notes].filter(Boolean).join(' · ') }}
+            <!-- A WOD's long notes are shown inside, not in the header. -->
+            <span v-if="block.hint || (block.notes && !block.wod)" class="block text-xs text-slate-500">
+              {{ [block.hint, block.wod ? '' : block.notes].filter(Boolean).join(' · ') }}
             </span>
           </span>
           <span class="shrink-0 text-xs text-slate-500">{{ blockProgress(block) }}</span>
@@ -54,6 +55,7 @@
         </button>
         <div v-show="expanded.has(block.key)">
           <ComplexSets v-if="block.complex" v-model="blocks[bi]" @toggle="toggleRound" />
+          <WodMovements v-else-if="block.wod" :lines="block.wod.lines" :notes="block.notes" />
           <div v-else class="divide-y divide-slate-100">
             <ExerciseSets
               v-for="(card, i) in block.exercises"
@@ -92,7 +94,7 @@
           />
           <p v-for="r in extraResults" :key="r.id" class="py-3 text-sm text-slate-700">
             <span class="font-semibold text-indigo-600">{{ blockLetter(r.block_position - 1) }}</span>
-            {{ scoreFormat(r.score_type)?.label }}: <span class="font-semibold">{{ scoreText(r) }}</span> · {{ r.rx ? 'Rx' : 'Scaled' }}
+            {{ scoreFormat(r.score_type)?.label }}: <span class="font-semibold">{{ scoreText(r) }}</span>
             <span v-if="r.notes" class="text-slate-500"> · {{ r.notes }}</span>
           </p>
         </div>
@@ -171,6 +173,7 @@ import TextInput from '../../components/form/TextInput.vue'
 import ComplexSets from '../../components/workout/ComplexSets.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'
+import WodMovements from '../../components/workout/WodMovements.vue'
 import WodResult from '../../components/workout/WodResult.vue'
 import { blockLetter } from '../../components/training/trainingForm'
 import { scoreFormat, scoreText } from '../../components/training/wod'
@@ -372,7 +375,6 @@ async function toggleScore(wod: WodCard) {
       block_position: wod.blockPosition,
       score_type: wod.scoreType,
       ...scoreValues(wod.scoreType, wod.draft),
-      rx: wod.draft.rx,
       notes: wod.draft.notes,
     })
     wod.draft = scoreDraft(wod.result)

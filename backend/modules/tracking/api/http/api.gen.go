@@ -204,9 +204,6 @@ type ResultInput struct {
 	Reps          *int32 `json:"reps"`
 	Rounds        *int32 `json:"rounds"`
 
-	// Rx false when scaled
-	Rx bool `json:"rx"`
-
 	// ScoreType How a WOD block is scored.
 	ScoreType   ScoreType `json:"score_type"`
 	TimeSeconds *int32    `json:"time_seconds"`
@@ -310,7 +307,6 @@ type WorkoutResult struct {
 	Notes         string             `json:"notes"`
 	Reps          *int32             `json:"reps"`
 	Rounds        *int32             `json:"rounds"`
-	Rx            bool               `json:"rx"`
 
 	// ScoreType How a WOD block is scored.
 	ScoreType   ScoreType          `json:"score_type"`

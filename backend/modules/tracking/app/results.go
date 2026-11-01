@@ -32,7 +32,7 @@ const (
 //	max_calories  Calories
 //	emom          Rounds: the intervals completed
 //
-// The others are dropped. Rx is false when the WOD was scaled.
+// The others are dropped.
 type ResultInput struct {
 	BlockPosition int32
 	ScoreType     string
@@ -40,7 +40,6 @@ type ResultInput struct {
 	Rounds        *int32
 	Reps          *int32
 	Calories      *int32
-	Rx            bool
 	Notes         string
 }
 

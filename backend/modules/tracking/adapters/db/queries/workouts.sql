@@ -60,10 +60,10 @@ WHERE id = $1 AND workout_id = $2;
 -- name: UpsertWorkoutResult :one
 -- Logs the score of a block, or corrects it when it was logged before.
 INSERT INTO tracking.workout_results (
-    workout_id, block_position, score_type, time_seconds, rounds, reps, calories, rx, notes
+    workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes
 ) VALUES (
     sqlc.arg(workout_id), sqlc.arg(block_position), sqlc.arg(score_type), sqlc.narg(time_seconds),
-    sqlc.narg(rounds), sqlc.narg(reps), sqlc.narg(calories), sqlc.arg(rx), sqlc.arg(notes)
+    sqlc.narg(rounds), sqlc.narg(reps), sqlc.narg(calories), sqlc.arg(notes)
 )
 ON CONFLICT (workout_id, block_position)
 DO UPDATE SET score_type = EXCLUDED.score_type,
@@ -71,7 +71,6 @@ DO UPDATE SET score_type = EXCLUDED.score_type,
               rounds = EXCLUDED.rounds,
               reps = EXCLUDED.reps,
               calories = EXCLUDED.calories,
-              rx = EXCLUDED.rx,
               notes = EXCLUDED.notes,
               completed_at = now()
 RETURNING *;

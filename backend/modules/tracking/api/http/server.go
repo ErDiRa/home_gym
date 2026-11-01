@@ -234,14 +234,14 @@ func (s *Server) LogResult(ctx context.Context, req LogResultRequestObject) (Log
 	b := req.Body
 	r, err := s.service.LogResult(ctx, userID, req.Id, app.ResultInput{
 		BlockPosition: b.BlockPosition, ScoreType: string(b.ScoreType), TimeSeconds: b.TimeSeconds,
-		Rounds: b.Rounds, Reps: b.Reps, Calories: b.Calories, Rx: b.Rx, Notes: b.Notes,
+		Rounds: b.Rounds, Reps: b.Reps, Calories: b.Calories, Notes: b.Notes,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return LogResult200JSONResponse{
 		Id: r.ID, WorkoutId: r.WorkoutID, BlockPosition: r.BlockPosition, ScoreType: ScoreType(r.ScoreType),
-		TimeSeconds: r.TimeSeconds, Rounds: r.Rounds, Reps: r.Reps, Calories: r.Calories, Rx: r.Rx, Notes: r.Notes,
+		TimeSeconds: r.TimeSeconds, Rounds: r.Rounds, Reps: r.Reps, Calories: r.Calories, Notes: r.Notes,
 		CompletedAt: r.CompletedAt,
 	}, nil
 }

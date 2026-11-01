@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type CatalogBlockKind struct {
@@ -266,7 +265,6 @@ type TrackingWorkoutLog struct {
 	Reps          bool
 	Load          bool
 	Score         *string
-	Rx            pgtype.Bool
 	Notes         *string
 	WorkoutNotes  string
 	StartedAt     time.Time
@@ -291,7 +289,6 @@ type TrackingWorkoutResult struct {
 	Rounds        *int32
 	Reps          *int32
 	Calories      *int32
-	Rx            bool
 	Notes         string
 	CompletedAt   time.Time
 }

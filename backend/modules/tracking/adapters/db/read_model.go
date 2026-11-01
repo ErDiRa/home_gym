@@ -107,7 +107,7 @@ func (m *ReadModel) Workout(ctx context.Context, userID, id uuid.UUID) (tracking
 		Results: mapSlice(results, func(r dbmodels.TrackingWorkoutResult) trackinghttp.WorkoutResult {
 			return trackinghttp.WorkoutResult{
 				Id: r.ID, WorkoutId: r.WorkoutID, BlockPosition: r.BlockPosition, ScoreType: trackinghttp.ScoreType(r.ScoreType),
-				TimeSeconds: r.TimeSeconds, Rounds: r.Rounds, Reps: r.Reps, Calories: r.Calories, Rx: r.Rx, Notes: r.Notes,
+				TimeSeconds: r.TimeSeconds, Rounds: r.Rounds, Reps: r.Reps, Calories: r.Calories, Notes: r.Notes,
 				CompletedAt: r.CompletedAt,
 			}
 		}),

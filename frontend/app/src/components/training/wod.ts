@@ -94,7 +94,7 @@ export function emomRounds(score: Score): number | null {
 }
 
 // A logged score as text: "8:42", "Capped · 81 reps", "14 rounds + 7 reps", "31 reps", "48 cal",
-// "9 rounds" (or "9/10 rounds" for an EMOM of known length). Rx or scaled is shown apart.
+// "9 rounds" (or "9/10 rounds" for an EMOM of known length).
 export function scoreText(r: Pick<ResultInput, 'score_type' | 'time_seconds' | 'rounds' | 'reps' | 'calories'>, of?: number | null) {
   const n = (v: number | null, unit: string) => `${v ?? 0} ${unit}${v === 1 ? '' : 's'}`
   switch (r.score_type) {

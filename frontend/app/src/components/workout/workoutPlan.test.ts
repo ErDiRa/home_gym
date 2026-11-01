@@ -5,7 +5,8 @@ import { buildCards, changed, progressOf, roundsOf, roundState, suggestedLoad, t
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
 const pct: Unit = { id: 'pct', name: '% 1RM', min_value: 0, max_value: 200, kg_per_unit: null, percent_of_max: true }
-const units = new Map([kg, lb, pct].map((u) => [u.id, u]))
+const ft: Unit = { id: 'ft', name: 'ft', min_value: 0, max_value: null, kg_per_unit: null, percent_of_max: false }
+const units = new Map([kg, lb, pct, ft].map((u) => [u.id, u]))
 const single: BlockKind = {
   code: 'single',
   name: 'Single',
@@ -325,5 +326,43 @@ describe('an endurance exercise', () => {
 
   it('is no endurance exercise without the type', () => {
     expect(buildCards(unloadedSession, [], [], () => single, 'kg', context(null)).blocks[0].exercises[0].endurance).toBe(false)
+  })
+})
+
+// A WOD alternating hang cleans (135 lb) and rope climbs, three rounds each.
+const wodKind: BlockKind = { ...single, code: 'wod', name: 'WOD', shared_sets: true, scored: true }
+const ladder = (id: string, name: string, reps: number, load: number | null, unit = 'lb'): TrainingSession['blocks'][number]['exercises'][number] => ({
+  ...plannedExercise,
+  exercise_id: id,
+  name,
+  sets: null,
+  reps_value: reps,
+  load_value: load,
+  load_max: null,
+  load_unit: load === null ? null : unit,
+  load_unit_name: load === null ? '' : unit,
+})
+const wodSession: TrainingSession = {
+  ...session,
+  blocks: [
+    {
+      ...session.blocks[0],
+      kind: 'wod',
+      score_type: 'for_time',
+      exercises: [ladder('clean', 'Hang Clean', 18, 135), ladder('rope', 'Rope Climb', 1, 15, 'ft'), ladder('clean', 'Hang Clean', 15, 135), ladder('rope', 'Rope Climb', 2, 15, 'ft')],
+    },
+  ],
+}
+const wodContext = { ...context(null), weightUnit: 'kg' }
+
+describe('a WOD', () => {
+  const wod = () => buildCards(wodSession, [], [], () => wodKind, 'kg', wodContext).blocks[0].wod!
+
+  it('lists the exercises in plan order, the buttons on each one\'s first line', () => {
+    const lines = wod().lines
+    expect(lines.map((l) => `${l.reps} ${l.name}`)).toEqual(['18 Hang Clean', '1 Rope Climb', '15 Hang Clean', '2 Rope Climb'])
+    expect(lines.map((l) => l.first)).toEqual([true, true, false, false])
+    expect(lines[0].load).toBe('135 lb')
+    expect(lines[1].load).toBe('15 ft')
   })
 })
