@@ -52,6 +52,11 @@ func TestCheckBlock(t *testing.T) {
 		{"bodyweight", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true})}}, ""},
 		{"bodyweight plus weight", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true, LoadValue: ptr(10.0), LoadUnit: &kg})}}, ""},
 		{"bodyweight plus RPE", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: &reps, LoadBodyweight: true, LoadValue: ptr(8.0), LoadUnit: &rpe})}}, "needs a weight unit"},
+		{"target", BlockInput{Kind: "single", Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps, Intensity: Intensity{IntensityMetric: ptr(IntensityWatts), IntensityValue: ptr(220.0), IntensityMax: ptr(240.0), RecoveryValue: ptr(120.0)}}}}, ""},
+		{"target without metric", BlockInput{Kind: "single", Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps, Intensity: Intensity{IntensityValue: ptr(220.0)}}}}, "needs a metric"},
+		{"unknown target metric", BlockInput{Kind: "single", Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps, Intensity: Intensity{IntensityMetric: ptr("mph"), IntensityValue: ptr(20.0)}}}}, "unknown target metric"},
+		{"falling target range", BlockInput{Kind: "single", Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps, Intensity: Intensity{IntensityMetric: ptr(IntensityPace500), IntensityValue: ptr(120.0), IntensityMax: ptr(115.0)}}}}, "target: the upper end"},
+		{"recovery max without value", BlockInput{Kind: "single", Exercises: []ExerciseInput{{ExerciseID: uuid.New(), Sets: ptr[int32](4), Amount: withReps, Intensity: Intensity{IntensityMetric: ptr(IntensityPace500), RecoveryMax: ptr(150.0)}}}}, "recovery: the upper end of a range needs a value"},
 		{"unknown unit", BlockInput{Kind: "single", Exercises: []ExerciseInput{exercise(Amount{RepsValue: ptr(8.0), RepsUnit: ptr(uuid.New())})}}, "unknown reps unit"},
 	}
 	for _, tt := range tests {
@@ -126,6 +131,14 @@ func TestCheckBlockClearsUnusedSide(t *testing.T) {
 	}
 	if msg := checkBlock(&superset, lk); msg != "" || superset.LoadBodyweight || superset.LoadUnit != nil {
 		t.Errorf("superset block kept a load: %q %+v", msg, superset.Amount)
+	}
+
+	// A metric without any value is dropped.
+	metricOnly := BlockInput{Kind: "single", Exercises: []ExerciseInput{
+		{ExerciseID: uuid.New(), Sets: ptr[int32](3), Amount: withReps, Intensity: Intensity{IntensityMetric: ptr(IntensityWatts)}},
+	}}
+	if msg := checkBlock(&metricOnly, lk); msg != "" || metricOnly.Exercises[0].IntensityMetric != nil {
+		t.Errorf("metric without values = %q %+v", msg, metricOnly.Exercises[0].Intensity)
 	}
 }
 

@@ -100,6 +100,7 @@ func (m *ReadModel) Workout(ctx context.Context, userID, id uuid.UUID) (tracking
 				BlockPosition: s.BlockPosition, ExercisePosition: s.ExercisePosition, SetNumber: s.SetNumber,
 				RepsValue: s.RepsValue, RepsUnit: s.RepsUnit, RepsUnitName: repUnits[s.RepsUnit], PerSide: s.PerSide,
 				LoadValue: s.LoadValue, LoadUnit: s.LoadUnit, LoadUnitName: loadUnitName, Bodyweight: s.Bodyweight,
+				IntensityMetric: (*trackinghttp.IntensityMetric)(s.IntensityMetric), IntensityValue: s.IntensityValue,
 				CompletedAt: s.CompletedAt,
 			}
 		}),

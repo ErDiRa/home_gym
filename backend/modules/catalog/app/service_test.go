@@ -115,6 +115,9 @@ func TestCreateExerciseWithoutLinks(t *testing.T) {
 	if _, err := newService(f).CreateExercise(context.Background(), uuid.New(), ExerciseInput{Name: "General Warmup 1", Type: "mobility"}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := newService(f).CreateExercise(context.Background(), uuid.New(), ExerciseInput{Name: "Row Erg", Type: "endurance"}); err != nil {
+		t.Fatal(err)
+	}
 	// Empty lists, not nil: they become the queries' array parameters.
 	if saved := f.created[0]; saved.JointIDs == nil || len(saved.JointIDs) != 0 || len(saved.MuscleGroupIDs) != 0 {
 		t.Errorf("ids = %v, %v, want empty lists", saved.JointIDs, saved.MuscleGroupIDs)
@@ -132,7 +135,7 @@ func TestCreateExerciseRejects(t *testing.T) {
 		wantMsg string
 	}{
 		{"no name", func(in *ExerciseInput) { in.Name = "" }, "name is required"},
-		{"bad type", func(in *ExerciseInput) { in.Type = "cardio" }, "type must be mobility or strength"},
+		{"bad type", func(in *ExerciseInput) { in.Type = "cardio" }, "type must be mobility, strength or endurance"},
 		{"not http", func(in *ExerciseInput) { in.VideoURLs = []string{"ftp://example.com/v"} }, "video links must be http(s) URLs (max 500 characters)"},
 		{"no host", func(in *ExerciseInput) { in.VideoURLs = []string{"https://"} }, "video links must be http(s) URLs (max 500 characters)"},
 		{"long url", func(in *ExerciseInput) { in.VideoURLs = []string{"https://example.com/" + strings.Repeat("v", 500)} }, "video links must be http(s) URLs (max 500 characters)"},

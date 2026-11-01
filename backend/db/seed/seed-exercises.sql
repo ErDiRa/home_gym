@@ -30,7 +30,11 @@ WITH v(name, joints, muscle_groups, description, video_url, focuses, type) AS (V
     ('Air Squat', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Bodyweight squat below parallel.', '', ARRAY['Functional fitness'], 'strength'),
     ('Box Jump', ARRAY['Ankle', 'Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes', 'Calves'], 'Two-footed jump onto a box, standing tall at the top.', '', ARRAY['Functional fitness'], 'strength'),
     ('Wall Ball', ARRAY['Knee', 'Hip', 'Shoulder'], ARRAY['Quadriceps', 'Glutes', 'Deltoids'], 'Squat and throw a medicine ball to a target on the wall.', '', ARRAY['Functional fitness'], 'strength'),
-    ('Row Erg', ARRAY['Knee', 'Hip', 'Elbow'], ARRAY['Back', 'Quadriceps', 'Hamstrings'], 'Rowing machine, scored in calories or metres.', '', ARRAY['Functional fitness'], 'strength')
+    ('Row Erg', ARRAY['Knee', 'Hip', 'Elbow'], ARRAY['Back', 'Quadriceps', 'Hamstrings'], 'Rowing machine, scored in calories or metres.', '', ARRAY['Functional fitness'], 'endurance'),
+    -- More machines for the endurance seeds (target pace, watts or cal/h)
+    ('Ski Erg', ARRAY['Shoulder', 'Hip'], ARRAY['Back', 'Triceps', 'Core'], 'Standing double-pole pull on a ski machine; pace per 500 m.', '', ARRAY['Functional fitness'], 'endurance'),
+    ('BikeErg', ARRAY['Knee', 'Hip'], ARRAY['Quadriceps', 'Glutes'], 'Stationary bike with a flywheel; pace per 1000 m.', '', ARRAY['Functional fitness'], 'endurance'),
+    ('Echo Bike', ARRAY['Knee', 'Hip', 'Shoulder'], ARRAY['Quadriceps', 'Glutes', 'Deltoids'], 'Air bike with moving arms; calories and watts.', '', ARRAY['Functional fitness'], 'endurance')
 ), new_exercises AS (
     INSERT INTO exercises (user_id, name, description, type)
     SELECT u.id, v.name, v.description, v.type

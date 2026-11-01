@@ -199,7 +199,7 @@ func (s *Server) LogSet(ctx context.Context, req LogSetRequestObject) (LogSetRes
 	set, err := s.service.LogSet(ctx, userID, req.Id, app.SetInput{
 		ExerciseID: b.ExerciseId, BlockPosition: b.BlockPosition, ExercisePosition: b.ExercisePosition, SetNumber: b.SetNumber,
 		RepsValue: b.RepsValue, RepsUnit: b.RepsUnit, PerSide: b.PerSide, LoadValue: b.LoadValue, LoadUnit: b.LoadUnit,
-		Bodyweight: b.Bodyweight,
+		Bodyweight: b.Bodyweight, IntensityMetric: (*string)(b.IntensityMetric), IntensityValue: b.IntensityValue,
 	})
 	if err != nil {
 		return nil, err
@@ -208,7 +208,8 @@ func (s *Server) LogSet(ctx context.Context, req LogSetRequestObject) (LogSetRes
 		Id: set.ID, WorkoutId: set.WorkoutID, ExerciseId: set.ExerciseID,
 		BlockPosition: set.BlockPosition, ExercisePosition: set.ExercisePosition, SetNumber: set.SetNumber,
 		RepsValue: set.RepsValue, RepsUnit: set.RepsUnit, PerSide: set.PerSide, LoadValue: set.LoadValue, LoadUnit: set.LoadUnit,
-		Bodyweight: set.Bodyweight, CompletedAt: set.CompletedAt,
+		Bodyweight: set.Bodyweight, IntensityMetric: (*IntensityMetric)(set.IntensityMetric), IntensityValue: set.IntensityValue,
+		CompletedAt: set.CompletedAt,
 	}, nil
 }
 

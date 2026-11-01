@@ -23,6 +23,7 @@ ORDER BY sb.session_id, sb.position;
 -- name: ListTrainingExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
        se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
+       se.intensity_metric, se.intensity_value, se.intensity_max, se.recovery_value, se.recovery_max,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id
@@ -111,11 +112,14 @@ RETURNING id;
 -- The exercise is checked to be one of the user's live ones before (the catalog's contract).
 INSERT INTO planning.session_exercises (
     block_id, exercise_id, position, sets,
-    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight, tempo, notes
+    reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
+    intensity_metric, intensity_value, intensity_max, recovery_value, recovery_max, tempo, notes
 ) VALUES (
     sqlc.arg(block_id), sqlc.arg(exercise_id), sqlc.arg(position), sqlc.narg(sets),
     sqlc.narg(reps_value), sqlc.narg(reps_max), sqlc.narg(reps_unit), sqlc.arg(per_side),
-    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(load_bodyweight), sqlc.arg(tempo), sqlc.arg(notes)
+    sqlc.narg(load_value), sqlc.narg(load_max), sqlc.narg(load_unit), sqlc.arg(load_bodyweight),
+    sqlc.narg(intensity_metric), sqlc.narg(intensity_value), sqlc.narg(intensity_max), sqlc.narg(recovery_value), sqlc.narg(recovery_max),
+    sqlc.arg(tempo), sqlc.arg(notes)
 );
 
 -- name: UserOwnsCycle :one

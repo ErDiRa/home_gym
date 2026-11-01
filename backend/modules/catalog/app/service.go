@@ -17,7 +17,7 @@ type Exercise struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	Type        string // mobility or strength
+	Type        string // mobility, strength or endurance
 	VideoURLs   []string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

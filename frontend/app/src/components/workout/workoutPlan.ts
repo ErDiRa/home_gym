@@ -1,4 +1,5 @@
-import type { BlockKind, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
+import type { BlockKind, IntensityMetric, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
+import { intensityText } from '../exercise/intensity'
 import { convertLoad, roundLoad, type MaxLoad } from '../exercise/maxes'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
 import { emomRounds, wodSummary } from '../training/wod'
@@ -13,6 +14,7 @@ export interface SetRow {
   number: number
   reps: number | null
   load: number | null
+  intensity: number | null // the average of an endurance exercise, in the card's intensityMetric
   logged: WorkoutSet | LoggedSet | null // as loaded with the workout, or as just logged
   saving: boolean
 }
@@ -33,6 +35,8 @@ export interface ExerciseCard {
   loadUnit: string | null // the unit the load inputs are in
   bodyweight: boolean // done on bodyweight: the load inputs hold the weight added to it, if any
   showLoad: boolean // whether the load inputs show; on bodyweight only once weight is added
+  endurance: boolean // an erg, a run…: each set also takes its average (watts, cal/h or a pace)
+  intensityMetric: IntensityMetric // what the average inputs are in
   percentPlan: { value: number; max: number | null } | null // a load planned in % 1RM (a range with max)
   newMax: LoggedSet | null // a logged single above the current 1RM, offered to be saved as the new one
   lastLoad: MaxLoad | null // the load last logged in another workout, suggested when the plan has none
@@ -155,7 +159,7 @@ const placeKey = (blockPosition: number, position: number) => `${blockPosition}-
 
 // Rows for sets 1..planned, filled with what was logged (or the planned values), followed by any
 // further sets logged beyond the plan.
-function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, load: number | null): SetRow[] {
+function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, load: number | null, intensity: number | null = null): SetRow[] {
   const byNumber = new Map(logged.map((s) => [s.set_number, s]))
   const count = Math.max(planned, ...logged.map((s) => s.set_number), 0)
   const rows: SetRow[] = []
@@ -163,7 +167,14 @@ function rowsFor(planned: number, logged: WorkoutSet[], reps: number | null, loa
     const set = byNumber.get(n) ?? null
     // Sets beyond the plan that weren't logged (a gap in the numbers) are skipped.
     if (n > planned && !set) continue
-    rows.push({ number: n, reps: set ? set.reps_value : reps, load: set ? set.load_value : load, logged: set, saving: false })
+    rows.push({
+      number: n,
+      reps: set ? set.reps_value : reps,
+      load: set ? set.load_value : load,
+      intensity: set ? set.intensity_value : intensity,
+      logged: set,
+      saving: false,
+    })
   }
   return rows
 }
@@ -184,7 +195,9 @@ export interface LoadContext {
 // 1RM, calculated from it, when there is one (loads); a planned load in another unit than the
 // logged sets' is converted too, where it can be. Without a planned load (or with only its unit) the
 // load last logged of the exercise is suggested, and its unit is where load starts. On bodyweight
-// the load inputs only show with weight added to it (planned or logged), in a weight unit.
+// the load inputs only show with weight added to it (planned or logged), in a weight unit. An
+// endurance exercise's sets also take their average, prefilled with the planned target, in the
+// metric logged, else planned, else watts (which every machine shows).
 export function buildCards(
   session: TrainingSession | null,
   sets: WorkoutSet[],
@@ -239,6 +252,11 @@ export function buildCards(
       if (bodyweight) text.push(weight ? `bodyweight + ${weight}` : 'bodyweight')
       else if (weight) text.push(weight)
       else if (load.load_unit !== null) text.push(`in ${load.load_unit_name}`) // logged in this unit, e.g. "in cal"
+      const endurance = e.type === 'endurance' || logged.some((s) => s.intensity_metric)
+      const target = endurance ? intensityText(e) : ''
+      if (target) text.push(target)
+      const intensityMetric = logged.find((s) => s.intensity_metric)?.intensity_metric ?? e.intensity_metric ?? 'watts'
+      const plannedIntensity = e.intensity_metric === intensityMetric ? e.intensity_value : null
       return {
         key,
         label: exerciseLabel(b.exercises.length, i, j),
@@ -255,12 +273,14 @@ export function buildCards(
         loadUnit,
         bodyweight,
         showLoad: !bodyweight || load.load_value !== null || logged.some((s) => s.load_value !== null),
+        endurance,
+        intensityMetric,
         percentPlan: planUnit?.percent_of_max && load.load_value !== null && !bodyweight ? { value: load.load_value, max: load.load_max } : null,
         newMax: null,
         lastLoad: scored ? null : last,
         scored,
         // Sets logged in a WOD block before it became one still show.
-        rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad),
+        rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad, plannedIntensity),
       }
     })
     const complex = !!kind?.shared_load && !scored && exercises.length > 1
@@ -331,6 +351,8 @@ export function buildCards(
       loadUnit: logged.find((s) => s.load_unit)?.load_unit ?? defaultLoadUnit,
       bodyweight: first.bodyweight,
       showLoad: !first.bodyweight || logged.some((s) => s.load_value !== null),
+      endurance: logged.some((s) => s.intensity_metric),
+      intensityMetric: logged.find((s) => s.intensity_metric)?.intensity_metric ?? 'watts',
       percentPlan: null,
       newMax: null,
       lastLoad: null,
@@ -380,5 +402,12 @@ export function changed(card: ExerciseCard, row: SetRow): boolean {
   const s = row.logged
   if (!s) return false
   const load = num(row.load)
-  return s.reps_value !== num(row.reps) || s.load_value !== load || (load !== null && s.load_unit !== card.loadUnit)
+  const intensity = card.endurance ? num(row.intensity) : null
+  return (
+    s.reps_value !== num(row.reps) ||
+    s.load_value !== load ||
+    (load !== null && s.load_unit !== card.loadUnit) ||
+    s.intensity_value !== intensity ||
+    (intensity !== null && s.intensity_metric !== card.intensityMetric)
+  )
 }

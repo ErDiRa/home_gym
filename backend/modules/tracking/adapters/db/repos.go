@@ -86,7 +86,7 @@ func (r *Repo) LogSet(ctx context.Context, workoutID uuid.UUID, in app.SetInput)
 		WorkoutID: workoutID, ExerciseID: in.ExerciseID,
 		BlockPosition: in.BlockPosition, ExercisePosition: in.ExercisePosition, SetNumber: in.SetNumber,
 		RepsValue: in.RepsValue, RepsUnit: *in.RepsUnit, PerSide: in.PerSide, LoadValue: in.LoadValue, LoadUnit: in.LoadUnit,
-		Bodyweight: in.Bodyweight,
+		Bodyweight: in.Bodyweight, IntensityMetric: in.IntensityMetric, IntensityValue: in.IntensityValue,
 	})
 	return app.LoggedSet(s), err
 }

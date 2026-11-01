@@ -16,6 +16,7 @@ ORDER BY sb.position;
 -- name: ListSessionExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
        se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
+       se.intensity_metric, se.intensity_value, se.intensity_max, se.recovery_value, se.recovery_max,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id

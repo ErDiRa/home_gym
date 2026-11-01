@@ -19,13 +19,16 @@ import (
 
 // Defines values for ExerciseType.
 const (
-	Mobility ExerciseType = "mobility"
-	Strength ExerciseType = "strength"
+	Endurance ExerciseType = "endurance"
+	Mobility  ExerciseType = "mobility"
+	Strength  ExerciseType = "strength"
 )
 
 // Valid indicates whether the value is a known member of the ExerciseType enum.
 func (e ExerciseType) Valid() bool {
 	switch e {
+	case Endurance:
+		return true
 	case Mobility:
 		return true
 	case Strength:
@@ -50,6 +53,30 @@ func (e GoalStatus) Valid() bool {
 	case Missed:
 		return true
 	case Open:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IntensityMetric.
+const (
+	CalPerHour IntensityMetric = "cal_per_hour"
+	Pace1000m  IntensityMetric = "pace_1000m"
+	Pace500m   IntensityMetric = "pace_500m"
+	Watts      IntensityMetric = "watts"
+)
+
+// Valid indicates whether the value is a known member of the IntensityMetric enum.
+func (e IntensityMetric) Valid() bool {
+	switch e {
+	case CalPerHour:
+		return true
+	case Pace1000m:
+		return true
+	case Pace500m:
+		return true
+	case Watts:
 		return true
 	default:
 		return false
@@ -224,7 +251,7 @@ type Error struct {
 	Error string `json:"error"`
 }
 
-// ExerciseType Whether an exercise mainly improves mobility or strength.
+// ExerciseType Whether an exercise mainly improves mobility, strength or endurance.
 type ExerciseType string
 
 // GoalStatus defines model for GoalStatus.
@@ -246,6 +273,18 @@ type ImportedCycle struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 	Weeks     int32           `json:"weeks"`
 }
+
+// Intensity The target intensity of an endurance exercise: the work's average and that of the recovery between intervals, in one metric. A value is null when not set; a max turns it into a range.
+type Intensity struct {
+	IntensityMax    *float64         `json:"intensity_max"`
+	IntensityMetric *IntensityMetric `json:"intensity_metric"`
+	IntensityValue  *float64         `json:"intensity_value"`
+	RecoveryMax     *float64         `json:"recovery_max"`
+	RecoveryValue   *float64         `json:"recovery_value"`
+}
+
+// IntensityMetric What an endurance exercise's intensity is measured in; a pace is in seconds per 500 m or 1000 m.
+type IntensityMetric string
 
 // LibrarySession A session template as listed.
 type LibrarySession struct {
@@ -381,7 +420,10 @@ type TrainingDetail struct {
 
 // TrainingExercise defines model for TrainingExercise.
 type TrainingExercise struct {
-	ExerciseId openapi_types.UUID `json:"exercise_id"`
+	ExerciseId      openapi_types.UUID `json:"exercise_id"`
+	IntensityMax    *float64           `json:"intensity_max"`
+	IntensityMetric *IntensityMetric   `json:"intensity_metric"`
+	IntensityValue  *float64           `json:"intensity_value"`
 
 	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
 	LoadBodyweight bool                `json:"load_bodyweight"`
@@ -392,6 +434,8 @@ type TrainingExercise struct {
 	Name           string              `json:"name"`
 	Notes          string              `json:"notes"`
 	PerSide        bool                `json:"per_side"`
+	RecoveryMax    *float64            `json:"recovery_max"`
+	RecoveryValue  *float64            `json:"recovery_value"`
 	RepsMax        *float64            `json:"reps_max"`
 	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
 	RepsUnitName   string              `json:"reps_unit_name"`
@@ -399,13 +443,16 @@ type TrainingExercise struct {
 	Sets           *int32              `json:"sets"`
 	Tempo          string              `json:"tempo"`
 
-	// Type Whether an exercise mainly improves mobility or strength.
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
 	Type ExerciseType `json:"type"`
 }
 
 // TrainingExerciseInput defines model for TrainingExerciseInput.
 type TrainingExerciseInput struct {
-	ExerciseId openapi_types.UUID `json:"exercise_id"`
+	ExerciseId      openapi_types.UUID `json:"exercise_id"`
+	IntensityMax    *float64           `json:"intensity_max"`
+	IntensityMetric *IntensityMetric   `json:"intensity_metric"`
+	IntensityValue  *float64           `json:"intensity_value"`
 
 	// LoadBodyweight Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none.
 	LoadBodyweight bool                `json:"load_bodyweight"`
@@ -414,6 +461,8 @@ type TrainingExerciseInput struct {
 	LoadValue      *float64            `json:"load_value"`
 	Notes          string              `json:"notes"`
 	PerSide        bool                `json:"per_side"`
+	RecoveryMax    *float64            `json:"recovery_max"`
+	RecoveryValue  *float64            `json:"recovery_value"`
 	RepsMax        *float64            `json:"reps_max"`
 	RepsUnit       *openapi_types.UUID `json:"reps_unit"`
 	RepsValue      *float64            `json:"reps_value"`

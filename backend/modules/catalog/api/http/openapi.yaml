@@ -282,8 +282,8 @@ components:
         error: { type: string, description: "Safe to show to the user." }
     ExerciseType:
       type: string
-      description: Whether an exercise mainly improves mobility or strength.
-      enum: [mobility, strength]
+      description: Whether an exercise mainly improves mobility, strength or endurance.
+      enum: [mobility, strength, endurance]
     Focus:
       type: object
       description: A training focus; the short alias is shown as a tag.

@@ -20,13 +20,16 @@ import (
 
 // Defines values for ExerciseType.
 const (
-	Mobility ExerciseType = "mobility"
-	Strength ExerciseType = "strength"
+	Endurance ExerciseType = "endurance"
+	Mobility  ExerciseType = "mobility"
+	Strength  ExerciseType = "strength"
 )
 
 // Valid indicates whether the value is a known member of the ExerciseType enum.
 func (e ExerciseType) Valid() bool {
 	switch e {
+	case Endurance:
+		return true
 	case Mobility:
 		return true
 	case Strength:
@@ -71,7 +74,7 @@ type Exercise struct {
 	MuscleGroups []string           `json:"muscle_groups"`
 	Name         string             `json:"name"`
 
-	// Type Whether an exercise mainly improves mobility or strength.
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
 	Type      ExerciseType `json:"type"`
 	UpdatedAt time.Time    `json:"updated_at"`
 
@@ -88,7 +91,7 @@ type ExerciseDetail struct {
 	MuscleGroupIds []openapi_types.UUID `json:"muscle_group_ids"`
 	Name           string               `json:"name"`
 
-	// Type Whether an exercise mainly improves mobility or strength.
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
 	Type      ExerciseType `json:"type"`
 	VideoUrls []string     `json:"video_urls"`
 }
@@ -112,7 +115,7 @@ type ExerciseInput struct {
 	MuscleGroupIds []openapi_types.UUID `json:"muscle_group_ids"`
 	Name           string               `json:"name"`
 
-	// Type Whether an exercise mainly improves mobility or strength.
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
 	Type ExerciseType `json:"type"`
 
 	// VideoUrls In display order; blank ones are dropped, at most 10.
@@ -134,13 +137,13 @@ type ExerciseSaved struct {
 	Id          openapi_types.UUID `json:"id"`
 	Name        string             `json:"name"`
 
-	// Type Whether an exercise mainly improves mobility or strength.
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
 	Type      ExerciseType `json:"type"`
 	UpdatedAt time.Time    `json:"updated_at"`
 	VideoUrls []string     `json:"video_urls"`
 }
 
-// ExerciseType Whether an exercise mainly improves mobility or strength.
+// ExerciseType Whether an exercise mainly improves mobility, strength or endurance.
 type ExerciseType string
 
 // Focus A training focus; the short alias is shown as a tag.

@@ -1,4 +1,5 @@
-import type { Amount, Exercise, ExerciseType, ScoreType } from '../../types'
+import type { Amount, Exercise, ExerciseType, Intensity, IntensityMetric, ScoreType } from '../../types'
+import { emptyIntensity, intensityMetrics, parseIntensity } from '../exercise/intensity'
 import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 import { isMonday } from '../../dates'
 import {
@@ -31,11 +32,21 @@ export interface ImportAmount {
 // bodyweight (e.g. pull-ups) it is the weight added to it, or nothing: then it needs no unit.
 export type ImportLoad = Omit<ImportAmount, 'value' | 'unit'> & { value?: number | null; unit?: string; bodyweight?: boolean }
 
+// The target of an endurance exercise in one metric; a pace in seconds or as "m:ss" ("1:55").
+export interface ImportIntensity {
+  metric: IntensityMetric
+  value?: number | string | null
+  max?: number | string | null
+  recovery?: number | string | null
+  recovery_max?: number | string | null
+}
+
 export interface ImportExercise {
   exercise: string // by name
   sets?: number // when the block's kind doesn't share sets
   reps?: ImportAmount
   load?: ImportLoad
+  intensity?: ImportIntensity
   tempo?: string
   notes?: string
 }
@@ -131,6 +142,37 @@ function checkAmount(v: unknown, where: string, unitOnly = false) {
   check(a.per_side === undefined || typeof a.per_side === 'boolean', where, 'per_side must be true or false.')
 }
 
+// Checks the optional intensity of an exercise: a known metric, values numbers or (a pace) m:ss.
+function checkIntensity(v: unknown, where: string) {
+  if (v === undefined || v === null) return
+  check(isObject(v), where, 'must be an object with metric and values.')
+  const metric = v.metric as IntensityMetric
+  check(
+    intensityMetrics.some((m) => m.id === metric),
+    where,
+    `unknown metric "${String(v.metric)}" (${intensityMetrics.map((m) => m.id).join(', ')}).`,
+  )
+  for (const key of ['value', 'max', 'recovery', 'recovery_max']) {
+    const value = v[key]
+    if (value === undefined || value === null) continue
+    const ok = typeof value === 'number' ? value > 0 : typeof value === 'string' && parseIntensity(value, metric) !== null
+    check(ok, where, `${key} must be a number above 0${metric.startsWith('pace') ? ' or a pace like "1:55"' : ''}.`)
+  }
+}
+
+// An import's intensity as the form's fields (see checkIntensity).
+function toIntensity(i?: ImportIntensity): Intensity {
+  if (!i) return emptyIntensity()
+  const value = (v?: number | string | null) => (v === undefined || v === null ? null : typeof v === 'number' ? v : parseIntensity(v, i.metric))
+  return {
+    intensity_metric: i.metric,
+    intensity_value: value(i.value),
+    intensity_max: value(i.max),
+    recovery_value: value(i.recovery),
+    recovery_max: value(i.recovery_max),
+  }
+}
+
 // Reads and checks the JSON of a training import against the block kinds there are. The values
 // are checked by the form afterwards (sets, units, scores), like anything entered there.
 export function parseImport(text: string, kinds: string[]): TrainingImport {
@@ -192,6 +234,7 @@ export function checkSessions(raw: unknown, kinds: string[], where: string) {
         check(e.sets === undefined || e.sets === null || isCount(e.sets), `${blockAt}, ${e.exercise}`, 'sets must be 1-100.')
         checkAmount(e.reps, `${blockAt}, ${e.exercise}, reps`)
         checkAmount(e.load, `${blockAt}, ${e.exercise}, load`, true)
+        checkIntensity(e.intensity, `${blockAt}, ${e.exercise}, intensity`)
         check(isOptionalText(e.tempo), exerciseAt, 'tempo must be text.')
         check(isOptionalText(e.notes), exerciseAt, 'notes must be text.')
       })
@@ -303,6 +346,7 @@ export function toImportedTraining(
             tempo: e.tempo ?? '',
             notes: e.notes ?? '',
             ...toAmount(e.reps, e.load),
+            ...toIntensity(e.intensity),
           }
         }),
       }

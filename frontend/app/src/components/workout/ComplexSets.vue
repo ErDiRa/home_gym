@@ -164,7 +164,7 @@ function addRound() {
   const last = rounds.value[rounds.value.length - 1]?.sets[0]?.row
   const number = (last?.number ?? 0) + 1
   for (const card of block.value.exercises) {
-    card.rows.push({ number, reps: last?.reps ?? null, load: last?.load ?? null, logged: null, saving: false })
+    card.rows.push({ number, reps: last?.reps ?? null, load: last?.load ?? null, intensity: null, logged: null, saving: false })
   }
 }
 </script>

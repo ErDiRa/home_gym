@@ -32,7 +32,7 @@ type ExerciseProfile struct {
 type Exercise struct {
 	ID      uuid.UUID
 	Name    string
-	Type    string // mobility or strength
+	Type    string // mobility, strength or endurance
 	Deleted bool
 }
 

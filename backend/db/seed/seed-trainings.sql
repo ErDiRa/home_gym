@@ -3,13 +3,17 @@
 -- already has a training. Squat also gets a second video link.
 --   Library             session templates the trainings are copied from
 --   Strength – Phase 2  active, 4 weeks from this week's Monday, 2-3 sessions a week (one
---                       repeated), all block kinds, ranges, kg / % 1RM / RPE / RIR loads; the
+--                       repeated), all block kinds, ranges, kg / % 1RM / RPE / RIR loads, a
+--                       weighted pull-up (bodyweight + 5 kg); the
 --                       first session of this week done today
 --   CrossFit warm-ups   active too, alongside: a warm-up per CrossFit day, 4-5 a week
 --   CrossFit WODs       active too: scored WOD blocks of every format, last week's workouts
 --                       with their scores (Rx and scaled)
 --   Strength – Phase 1  the previous 4 weeks, with finished workouts and their sets
---   Home functional     the next phase, inactive: kettlebell work, seconds, per-side reps
+--   Home functional     the next phase, inactive: kettlebell work, seconds, per-side reps,
+--                       bodyweight exercises
+--   Engine              active too: erg intervals (endurance exercises) with target pace, watts
+--                       and cal/h plus recovery; last week's workout with each set's average
 --   Strength base       a cycle of 8 weeks around both strength phases (now in its second half),
 --                       with two goals; the other trainings are in no cycle
 -- The user also rates some exercises (1-5), for the rating filter in the exercise picker.
@@ -72,19 +76,21 @@ BEGIN
     FOR src IN SELECT * FROM session_blocks WHERE session_id = template ORDER BY position LOOP
         INSERT INTO session_blocks (
             session_id, position, kind, name, sets, notes,
-            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit,
+            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
             score_type, time_seconds, interval_seconds
         ) VALUES (
             new_session, src.position, src.kind, src.name, src.sets, src.notes,
-            src.reps_value, src.reps_max, src.reps_unit, src.per_side, src.load_value, src.load_max, src.load_unit,
+            src.reps_value, src.reps_max, src.reps_unit, src.per_side, src.load_value, src.load_max, src.load_unit, src.load_bodyweight,
             src.score_type, src.time_seconds, src.interval_seconds
         ) RETURNING id INTO block;
         INSERT INTO session_exercises (
             block_id, exercise_id, position, sets, tempo, notes,
-            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit
+            reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
+            intensity_metric, intensity_value, intensity_max, recovery_value, recovery_max
         )
         SELECT block, exercise_id, position, sets, tempo, notes,
-               reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit
+               reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
+               intensity_metric, intensity_value, intensity_max, recovery_value, recovery_max
         FROM session_exercises WHERE block_id = src.id;
     END LOOP;
     RETURN new_session;
@@ -134,21 +140,31 @@ CREATE FUNCTION pg_temp.wod(
 $$;
 
 -- Sets are only set for the exercises of a single block; reps and load stay empty in a complex.
--- In a WOD the reps may stay empty too (e.g. max calories).
+-- In a WOD the reps may stay empty too (e.g. max calories). The load is in kg unless load_unit
+-- says otherwise; logged_in names a unit without a value, the one the sets are logged in (e.g.
+-- cal). bodyweight marks a load on bodyweight (load = weight added, if any). An endurance
+-- exercise may have a target intensity (watts, cal_per_hour, pace_500m, pace_1000m; a pace in
+-- seconds) and a recovery one in the same metric.
 
 CREATE FUNCTION pg_temp.exercise(
     block uuid, pos int, exercise text, sets int DEFAULT NULL,
     reps numeric DEFAULT NULL, reps_max numeric DEFAULT NULL, reps_unit text DEFAULT 'reps', per_side boolean DEFAULT false,
     load numeric DEFAULT NULL, load_max numeric DEFAULT NULL, load_unit text DEFAULT 'kg', tempo text DEFAULT '',
-    notes text DEFAULT ''
+    notes text DEFAULT '', logged_in text DEFAULT NULL, bodyweight boolean DEFAULT false,
+    intensity_metric text DEFAULT NULL, intensity numeric DEFAULT NULL, intensity_max numeric DEFAULT NULL,
+    recovery numeric DEFAULT NULL, recovery_max numeric DEFAULT NULL
 ) RETURNS void LANGUAGE sql AS $$
     INSERT INTO session_exercises (
         block_id, exercise_id, position, sets, tempo, notes,
-        reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit
+        reps_value, reps_max, reps_unit, per_side, load_value, load_max, load_unit, load_bodyweight,
+        intensity_metric, intensity_value, intensity_max, recovery_value, recovery_max
     ) VALUES (
         block, pg_temp.exercise_id(exercise), pos, sets, tempo, notes,
         reps, reps_max, CASE WHEN reps IS NOT NULL THEN pg_temp.rep_unit(reps_unit) END, per_side,
-        load, load_max, CASE WHEN load IS NOT NULL THEN pg_temp.load_unit(load_unit) END
+        load, load_max,
+        CASE WHEN load IS NOT NULL THEN pg_temp.load_unit(load_unit) WHEN logged_in IS NOT NULL THEN pg_temp.load_unit(logged_in) END,
+        bodyweight,
+        intensity_metric, intensity, intensity_max, recovery, recovery_max
     )
 $$;
 
@@ -173,17 +189,24 @@ CREATE FUNCTION pg_temp.result(
 $$;
 
 -- Logs sets 1..sets of an exercise at its place in the session, all with the same reps and load.
+-- An endurance exercise's sets also get their average (intensity, in intensity_metric), changing
+-- by intensity_step from set to set (e.g. a pace getting slower); load_step does the same for the
+-- load (e.g. calories getting fewer).
 CREATE FUNCTION pg_temp.sets(
     workout uuid, block int, pos int, exercise text, sets int, reps numeric, reps_unit text DEFAULT 'reps',
-    load numeric DEFAULT NULL, load_unit text DEFAULT 'kg', per_side boolean DEFAULT false
+    load numeric DEFAULT NULL, load_unit text DEFAULT 'kg', per_side boolean DEFAULT false,
+    bodyweight boolean DEFAULT false, load_step numeric DEFAULT 0,
+    intensity_metric text DEFAULT NULL, intensity numeric DEFAULT NULL, intensity_step numeric DEFAULT 0
 ) RETURNS void LANGUAGE sql AS $$
     INSERT INTO workout_sets (
         workout_id, exercise_id, block_position, exercise_position, set_number,
-        reps_value, reps_unit, per_side, load_value, load_unit, completed_at
+        reps_value, reps_unit, per_side, load_value, load_unit, bodyweight,
+        intensity_metric, intensity_value, completed_at
     )
     SELECT workout, pg_temp.exercise_id(exercise), block, pos, n,
            reps, pg_temp.rep_unit(reps_unit), per_side,
-           load, CASE WHEN load IS NOT NULL THEN pg_temp.load_unit(load_unit) END,
+           load + (n - 1) * load_step, CASE WHEN load IS NOT NULL THEN pg_temp.load_unit(load_unit) END, bodyweight,
+           intensity_metric, intensity + (n - 1) * intensity_step,
            w.started_at + n * interval '3 minutes'
     FROM generate_series(1, sets) AS n, workouts w
     WHERE w.id = workout
@@ -206,6 +229,7 @@ DECLARE
     warm_pull uuid;
     wod_1 uuid;
     wod_2 uuid;
+    engine uuid;
     c uuid; -- the cycle
     week int;
     session int;
@@ -247,7 +271,7 @@ BEGIN
     b := pg_temp.block(u, 3, 'superset', 3, name => 'Accessories');
     PERFORM pg_temp.exercise(b, 1, 'Lateral Raise', reps => 12, reps_max => 15, load => 8);
     PERFORM pg_temp.exercise(b, 2, 'Triceps Pushdown', reps => 12, load => 8, load_unit => 'RPE');
-    PERFORM pg_temp.exercise(b, 3, 'Calf Raise', reps => 15, notes => 'Pause at the top');
+    PERFORM pg_temp.exercise(b, 3, 'Calf Raise', reps => 15, bodyweight => true, notes => 'Pause at the top');
 
     u := pg_temp.template('Gym – complex and pull');
     gym_2 := u;
@@ -259,8 +283,8 @@ BEGIN
     b := pg_temp.block(u, 2, 'single', NULL);
     PERFORM pg_temp.exercise(b, 1, 'Hip Thrust', sets => 4, reps => 8, reps_max => 12, load => 100, tempo => '21X2');
     b := pg_temp.block(u, 3, 'superset', 3);
-    PERFORM pg_temp.exercise(b, 1, 'Pull-up', reps => 6, reps_max => 8, load => 2, load_unit => 'RIR');
-    PERFORM pg_temp.exercise(b, 2, 'Bicep Curl', reps => 10, load => 12, tempo => '4010', notes => 'Slow eccentric');
+    PERFORM pg_temp.exercise(b, 1, 'Pull-up', reps => 6, reps_max => 8, load => 5, bodyweight => true, notes => 'Weighted: belt or dumbbell between the feet');
+    PERFORM pg_temp.exercise(b, 2, 'Bicep Curl', reps => 10, load => 2, load_unit => 'RIR', tempo => '4010', notes => 'Slow eccentric');
 
     u := pg_temp.template('Technique full body');
     technique := u;
@@ -278,7 +302,7 @@ BEGIN
     PERFORM pg_temp.exercise(b, 1, 'Kettlebell Swing', sets => 2, reps => 20, load => 6, load_unit => 'RPE');
     b := pg_temp.block(u, 2, 'superset', 4, notes => '60s rest after each round');
     PERFORM pg_temp.exercise(b, 1, 'Bulgarian Split Squat', reps => 8, per_side => true, load => 16, tempo => '3110');
-    PERFORM pg_temp.exercise(b, 2, 'Ring Row', reps => 10, reps_max => 12);
+    PERFORM pg_temp.exercise(b, 2, 'Ring Row', reps => 10, reps_max => 12, bodyweight => true);
     b := pg_temp.block(u, 3, 'superset', 3, name => 'Finisher');
     PERFORM pg_temp.exercise(b, 1, 'Walking Lunge', reps => 30, reps_unit => 's');
     PERFORM pg_temp.exercise(b, 2, 'Single Leg Deadlift', reps => 8, per_side => true, load => 16);
@@ -290,9 +314,9 @@ BEGIN
     PERFORM pg_temp.exercise(b, 2, 'Romanian Deadlift');
     PERFORM pg_temp.exercise(b, 3, 'Split Squat');
     b := pg_temp.block(u, 2, 'single', NULL);
-    PERFORM pg_temp.exercise(b, 1, 'Push-up', sets => 3, reps => 10, reps_max => 15);
+    PERFORM pg_temp.exercise(b, 1, 'Push-up', sets => 3, reps => 10, reps_max => 15, bodyweight => true);
     b := pg_temp.block(u, 3, 'single', NULL);
-    PERFORM pg_temp.exercise(b, 1, 'Box Pistol Squat', sets => 3, reps => 5, per_side => true, notes => 'Lower box if needed');
+    PERFORM pg_temp.exercise(b, 1, 'Box Pistol Squat', sets => 3, reps => 5, per_side => true, bodyweight => true, notes => 'Lower box if needed');
 
     u := pg_temp.template('Warm-up – squat day', notes => 'Before the CrossFit class; light and quick.');
     warm_squat := u;
@@ -333,6 +357,38 @@ BEGIN
     PERFORM pg_temp.exercise(b, 2, 'Wall Ball', reps => 20, load => 9);
     b := pg_temp.wod(u, 4, 'max_reps', 2 * 60, name => 'Burpee test');
     PERFORM pg_temp.exercise(b, 1, 'Burpee');
+
+    -- Endurance: erg intervals with a target and recovery in each machine's metric.
+    u := pg_temp.template('Engine – erg intervals', notes => 'Keep the pace even; the recovery is easy, not a stop.');
+    engine := u;
+    b := pg_temp.block(u, 1, 'single', NULL, name => 'Row', notes => '2 min easy between intervals');
+    PERFORM pg_temp.exercise(b, 1, 'Row Erg', sets => 4, reps => 4, reps_unit => 'min', logged_in => 'cal',
+        intensity_metric => 'pace_500m', intensity => 115, intensity_max => 120, recovery => 150);
+    b := pg_temp.block(u, 2, 'single', NULL, name => 'Bike', notes => '1 min easy between intervals');
+    PERFORM pg_temp.exercise(b, 1, 'BikeErg', sets => 3, reps => 3, reps_unit => 'min', logged_in => 'cal',
+        intensity_metric => 'pace_1000m', intensity => 130, recovery => 165, recovery_max => 180);
+    b := pg_temp.block(u, 3, 'superset', 3, name => 'Sprints', notes => 'All out, 90 s easy on the ski between rounds');
+    PERFORM pg_temp.exercise(b, 1, 'Echo Bike', reps => 30, reps_unit => 's', logged_in => 'cal',
+        intensity_metric => 'cal_per_hour', intensity => 1500, intensity_max => 1700);
+    PERFORM pg_temp.exercise(b, 2, 'Ski Erg', reps => 90, reps_unit => 's',
+        intensity_metric => 'watts', intensity => 120, intensity_max => 150);
+
+    -- Active alongside: conditioning twice a week; last week's first session done.
+    t := pg_temp.training('Engine', 'Erg intervals for the aerobic base, logged with each set''s average.', true,
+        pg_temp.this_monday() - 7, 6);
+    s1 := pg_temp.copy_session(engine, t, 1, 'Intervals');
+    FOR week IN 1..6 LOOP
+        PERFORM pg_temp.plan(t, week, ARRAY[s1, s1]);
+    END LOOP;
+    w := pg_temp.workout(pg_temp.slot(t, 1, 1), (pg_temp.this_monday() - 6)::timestamptz + interval '7 hours', 'Last row interval hurt.');
+    PERFORM pg_temp.sets(w, 1, 1, 'Row Erg', 4, 4, reps_unit => 'min', load => 64, load_unit => 'cal', load_step => -1,
+        intensity_metric => 'pace_500m', intensity => 115.8, intensity_step => 1.2);
+    PERFORM pg_temp.sets(w, 2, 1, 'BikeErg', 3, 3, reps_unit => 'min', load => 41, load_unit => 'cal',
+        intensity_metric => 'pace_1000m', intensity => 129.5, intensity_step => 0.8);
+    PERFORM pg_temp.sets(w, 3, 1, 'Echo Bike', 3, 30, reps_unit => 's', load => 14, load_unit => 'cal', load_step => -1,
+        intensity_metric => 'cal_per_hour', intensity => 1640, intensity_step => -60);
+    PERFORM pg_temp.sets(w, 3, 2, 'Ski Erg', 3, 90, reps_unit => 's', load => 6, load_unit => 'cal',
+        intensity_metric => 'watts', intensity => 135, intensity_step => -5);
 
     -- Active alongside: the WODs, three a week; last week's done with their scores.
     t := pg_temp.training('CrossFit WODs', 'Class programming, logged with the score of every WOD.', true,

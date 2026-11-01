@@ -355,6 +355,10 @@ func sessionInputFromAPI(s TrainingSessionInput) app.SessionInput {
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
 					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight,
 				},
+				Intensity: app.Intensity{
+					IntensityMetric: (*string)(e.IntensityMetric), IntensityValue: e.IntensityValue, IntensityMax: e.IntensityMax,
+					RecoveryValue: e.RecoveryValue, RecoveryMax: e.RecoveryMax,
+				},
 				Tempo: e.Tempo, Notes: e.Notes,
 			}
 		}

@@ -3062,7 +3062,7 @@
    "groupIds": [
     "table-session_exercises"
    ],
-   "height": 286,
+   "height": 376,
    "id": "el-080",
    "isDeleted": false,
    "link": null,
@@ -3095,21 +3095,21 @@
    "groupIds": [
     "table-session_exercises"
    ],
-   "height": 270,
+   "height": 360,
    "id": "el-081",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean",
+   "originalText": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean\n   intensity_metric  text?\n   intensity_value  numeric?\n   intensity_max  numeric?\n   recovery_value  numeric?\n   recovery_max  numeric?",
    "roughness": 0,
    "roundness": null,
    "seed": 1081,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean",
+   "text": "PK id  uuid\nFK block_id  uuid → session_blocks\nFK exercise_id  uuid → exercises\n   position  int\n   sets  int?\n   reps_value  numeric?\n   reps_max  numeric?\nFK reps_unit  uuid? → rep_units\n   per_side  boolean\n   load_value  numeric?\n   load_max  numeric?\nFK load_unit  uuid? → load_units\n   tempo  text\n   notes  text\n   load_bodyweight  boolean\n   intensity_metric  text?\n   intensity_value  numeric?\n   intensity_max  numeric?\n   recovery_value  numeric?\n   recovery_max  numeric?",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -3394,7 +3394,7 @@
    "groupIds": [
     "table-workout_sets"
    ],
-   "height": 250,
+   "height": 286,
    "id": "el-088",
    "isDeleted": false,
    "link": null,
@@ -3427,21 +3427,21 @@
    "groupIds": [
     "table-workout_sets"
    ],
-   "height": 234,
+   "height": 270,
    "id": "el-089",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean",
+   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean\n   intensity_metric  text?\n   intensity_value  numeric?",
    "roughness": 0,
    "roundness": null,
    "seed": 1089,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean",
+   "text": "PK id  uuid\nFK workout_id  uuid → workouts\nFK exercise_id  uuid → exercises\n   block_position  int\n   exercise_position  int\n   set_number  int\n   reps_value  numeric?\nFK reps_unit  uuid → rep_units\n   per_side  boolean\n   load_value  numeric?\nFK load_unit  uuid? → load_units\n   completed_at  timestamptz\n   bodyweight  boolean\n   intensity_metric  text?\n   intensity_value  numeric?",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -5759,7 +5759,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 304.0,
+   "height": 259.0,
    "id": "el-142",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5773,7 +5773,7 @@
     ],
     [
      -180,
-     304.0
+     259.0
     ]
    ],
    "roughness": 0,
@@ -5796,7 +5796,7 @@
    "versionNonce": 2142,
    "width": 180,
    "x": 1260,
-   "y": 1324.0
+   "y": 1369.0
   },
   {
    "angle": 0,
@@ -5832,7 +5832,7 @@
    "verticalAlign": "middle",
    "width": 81,
    "x": 1130.0,
-   "y": 1467.0
+   "y": 1489.5
   },
   {
    "angle": 0,
@@ -5853,7 +5853,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 165.0,
+   "height": 210.0,
    "id": "el-144",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5867,7 +5867,7 @@
     ],
     [
      206.4000000000001,
-     -165.0
+     -210.0
     ]
    ],
    "roughness": 0,
@@ -5890,7 +5890,7 @@
    "versionNonce": 2144,
    "width": 206.4000000000001,
    "x": 1573.6,
-   "y": 1324.0
+   "y": 1369.0
   },
   {
    "angle": 0,
@@ -5926,7 +5926,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1636.8,
-   "y": 1232.5
+   "y": 1255.0
   },
   {
    "angle": 0,
@@ -5947,7 +5947,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 43.0,
+   "height": 2.0,
    "id": "el-146",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -5961,7 +5961,7 @@
     ],
     [
      206.4000000000001,
-     43.0
+     -2.0
     ]
    ],
    "roughness": 0,
@@ -5984,7 +5984,7 @@
    "versionNonce": 2146,
    "width": 206.4000000000001,
    "x": 1573.6,
-   "y": 1324.0
+   "y": 1369.0
   },
   {
    "angle": 0,
@@ -6020,7 +6020,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1636.8,
-   "y": 1336.5
+   "y": 1359.0
   },
   {
    "angle": 0,
@@ -6417,7 +6417,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 72.0,
+   "height": 90.0,
    "id": "el-156",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6431,7 +6431,7 @@
     ],
     [
      -1220,
-     -72.0
+     -90.0
     ]
    ],
    "roughness": 0,
@@ -6454,7 +6454,7 @@
    "versionNonce": 2156,
    "width": 1220,
    "x": 2300,
-   "y": 1700.0
+   "y": 1718.0
   },
   {
    "angle": 0,
@@ -6490,7 +6490,7 @@
    "verticalAlign": "middle",
    "width": 81,
    "x": 1650.0,
-   "y": 1655.0
+   "y": 1664.0
   },
   {
    "angle": 0,
@@ -6511,7 +6511,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 541.0,
+   "height": 559.0,
    "id": "el-158",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6525,7 +6525,7 @@
     ],
     [
      -220,
-     -541.0
+     -559.0
     ]
    ],
    "roughness": 0,
@@ -6548,7 +6548,7 @@
    "versionNonce": 2158,
    "width": 220,
    "x": 2300,
-   "y": 1700.0
+   "y": 1718.0
   },
   {
    "angle": 0,
@@ -6584,7 +6584,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 2150.0,
-   "y": 1420.5
+   "y": 1429.5
   },
   {
    "angle": 0,
@@ -6605,7 +6605,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 333.0,
+   "height": 351.0,
    "id": "el-160",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6619,7 +6619,7 @@
     ],
     [
      -220,
-     -333.0
+     -351.0
     ]
    ],
    "roughness": 0,
@@ -6642,7 +6642,7 @@
    "versionNonce": 2160,
    "width": 220,
    "x": 2300,
-   "y": 1700.0
+   "y": 1718.0
   },
   {
    "angle": 0,
@@ -6678,7 +6678,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 2150.0,
-   "y": 1524.5
+   "y": 1533.5
   },
   {
    "angle": 0,
@@ -6981,7 +6981,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 155.0,
+   "height": 137.0,
    "id": "el-168",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6995,7 +6995,7 @@
     ],
     [
      684.4000000000001,
-     -155.0
+     -137.0
     ]
    ],
    "roughness": 0,
@@ -7054,7 +7054,7 @@
    "verticalAlign": "middle",
    "width": 102,
    "x": 1917.8,
-   "y": 1768.5
+   "y": 1777.5
   },
   {
    "angle": 0,

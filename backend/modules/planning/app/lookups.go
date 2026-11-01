@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -76,6 +77,16 @@ func (s *Service) checkExercises(ctx context.Context, userID uuid.UUID, sessions
 	for _, id := range ids {
 		if e, ok := exercises[id]; !ok || e.Deleted {
 			return errs.Invalid("unknown exercise")
+		}
+	}
+	// A target pace or watts only makes sense on an erg, a run and the like.
+	for _, session := range sessions {
+		for _, b := range session.Blocks {
+			for _, e := range b.Exercises {
+				if e.IntensityMetric != nil && exercises[e.ExerciseID].Type != "endurance" {
+					return errs.Invalid(fmt.Sprintf("%s: a target pace or watts is only for endurance exercises", exercises[e.ExerciseID].Name))
+				}
+			}
 		}
 	}
 	return nil

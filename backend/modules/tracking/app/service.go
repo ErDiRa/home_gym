@@ -127,6 +127,8 @@ type LoggedSet struct {
 	LoadUnit         *uuid.UUID
 	CompletedAt      time.Time
 	Bodyweight       bool
+	IntensityMetric  *string
+	IntensityValue   *float64
 }
 
 // Result is the score of a WOD block as stored.

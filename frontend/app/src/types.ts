@@ -11,12 +11,13 @@ type Planning = planning['schemas']
 type Tracking = tracking['schemas']
 type Whoop = whoop['schemas']
 
-// Whether an exercise mainly improves mobility or strength.
+// Whether an exercise mainly improves mobility, strength or endurance.
 export type ExerciseType = Catalog['ExerciseType']
 
 export const exerciseTypeLabels: Record<ExerciseType, string> = {
   mobility: 'Mobility',
   strength: 'Strength',
+  endurance: 'Endurance',
 }
 
 // An exercise as listed: its links by name (focuses with alias), for display and filtering.
@@ -49,6 +50,9 @@ export type Unit = Catalog['Unit'] & Partial<Pick<Catalog['LoadUnit'], 'kg_per_u
 
 // Planned reps and load. A value is null when not set; a max turns it into a range (8-10).
 export type Amount = Planning['Amount']
+// The target intensity of an endurance exercise (see components/exercise/intensity.ts).
+export type Intensity = Planning['Intensity']
+export type IntensityMetric = Planning['IntensityMetric']
 // The unit names of an amount, as returned by the server.
 export type AmountUnitNames = Planning['AmountUnitNames']
 

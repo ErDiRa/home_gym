@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	catalogclient "github.com/erdira/homegym/backend/modules/catalog/api/http/client"
 	planningclient "github.com/erdira/homegym/backend/modules/planning/api/http/client"
 	trackingclient "github.com/erdira/homegym/backend/modules/tracking/api/http/client"
 )
@@ -263,5 +264,50 @@ func TestWeekWithCycle(t *testing.T) {
 	w := week(t, u, nil)
 	if c := w.Cycle; c == nil || c.Name != "Base" || *c.WeekNumber != 2 || len(c.Goals) != 1 || *w.Training.CycleName != "Base" {
 		t.Errorf("week cycle = %+v, training %+v", w.Cycle, w.Training)
+	}
+}
+
+// An endurance exercise is planned with a target pace and recovery, and its sets keep their
+// average as entered; a strength exercise takes neither.
+func TestEnduranceIntensity(t *testing.T) {
+	t.Parallel()
+	u := newUser(t)
+	ctx := t.Context()
+	rowIn := exerciseInput("Row Erg")
+	rowIn.Type = catalogclient.Endurance
+	row, reps := createExercise(t, u, rowIn), repsUnit(t, u)
+
+	in := trainingInput(thisMonday().Format(time.DateOnly), row, reps)
+	in.Active = true
+	metric, target, recovery := planningclient.Pace500m, 115.0, 150.0
+	e := &in.Sessions[0].Blocks[0].Exercises[0]
+	e.IntensityMetric, e.IntensityValue, e.RecoveryValue = &metric, &target, &recovery
+	training := createTraining(t, u, in)
+	detail, _ := u.Planning.GetTrainingWithResponse(ctx, training)
+	if got := detail.JSON200.Sessions[0].Blocks[0].Exercises[0]; got.IntensityMetric == nil || *got.IntensityMetric != metric ||
+		*got.IntensityValue != 115 || *got.RecoveryValue != 150 || got.IntensityMax != nil {
+		t.Errorf("planned exercise = %s", body(detail.Body))
+	}
+
+	squatIn := trainingInput(thisMonday().Format(time.DateOnly), createExercise(t, u, exerciseInput("Squat")), reps)
+	squatIn.Sessions[0].Blocks[0].Exercises[0].IntensityMetric, squatIn.Sessions[0].Blocks[0].Exercises[0].IntensityValue = &metric, &target
+	if resp, _ := u.Planning.CreateTrainingWithResponse(ctx, squatIn); resp.StatusCode() != http.StatusBadRequest ||
+		resp.JSON400.Error != "Squat: a target pace or watts is only for endurance exercises" {
+		t.Errorf("target on a strength exercise = %d %s", resp.StatusCode(), body(resp.Body))
+	}
+
+	started, err := u.Tracking.StartWorkoutWithResponse(ctx, trackingclient.StartWorkoutRequest{WeekSessionId: week(t, u, &training).Planned[0].Id})
+	if err != nil || started.JSON201 == nil {
+		t.Fatalf("start = %v %s", err, body(started.Body))
+	}
+	four, average, logged := 4.0, 116.4, trackingclient.Pace500m
+	set := trackingclient.SetInput{ExerciseId: row, BlockPosition: 1, ExercisePosition: 1, SetNumber: 1, RepsValue: &four, RepsUnit: &reps,
+		IntensityMetric: &logged, IntensityValue: &average}
+	if resp, err := u.Tracking.LogSetWithResponse(ctx, started.JSON201.Id, set); err != nil || resp.StatusCode() != http.StatusOK {
+		t.Fatalf("log set = %v %s", err, body(resp.Body))
+	}
+	workout, _ := u.Tracking.GetWorkoutWithResponse(ctx, started.JSON201.Id)
+	if s := workout.JSON200.Sets; len(s) != 1 || s[0].IntensityMetric == nil || *s[0].IntensityMetric != logged || *s[0].IntensityValue != 116.4 {
+		t.Errorf("sets = %s", body(workout.Body))
 	}
 }

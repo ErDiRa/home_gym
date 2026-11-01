@@ -151,7 +151,11 @@ Trainings → Import (or Cycles → Import) reads two kinds of JSON files. Exerc
         // a load with only a unit: what each set is logged in, e.g. the calories of a 4 min interval
         { "exercise": "Echo Bike", "sets": 3, "reps": { "value": 4, "unit": "min" }, "load": { "unit": "cal" } },
         // on bodyweight: alone ({ "bodyweight": true }) or with weight added in kg or lb
-        { "exercise": "Pull-up", "sets": 4, "reps": { "value": 6, "unit": "reps" }, "load": { "bodyweight": true, "value": 10, "unit": "kg" } }
+        { "exercise": "Pull-up", "sets": 4, "reps": { "value": 6, "unit": "reps" }, "load": { "bodyweight": true, "value": 10, "unit": "kg" } },
+        // an endurance exercise's target: metric watts, cal_per_hour, pace_500m or pace_1000m (a pace as "m:ss" or seconds),
+        // optional max (a range) and the recovery between intervals
+        { "exercise": "Row Erg", "sets": 4, "reps": { "value": 4, "unit": "min" }, "load": { "unit": "cal" },
+          "intensity": { "metric": "pace_500m", "value": "1:55", "max": "2:00", "recovery": "2:30" } }
       ] }
     ] }
   ]

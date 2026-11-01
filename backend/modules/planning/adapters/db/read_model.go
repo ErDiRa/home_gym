@@ -217,6 +217,8 @@ func (n catalogNames) blocks(blocks []app.Block) []planninghttp.TrainingBlock {
 					ExerciseId: e.ExerciseID, Name: ex.Name, Type: planninghttp.ExerciseType(ex.Type), Sets: e.Sets,
 					RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, RepsUnitName: unitName(n.repUnits, e.RepsUnit), PerSide: e.PerSide,
 					LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadUnitName: unitName(n.loadUnits, e.LoadUnit), LoadBodyweight: e.LoadBodyweight,
+					IntensityMetric: (*planninghttp.IntensityMetric)(e.IntensityMetric), IntensityValue: e.IntensityValue, IntensityMax: e.IntensityMax,
+					RecoveryValue: e.RecoveryValue, RecoveryMax: e.RecoveryMax,
 					Tempo: e.Tempo, Notes: e.Notes,
 				}
 			}),

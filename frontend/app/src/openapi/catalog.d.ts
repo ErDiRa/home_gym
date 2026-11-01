@@ -181,10 +181,10 @@ export interface components {
             error: string;
         };
         /**
-         * @description Whether an exercise mainly improves mobility or strength.
+         * @description Whether an exercise mainly improves mobility, strength or endurance.
          * @enum {string}
          */
-        ExerciseType: "mobility" | "strength";
+        ExerciseType: "mobility" | "strength" | "endurance";
         /** @description A training focus; the short alias is shown as a tag. */
         Focus: {
             /** Format: uuid */

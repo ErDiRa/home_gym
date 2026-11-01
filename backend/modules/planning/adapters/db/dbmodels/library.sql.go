@@ -144,6 +144,7 @@ func (q *Queries) ListSessionBlocks(ctx context.Context, sessionID uuid.UUID) ([
 const listSessionExercises = `-- name: ListSessionExercises :many
 SELECT se.block_id, se.exercise_id, se.sets,
        se.reps_value, se.reps_max, se.reps_unit, se.per_side, se.load_value, se.load_max, se.load_unit, se.load_bodyweight,
+       se.intensity_metric, se.intensity_value, se.intensity_max, se.recovery_value, se.recovery_max,
        se.tempo, se.notes
 FROM planning.session_exercises se
 JOIN planning.session_blocks sb ON sb.id = se.block_id
@@ -152,19 +153,24 @@ ORDER BY se.block_id, se.position
 `
 
 type ListSessionExercisesRow struct {
-	BlockID        uuid.UUID
-	ExerciseID     uuid.UUID
-	Sets           *int32
-	RepsValue      *float64
-	RepsMax        *float64
-	RepsUnit       *uuid.UUID
-	PerSide        bool
-	LoadValue      *float64
-	LoadMax        *float64
-	LoadUnit       *uuid.UUID
-	LoadBodyweight bool
-	Tempo          string
-	Notes          string
+	BlockID         uuid.UUID
+	ExerciseID      uuid.UUID
+	Sets            *int32
+	RepsValue       *float64
+	RepsMax         *float64
+	RepsUnit        *uuid.UUID
+	PerSide         bool
+	LoadValue       *float64
+	LoadMax         *float64
+	LoadUnit        *uuid.UUID
+	LoadBodyweight  bool
+	IntensityMetric *string
+	IntensityValue  *float64
+	IntensityMax    *float64
+	RecoveryValue   *float64
+	RecoveryMax     *float64
+	Tempo           string
+	Notes           string
 }
 
 func (q *Queries) ListSessionExercises(ctx context.Context, sessionID uuid.UUID) ([]ListSessionExercisesRow, error) {
@@ -188,6 +194,11 @@ func (q *Queries) ListSessionExercises(ctx context.Context, sessionID uuid.UUID)
 			&i.LoadMax,
 			&i.LoadUnit,
 			&i.LoadBodyweight,
+			&i.IntensityMetric,
+			&i.IntensityValue,
+			&i.IntensityMax,
+			&i.RecoveryValue,
+			&i.RecoveryMax,
 			&i.Tempo,
 			&i.Notes,
 		); err != nil {

@@ -143,6 +143,7 @@ type Exercise struct {
 	ExerciseID uuid.UUID
 	Sets       *int32
 	Amount
+	Intensity
 	Tempo string
 	Notes string
 }

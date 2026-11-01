@@ -29,13 +29,33 @@ func (a *Amount) clearLoad() {
 	a.LoadValue, a.LoadMax, a.LoadUnit, a.LoadBodyweight = nil, nil, nil, false
 }
 
+// Intensity is the target of an endurance exercise in one metric (see the Intensity* constants):
+// the work's average and that of the recovery between intervals, each nil when not set, a max
+// turning it into a range. A pace is in seconds per 500 m or 1000 m.
+type Intensity struct {
+	IntensityMetric *string
+	IntensityValue  *float64
+	IntensityMax    *float64
+	RecoveryValue   *float64
+	RecoveryMax     *float64
+}
+
+// The metrics of an intensity, as in the planning.session_exercises.intensity_metric CHECK.
+const (
+	IntensityWatts      = "watts"
+	IntensityCalPerHour = "cal_per_hour"
+	IntensityPace500    = "pace_500m"
+	IntensityPace1000   = "pace_1000m"
+)
+
 // ExerciseInput is one exercise in a block.
 type ExerciseInput struct {
 	ExerciseID uuid.UUID
 	Sets       *int32 // nil when the block's kind shares sets
 	Amount
-	Tempo string // free text, e.g. '31X1'
-	Notes string
+	Intensity        // only for endurance exercises
+	Tempo     string // free text, e.g. '31X1'
+	Notes     string
 } // Score is how a scored block (a WOD) is scored: the format (see the Score* constants) and its
 // time in seconds, a time cap or the duration depending on the format, plus the interval of an
 // EMOM. All nil on other blocks.

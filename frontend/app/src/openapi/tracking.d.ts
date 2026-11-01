@@ -363,6 +363,13 @@ export interface components {
             load_unit: string | null;
             /** @description Done on bodyweight: the load is the weight added to it (in a weight unit), if any. */
             bodyweight: boolean;
+            /** @description Of an endurance exercise only; null without an average. */
+            intensity_metric: (string & components["schemas"]["IntensityMetric"]) | null;
+            /**
+             * Format: double
+             * @description The set's average in the metric; a pace in seconds.
+             */
+            intensity_value: number | null;
         };
         /** @description A set as stored. */
         LoggedSet: {
@@ -388,6 +395,9 @@ export interface components {
             /** Format: uuid */
             load_unit: string | null;
             bodyweight: boolean;
+            intensity_metric: (string & components["schemas"]["IntensityMetric"]) | null;
+            /** Format: double */
+            intensity_value: number | null;
             /** Format: date-time */
             completed_at: string;
         };
@@ -417,9 +427,20 @@ export interface components {
             load_unit_name: string;
             /** @description Done on bodyweight: the load is the weight added to it, if any. */
             bodyweight: boolean;
+            intensity_metric: (string & components["schemas"]["IntensityMetric"]) | null;
+            /**
+             * Format: double
+             * @description A pace in seconds.
+             */
+            intensity_value: number | null;
             /** Format: date-time */
             completed_at: string;
         };
+        /**
+         * @description What an endurance exercise's average is measured in; a pace is in seconds per 500 m or 1000 m.
+         * @enum {string}
+         */
+        IntensityMetric: "watts" | "cal_per_hour" | "pace_500m" | "pace_1000m";
         /**
          * @description The score of a WOD block as done, at its place in the session (from 1). score_type is the
          *     format as planned and decides which values are kept: for_time time_seconds (or reps when

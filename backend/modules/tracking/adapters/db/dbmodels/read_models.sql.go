@@ -246,7 +246,7 @@ func (q *Queries) ListWorkoutResults(ctx context.Context, workoutID uuid.UUID) (
 }
 
 const listWorkoutSets = `-- name: ListWorkoutSets :many
-SELECT id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at, bodyweight FROM tracking.workout_sets
+SELECT id, workout_id, exercise_id, block_position, exercise_position, set_number, reps_value, reps_unit, per_side, load_value, load_unit, completed_at, bodyweight, intensity_metric, intensity_value FROM tracking.workout_sets
 WHERE workout_id = $1
 ORDER BY block_position, exercise_position, set_number
 `
@@ -275,6 +275,8 @@ func (q *Queries) ListWorkoutSets(ctx context.Context, workoutID uuid.UUID) ([]T
 			&i.LoadUnit,
 			&i.CompletedAt,
 			&i.Bodyweight,
+			&i.IntensityMetric,
+			&i.IntensityValue,
 		); err != nil {
 			return nil, err
 		}

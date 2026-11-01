@@ -39,6 +39,30 @@ func (e GoalStatus) Valid() bool {
 	}
 }
 
+// Defines values for IntensityMetric.
+const (
+	CalPerHour IntensityMetric = "cal_per_hour"
+	Pace1000m  IntensityMetric = "pace_1000m"
+	Pace500m   IntensityMetric = "pace_500m"
+	Watts      IntensityMetric = "watts"
+)
+
+// Valid indicates whether the value is a known member of the IntensityMetric enum.
+func (e IntensityMetric) Valid() bool {
+	switch e {
+	case CalPerHour:
+		return true
+	case Pace1000m:
+		return true
+	case Pace500m:
+		return true
+	case Watts:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScoreType.
 const (
 	Amrap       ScoreType = "amrap"
@@ -132,6 +156,9 @@ type FinishWorkoutRequest struct {
 // GoalStatus defines model for GoalStatus.
 type GoalStatus string
 
+// IntensityMetric What an endurance exercise's average is measured in; a pace is in seconds per 500 m or 1000 m.
+type IntensityMetric string
+
 // LastLoad The load of the last set with one of the newest finished workout that logged the exercise.
 type LastLoad struct {
 	// DoneAt When that workout was finished.
@@ -150,6 +177,8 @@ type LoggedSet struct {
 	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
 	ExercisePosition int32               `json:"exercise_position"`
 	Id               openapi_types.UUID  `json:"id"`
+	IntensityMetric  *IntensityMetric    `json:"intensity_metric"`
+	IntensityValue   *float64            `json:"intensity_value"`
 	LoadUnit         *openapi_types.UUID `json:"load_unit"`
 	LoadValue        *float64            `json:"load_value"`
 	PerSide          bool                `json:"per_side"`
@@ -192,10 +221,16 @@ type SetInput struct {
 	BlockPosition int32 `json:"block_position"`
 
 	// Bodyweight Done on bodyweight: the load is the weight added to it (in a weight unit), if any.
-	Bodyweight       bool                `json:"bodyweight"`
-	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
-	ExercisePosition int32               `json:"exercise_position"`
-	LoadUnit         *openapi_types.UUID `json:"load_unit"`
+	Bodyweight       bool               `json:"bodyweight"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExercisePosition int32              `json:"exercise_position"`
+
+	// IntensityMetric Of an endurance exercise only; null without an average.
+	IntensityMetric *IntensityMetric `json:"intensity_metric"`
+
+	// IntensityValue The set's average in the metric; a pace in seconds.
+	IntensityValue *float64            `json:"intensity_value"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
 
 	// LoadValue null without load; never both null
 	LoadValue *float64            `json:"load_value"`
@@ -289,20 +324,24 @@ type WorkoutSet struct {
 	BlockPosition int32 `json:"block_position"`
 
 	// Bodyweight Done on bodyweight: the load is the weight added to it, if any.
-	Bodyweight       bool                `json:"bodyweight"`
-	CompletedAt      time.Time           `json:"completed_at"`
-	ExerciseId       openapi_types.UUID  `json:"exercise_id"`
-	ExerciseName     string              `json:"exercise_name"`
-	ExercisePosition int32               `json:"exercise_position"`
-	Id               openapi_types.UUID  `json:"id"`
-	LoadUnit         *openapi_types.UUID `json:"load_unit"`
-	LoadUnitName     string              `json:"load_unit_name"`
-	LoadValue        *float64            `json:"load_value"`
-	PerSide          bool                `json:"per_side"`
-	RepsUnit         openapi_types.UUID  `json:"reps_unit"`
-	RepsUnitName     string              `json:"reps_unit_name"`
-	RepsValue        *float64            `json:"reps_value"`
-	SetNumber        int32               `json:"set_number"`
+	Bodyweight       bool               `json:"bodyweight"`
+	CompletedAt      time.Time          `json:"completed_at"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExerciseName     string             `json:"exercise_name"`
+	ExercisePosition int32              `json:"exercise_position"`
+	Id               openapi_types.UUID `json:"id"`
+	IntensityMetric  *IntensityMetric   `json:"intensity_metric"`
+
+	// IntensityValue A pace in seconds.
+	IntensityValue *float64            `json:"intensity_value"`
+	LoadUnit       *openapi_types.UUID `json:"load_unit"`
+	LoadUnitName   string              `json:"load_unit_name"`
+	LoadValue      *float64            `json:"load_value"`
+	PerSide        bool                `json:"per_side"`
+	RepsUnit       openapi_types.UUID  `json:"reps_unit"`
+	RepsUnitName   string              `json:"reps_unit_name"`
+	RepsValue      *float64            `json:"reps_value"`
+	SetNumber      int32               `json:"set_number"`
 }
 
 // WorkoutSummary A finished workout as listed.

@@ -61,6 +61,16 @@ describe('parseImport', () => {
     ['an amount without unit', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.unit), 'Mon, block A, Squat, reps: unit is missing.'],
     ['reps without value', changed((d) => delete d.sessions[0].blocks[0].exercises[0].reps.value), 'Mon, block A, Squat, reps: value must be a number of at least 0.'],
     [
+      'an unknown intensity metric',
+      changed((d) => (d.sessions[0].blocks[0].exercises[0].intensity = { metric: 'mph', value: 12 })),
+      'Mon, block A, Squat, intensity: unknown metric "mph" (watts, cal_per_hour, pace_500m, pace_1000m).',
+    ],
+    [
+      'an unreadable pace',
+      changed((d) => (d.sessions[0].blocks[0].exercises[0].intensity = { metric: 'pace_500m', value: 'fast' })),
+      'Mon, block A, Squat, intensity: value must be a number above 0 or a pace like "1:55".',
+    ],
+    [
       'a load without unit and value not on bodyweight',
       changed((d) => (d.sessions[0].blocks[0].exercises[0].load = {})),
       'Mon, block A, Squat, load: unit is missing.',
@@ -137,6 +147,17 @@ describe('toImportedTraining', () => {
       load_bodyweight: true,
       load_value: 10,
       load_unit: 'unit-kg',
+    })
+  })
+
+  it('reads the target intensity, paces as m:ss', () => {
+    const text = changed((d) => (d.sessions[0].blocks[0].exercises[0].intensity = { metric: 'pace_500m', value: '1:55', max: 120, recovery: '2:30' }))
+    expect(toImportedTraining(parseImport(text, kinds), names).sessions[0].blocks[0].exercises[0]).toMatchObject({
+      intensity_metric: 'pace_500m',
+      intensity_value: 115,
+      intensity_max: 120,
+      recovery_value: 150,
+      recovery_max: null,
     })
   })
 

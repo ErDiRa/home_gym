@@ -118,6 +118,11 @@
             part="load"
             :label="exerciseLabel(block.exercises.length, index, i)"
           />
+          <IntensityTargetInput
+            v-if="item.type === 'endurance'"
+            v-model="block.exercises[i]"
+            :label="exerciseLabel(block.exercises.length, index, i)"
+          />
           <label class="text-xs font-medium text-slate-600" title="Eccentric, pause, concentric, pause in seconds; X = explosive">
             Tempo
             <TextInput
@@ -165,9 +170,11 @@ import TextInput from '../form/TextInput.vue'
 import ExerciseTypeBadge from '../exercise/ExerciseTypeBadge.vue'
 import RatingBadge from '../exercise/RatingBadge.vue'
 import AmountInput from './AmountInput.vue'
+import IntensityTargetInput from './IntensityTargetInput.vue'
 import ExercisePickerDialog from './ExercisePickerDialog.vue'
 import MoveRemoveButtons from '../ui/MoveRemoveButtons.vue'
 import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
+import { emptyIntensity } from '../exercise/intensity'
 import { DEFAULT_INTERVAL, scoreFormat, scoreFormats } from './wod'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
@@ -234,6 +241,7 @@ function addExercise(exercise: Exercise) {
     tempo: '',
     notes: '',
     ...emptyAmount(),
+    ...emptyIntensity(),
   })
 }
 </script>

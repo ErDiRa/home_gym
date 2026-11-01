@@ -47,8 +47,8 @@ func validateExercise(in *ExerciseInput) error {
 	if in.Name == "" {
 		return errs.Invalid("name is required")
 	}
-	if in.Type != "mobility" && in.Type != "strength" {
-		return errs.Invalid("type must be mobility or strength")
+	if in.Type != "mobility" && in.Type != "strength" && in.Type != "endurance" {
+		return errs.Invalid("type must be mobility, strength or endurance")
 	}
 	// Empty inputs are dropped, so the form can send the blank row it shows for adding a link.
 	videos := make([]string, 0, len(in.VideoURLs))

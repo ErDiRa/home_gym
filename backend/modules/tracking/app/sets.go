@@ -23,7 +23,9 @@ type SetInput struct {
 	PerSide          bool
 	LoadValue        *float64 // nil without load
 	LoadUnit         *uuid.UUID
-	Bodyweight       bool // done on bodyweight: the load is the weight added to it, if any
+	Bodyweight       bool     // done on bodyweight: the load is the weight added to it, if any
+	IntensityMetric  *string  // of an endurance exercise: watts, cal_per_hour, pace_500m or pace_1000m
+	IntensityValue   *float64 // the set's average in that metric, a pace in seconds
 }
 
 // LogSet stores a set of one of the user's workouts, or corrects it. Sets can be logged until the
@@ -40,8 +42,12 @@ func (s *Service) LogSet(ctx context.Context, userID, workoutID uuid.UUID, in Se
 	if err != nil {
 		return LoggedSet{}, err
 	}
-	if e, ok := exercises[in.ExerciseID]; !ok || e.Deleted {
+	e, ok := exercises[in.ExerciseID]
+	if !ok || e.Deleted {
 		return LoggedSet{}, errs.Invalid("unknown exercise")
+	}
+	if in.IntensityMetric != nil && e.Type != "endurance" {
+		return LoggedSet{}, errs.Invalid("an average pace or watts is only for endurance exercises")
 	}
 	return s.workouts.LogSet(ctx, workoutID, in)
 }
@@ -88,6 +94,18 @@ func (s *Service) checkSet(ctx context.Context, in SetInput) error {
 		return errs.Invalid("load needs a value and a unit")
 	case in.RepsValue == nil && in.LoadValue == nil:
 		return errs.Invalid("enter the reps or the load")
+	case (in.IntensityMetric == nil) != (in.IntensityValue == nil):
+		return errs.Invalid("an average needs a value and a metric")
+	}
+	if in.IntensityMetric != nil {
+		switch *in.IntensityMetric {
+		case "watts", "cal_per_hour", "pace_500m", "pace_1000m":
+		default:
+			return errs.Invalid("unknown intensity metric")
+		}
+		if *in.IntensityValue <= 0 || *in.IntensityValue >= maxAmount {
+			return errs.Invalid(fmt.Sprintf("the average must be between 0 and %d", maxAmount))
+		}
 	}
 
 	units, err := s.catalog.Units(ctx)

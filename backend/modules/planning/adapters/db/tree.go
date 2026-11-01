@@ -94,6 +94,10 @@ func groupBlocks(blocks []dbmodels.ListTrainingBlocksRow, exercises []dbmodels.L
 				RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
 				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight,
 			},
+			Intensity: app.Intensity{
+				IntensityMetric: e.IntensityMetric, IntensityValue: e.IntensityValue, IntensityMax: e.IntensityMax,
+				RecoveryValue: e.RecoveryValue, RecoveryMax: e.RecoveryMax,
+			},
 		})
 	}
 	blocksBySession := map[uuid.UUID][]app.Block{}
@@ -241,7 +245,9 @@ func insertBlocks(ctx context.Context, q *dbmodels.Queries, sessionID uuid.UUID,
 			if err := q.InsertSessionExercise(ctx, dbmodels.InsertSessionExerciseParams{
 				BlockID: blockID, ExerciseID: e.ExerciseID, Position: int32(k + 1), Sets: e.Sets,
 				RepsValue: e.RepsValue, RepsMax: e.RepsMax, RepsUnit: e.RepsUnit, PerSide: e.PerSide,
-				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight, Tempo: e.Tempo, Notes: e.Notes,
+				LoadValue: e.LoadValue, LoadMax: e.LoadMax, LoadUnit: e.LoadUnit, LoadBodyweight: e.LoadBodyweight,
+				IntensityMetric: e.IntensityMetric, IntensityValue: e.IntensityValue, IntensityMax: e.IntensityMax,
+				RecoveryValue: e.RecoveryValue, RecoveryMax: e.RecoveryMax, Tempo: e.Tempo, Notes: e.Notes,
 			}); err != nil {
 				return err
 			}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
+import { buildCards, changed, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -59,6 +59,11 @@ const session: TrainingSession = {
           load_max: 75,
           load_unit: 'pct',
           load_bodyweight: false,
+          intensity_metric: null,
+          intensity_value: null,
+          intensity_max: null,
+          recovery_value: null,
+          recovery_max: null,
           reps_unit_name: 'reps',
           load_unit_name: '% 1RM',
         },
@@ -105,6 +110,8 @@ describe('buildCards with % 1RM', () => {
       load_value: 185,
       load_unit: 'lb',
       bodyweight: false,
+      intensity_metric: null,
+      intensity_value: null,
       completed_at: '',
       exercise_name: 'Back squat',
       reps_unit_name: 'reps',
@@ -186,6 +193,8 @@ const cleanSet: WorkoutSet = {
   load_value: 65,
   load_unit: 'kg',
   bodyweight: false,
+  intensity_metric: null,
+  intensity_value: null,
   completed_at: '',
   exercise_name: 'Power clean',
   reps_unit_name: 'reps',
@@ -262,5 +271,59 @@ describe('an exercise on bodyweight', () => {
     expect(card.bodyweight).toBe(true)
     expect(card.showLoad).toBe(true)
     expect(card.rows.map((r) => r.load)).toEqual([5, null, null])
+  })
+})
+
+describe('an endurance exercise', () => {
+  // 4 × 4 min on the rower, logged in cal, at 1:55–2:00 /500 m with 2:30 recovery.
+  const rowing = () => {
+    const plan = structuredClone(unloadedSession)
+    Object.assign(plan.blocks[0].exercises[0], {
+      exercise_id: 'row',
+      name: 'Row Erg',
+      type: 'endurance',
+      sets: 4,
+      reps_value: 4,
+      reps_unit_name: 'min',
+      load_unit: 'cal',
+      load_unit_name: 'cal',
+      intensity_metric: 'pace_500m',
+      intensity_value: 115,
+      intensity_max: 120,
+      recovery_value: 150,
+    })
+    return plan
+  }
+
+  it('shows the target and prefills the average with it', () => {
+    const card = buildCards(rowing(), [], [], () => single, 'kg', context(null)).blocks[0].exercises[0]
+    expect(card.planned).toBe('4 × 4 min · in cal · @ 1:55–2:00 /500 m · recovery 2:30 /500 m')
+    expect(card.endurance).toBe(true)
+    expect(card.intensityMetric).toBe('pace_500m')
+    expect(card.rows.map((r) => r.intensity)).toEqual([115, 115, 115, 115])
+  })
+
+  it('keeps the metric logged in and counts a changed average as an edit', () => {
+    const logged: WorkoutSet = {
+      ...cleanSet,
+      exercise_id: 'row',
+      set_number: 1,
+      reps_value: 4,
+      load_value: 62,
+      load_unit: 'cal',
+      intensity_metric: 'watts',
+      intensity_value: 231,
+    }
+    const card = buildCards(rowing(), [logged], [], () => single, 'kg', context(null)).blocks[0].exercises[0]
+    expect(card.intensityMetric).toBe('watts')
+    expect(card.rows.map((r) => r.intensity)).toEqual([231, null, null, null]) // the target is a pace, not watts
+    const row = card.rows[0]
+    expect(changed(card, row)).toBe(false)
+    row.intensity = 240
+    expect(changed(card, row)).toBe(true)
+  })
+
+  it('is no endurance exercise without the type', () => {
+    expect(buildCards(unloadedSession, [], [], () => single, 'kg', context(null)).blocks[0].exercises[0].endurance).toBe(false)
   })
 })

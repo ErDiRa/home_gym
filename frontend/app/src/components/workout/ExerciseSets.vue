@@ -28,10 +28,12 @@
 
     <!-- One row per set: reps and load as done, and a button that logs, saves or undoes it. A WOD's
          exercises have none (the block has one score), unless sets were logged there before. On
-         bodyweight only the reps, until weight is added ("BW + kg"). -->
+         bodyweight only the reps, until weight is added ("BW + kg"). An endurance exercise also takes
+         each set's average as the machine showed it (watts, cal/h or a pace). -->
     <div
       v-if="!card.scored || card.rows.length"
-      :class="['mt-2 grid items-center gap-x-2 gap-y-1.5', card.showLoad ? 'grid-cols-[2rem_1fr_1fr_2.75rem]' : 'grid-cols-[2rem_1fr_2.75rem]']"
+      class="mt-2 grid items-center gap-x-2 gap-y-1.5"
+      :style="{ gridTemplateColumns: columns }"
     >
       <span class="text-xs font-medium text-slate-500">Set</span>
       <span class="text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
@@ -49,6 +51,17 @@
           @update:model-value="switchUnit"
         />
       </div>
+      <SelectField
+        v-if="card.endurance"
+        :model-value="card.intensityMetric"
+        :options="intensityMetrics"
+        :searchable="false"
+        size="sm"
+        option-size="touch"
+        :aria-label="`${card.label} average in`"
+        field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
+        @update:model-value="switchMetric"
+      />
       <span />
 
       <template v-for="row in card.rows" :key="row.number">
@@ -73,6 +86,14 @@
           :placeholder="lastLoad === null ? '–' : `${lastLoad}`"
           :title="lastLoad === null ? undefined : `Last time: ${lastLoad} ${unitOf(card.loadUnit)?.name ?? ''}`"
           :aria-label="`${card.label} set ${row.number} load`"
+          size="touch"
+          :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
+        />
+        <IntensityInput
+          v-if="card.endurance"
+          v-model="row.intensity"
+          :metric="card.intensityMetric"
+          :aria-label="`${card.label} set ${row.number} average ${intensityName(card.intensityMetric)}`"
           size="touch"
           :tone="row.logged && !changed(card, row) ? 'success' : 'default'"
         />
@@ -121,13 +142,16 @@ import { ArrowPathIcon, CheckIcon, PlusIcon, TrophyIcon } from '@heroicons/vue/2
 import { toast } from 'vue-sonner'
 import AppButton from '../button/AppButton.vue'
 import SelectField from '../form/SelectField.vue'
+import IntensityInput from '../form/IntensityInput.vue'
 import TextInput from '../form/TextInput.vue'
 import ExerciseMaxDialog from '../exercise/ExerciseMaxDialog.vue'
 import ExerciseActions from './ExerciseActions.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { convertLoad, formatLoad, roundLoad } from '../exercise/maxes'
+import { intensityMetrics, intensityName } from '../exercise/intensity'
 import { changed, num, suggestedLoad, type ExerciseCard, type SetRow } from './workoutPlan'
+import type { IntensityMetric } from '../../types'
 
 // An exercise of the workout with its sets. Logging is up to the parent, which owns the card;
 // doneOn is the workout's day, the day a 1RM saved from it was lifted.
@@ -150,6 +174,17 @@ const approxLoad = computed(() => {
   const weight = (v: number) => roundLoad(convertLoad(v, percent, to, maxLoad.value) ?? 0)
   return `${plan.max === null ? weight(plan.value) : `${weight(plan.value)}–${weight(plan.max)}`} ${to.name}`
 })
+
+// Set, reps, load (unless on bodyweight without weight), the average of an endurance exercise, ✓.
+const columns = computed(() => ['2rem', '1fr', card.value.showLoad && '1fr', card.value.endurance && '1fr', '2.75rem'].filter(Boolean).join(' '))
+
+// Another metric isn't converted (machines differ): the values not logged yet are cleared, logged
+// ones show as edited until saved in it.
+function switchMetric(to: string | null) {
+  if (!to) return
+  card.value.intensityMetric = to as IntensityMetric
+  for (const row of card.value.rows) if (!row.logged) row.intensity = null
+}
 
 // Weight added to bodyweight is in kg or lb.
 const loadUnits = computed(() => (card.value.bodyweight ? lookups.loadUnits.filter((u) => u.kg_per_unit) : lookups.loadUnits))
@@ -215,6 +250,7 @@ function addSet() {
     number: (last?.number ?? 0) + 1,
     reps: last?.reps ?? null,
     load: last?.load ?? null,
+    intensity: last?.intensity ?? null,
     logged: null,
     saving: false,
   })

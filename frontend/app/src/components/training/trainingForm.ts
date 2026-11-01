@@ -2,6 +2,7 @@ import type {
   Amount,
   BlockKind,
   ExerciseType,
+  Intensity,
   Score,
   TrainingBlock,
   TrainingDetail,
@@ -11,12 +12,13 @@ import type {
 } from '../../types'
 import { useLookupsStore, type AmountPart } from '../../stores/lookups'
 import { scoreFormat, scoreProblem } from './wod'
+import { cleanIntensity, emptyIntensity, intensityProblem, pickIntensity } from '../exercise/intensity'
 
 // Editable rows of the training and session forms. key keeps v-for stable while rows move, since
 // the same exercise may appear several times and new sessions and blocks have no id yet. Blocks and
 // exercises both keep sets, so switching kinds doesn't lose them; toInput sends the side the
 // kind uses. A WOD block keeps its rounds (optional) apart from the sets, and its score.
-export interface ExerciseRow extends Amount {
+export interface ExerciseRow extends Amount, Intensity {
   key: number
   exercise_id: string
   name: string
@@ -153,6 +155,7 @@ function toBlockRows(blocks: TrainingBlock[]): BlockRow[] {
       tempo: e.tempo,
       notes: e.notes,
       ...pickAmount(e),
+      ...pickIntensity(e),
     })),
   }))
 }
@@ -200,6 +203,8 @@ export function toSessionInput({ id, name, notes, blocks }: SessionRow): Trainin
           tempo: e.tempo,
           notes: e.notes,
           ...cleanAmount(e),
+          // Only an endurance exercise has a target pace or watts.
+          ...(e.type === 'endurance' ? cleanIntensity(e) : emptyIntensity()),
         })),
       }
     }),
@@ -291,6 +296,10 @@ export function blockProblem(b: BlockRow): string {
       const problem = amountProblem(a, part, kind.scored && !shared)
       if (problem) return shared ? problem : `${(a as ExerciseRow).name}: ${problem}`
     }
+  }
+  for (const e of b.exercises) {
+    const problem = e.type === 'endurance' ? intensityProblem(e) : ''
+    if (problem) return `${e.name}: ${problem}`
   }
   return ''
 }

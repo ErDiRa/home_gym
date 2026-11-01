@@ -301,6 +301,7 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
     // Whatever was entered is saved, also only the reps or only the load; just not nothing.
     const reps = num(row.reps)
     const load = num(row.load)
+    const intensity = card.endurance ? num(row.intensity) : null
     if (reps === null && load === null) {
       toast.error(`Enter the ${card.repsUnitName || 'reps'}${card.showLoad ? ' or the load' : ''} of set ${row.number} first.`)
       return
@@ -316,9 +317,12 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
       load_value: load,
       load_unit: load === null ? null : card.loadUnit,
       bodyweight: card.bodyweight,
+      intensity_metric: intensity === null ? null : card.intensityMetric,
+      intensity_value: intensity,
     })
     row.reps = reps
     row.load = load
+    row.intensity = intensity
     if (offerMax) offerNewMax(card, row.logged)
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the set.')

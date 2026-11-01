@@ -156,10 +156,10 @@ export interface components {
             error: string;
         };
         /**
-         * @description Whether an exercise mainly improves mobility or strength.
+         * @description Whether an exercise mainly improves mobility, strength or endurance.
          * @enum {string}
          */
-        ExerciseType: "mobility" | "strength";
+        ExerciseType: "mobility" | "strength" | "endurance";
         /** @description Planned reps and load. A value is null when not set; a max turns it into a range. */
         Amount: {
             /** Format: double */
@@ -178,6 +178,23 @@ export interface components {
             /** @description Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none. */
             load_bodyweight: boolean;
         };
+        /**
+         * @description What an endurance exercise's intensity is measured in; a pace is in seconds per 500 m or 1000 m.
+         * @enum {string}
+         */
+        IntensityMetric: "watts" | "cal_per_hour" | "pace_500m" | "pace_1000m";
+        /** @description The target intensity of an endurance exercise: the work's average and that of the recovery between intervals, in one metric. A value is null when not set; a max turns it into a range. */
+        Intensity: {
+            intensity_metric: (string & components["schemas"]["IntensityMetric"]) | null;
+            /** Format: double */
+            intensity_value: number | null;
+            /** Format: double */
+            intensity_max: number | null;
+            /** Format: double */
+            recovery_value: number | null;
+            /** Format: double */
+            recovery_max: number | null;
+        };
         AmountUnitNames: {
             reps_unit_name: string;
             load_unit_name: string;
@@ -195,7 +212,7 @@ export interface components {
             /** Format: int32 */
             interval_seconds: number | null;
         };
-        TrainingExerciseInput: components["schemas"]["Amount"] & {
+        TrainingExerciseInput: components["schemas"]["Amount"] & components["schemas"]["Intensity"] & {
             /** Format: uuid */
             exercise_id: string;
             /**
@@ -259,7 +276,7 @@ export interface components {
             /** @description One list per week, up to 7 sessions each. */
             schedule: components["schemas"]["SlotInput"][][];
         };
-        TrainingExercise: components["schemas"]["Amount"] & components["schemas"]["AmountUnitNames"] & {
+        TrainingExercise: components["schemas"]["Amount"] & components["schemas"]["AmountUnitNames"] & components["schemas"]["Intensity"] & {
             /** Format: uuid */
             exercise_id: string;
             name: string;

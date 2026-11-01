@@ -297,8 +297,8 @@ components:
         error: { type: string, description: "Safe to show to the user." }
     ExerciseType:
       type: string
-      description: Whether an exercise mainly improves mobility or strength.
-      enum: [mobility, strength]
+      description: Whether an exercise mainly improves mobility, strength or endurance.
+      enum: [mobility, strength, endurance]
     Amount:
       type: object
       description: Planned reps and load. A value is null when not set; a max turns it into a range.
@@ -312,6 +312,23 @@ components:
         load_max: { type: number, format: double, nullable: true }
         load_unit: { type: string, format: uuid, nullable: true }
         load_bodyweight: { type: boolean, description: "Done on bodyweight (e.g. pull-ups): the load is then the weight added to it, in a weight unit, or none." }
+    IntensityMetric:
+      type: string
+      description: What an endurance exercise's intensity is measured in; a pace is in seconds per 500 m or 1000 m.
+      enum: [watts, cal_per_hour, pace_500m, pace_1000m]
+    Intensity:
+      type: object
+      description: "The target intensity of an endurance exercise: the work's average and that of the recovery between intervals, in one metric. A value is null when not set; a max turns it into a range."
+      required: [intensity_metric, intensity_value, intensity_max, recovery_value, recovery_max]
+      properties:
+        intensity_metric:
+          type: string
+          allOf: [{ $ref: "#/components/schemas/IntensityMetric" }]
+          nullable: true
+        intensity_value: { type: number, format: double, nullable: true }
+        intensity_max: { type: number, format: double, nullable: true }
+        recovery_value: { type: number, format: double, nullable: true }
+        recovery_max: { type: number, format: double, nullable: true }
     AmountUnitNames:
       type: object
       required: [reps_unit_name, load_unit_name]
@@ -336,6 +353,7 @@ components:
     TrainingExerciseInput:
       allOf:
         - $ref: "#/components/schemas/Amount"
+        - $ref: "#/components/schemas/Intensity"
         - type: object
           required: [exercise_id, sets, tempo, notes]
           properties:
@@ -390,6 +408,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/Amount"
         - $ref: "#/components/schemas/AmountUnitNames"
+        - $ref: "#/components/schemas/Intensity"
         - type: object
           required: [exercise_id, name, type, sets, tempo, notes]
           properties:

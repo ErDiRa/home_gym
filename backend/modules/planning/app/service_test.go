@@ -36,6 +36,27 @@ func TestCreateTrainingInvalidWritesNothing(t *testing.T) {
 	}
 }
 
+// A target pace or watts is only for endurance exercises.
+func TestCreateTrainingIntensity(t *testing.T) {
+	s, repo, cat := newTestService()
+	in := twoSessions(cat)
+	e := &in.Sessions[0].Blocks[0].Exercises[0]
+	metric := IntensityPace500
+	e.IntensityMetric, e.IntensityValue, e.RecoveryValue = &metric, ptr(115.0), ptr(150.0)
+	_, err := s.CreateTraining(context.Background(), uuid.New(), in)
+	wantError(t, err, errs.KindInvalid, "Squat: a target pace or watts is only for endurance exercises")
+
+	ex := cat.exercises[e.ExerciseID]
+	ex.Type = "endurance"
+	cat.exercises[e.ExerciseID] = ex
+	if _, err := s.CreateTraining(context.Background(), uuid.New(), in); err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.created) != 1 {
+		t.Fatalf("created %d trainings, want 1", len(repo.created))
+	}
+}
+
 // Only the user's live exercises can be planned: one the catalog doesn't know for the user, or a
 // deleted one, is unknown.
 func TestCreateTrainingUnknownExercise(t *testing.T) {

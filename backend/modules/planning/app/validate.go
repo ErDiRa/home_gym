@@ -167,6 +167,9 @@ func checkBlock(b *BlockInput, lk lookups) string {
 		} else if msg := checkLoad(&e.Amount, lk); msg != "" {
 			return fmt.Sprintf("exercise %d: %s", k+1, msg)
 		}
+		if msg := checkIntensity(&e.Intensity); msg != "" {
+			return fmt.Sprintf("exercise %d: %s", k+1, msg)
+		}
 	}
 	return ""
 }
@@ -279,6 +282,41 @@ func checkLoad(a *Amount, lk lookups) string {
 		return ""
 	}
 	return checkRange("load", a.LoadValue, a.LoadMax, a.LoadUnit, lk.loadUnits)
+}
+
+// checkIntensity validates the optional target intensity of an exercise: a known metric once the
+// work or the recovery has a value (without one the metric is dropped), each a positive value
+// with an optional higher upper end.
+func checkIntensity(in *Intensity) string {
+	if in.IntensityValue == nil && in.IntensityMax == nil && in.RecoveryValue == nil && in.RecoveryMax == nil {
+		in.IntensityMetric = nil
+		return ""
+	}
+	if in.IntensityMetric == nil {
+		return "the target needs a metric: watts, cal/h or a pace"
+	}
+	switch *in.IntensityMetric {
+	case IntensityWatts, IntensityCalPerHour, IntensityPace500, IntensityPace1000:
+	default:
+		return "unknown target metric"
+	}
+	for _, r := range []struct {
+		what       string
+		value, max *float64
+	}{{"target", in.IntensityValue, in.IntensityMax}, {"recovery", in.RecoveryValue, in.RecoveryMax}} {
+		if r.max != nil && r.value == nil {
+			return r.what + ": the upper end of a range needs a value"
+		}
+		for _, v := range []*float64{r.value, r.max} {
+			if v != nil && (*v <= 0 || *v >= maxAmount) {
+				return fmt.Sprintf("%s must be between 0 and %d", r.what, maxAmount)
+			}
+		}
+		if r.max != nil && *r.max <= *r.value {
+			return r.what + ": the upper end of a range must be higher than the value"
+		}
+	}
+	return ""
 }
 
 // checkRange validates a value with an optional max in one of units.

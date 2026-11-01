@@ -158,6 +158,15 @@ func TestLogSet(t *testing.T) {
 	if _, err := f.s.LogSet(context.Background(), uuid.New(), f.repo.workout, loadOnly); err != nil {
 		t.Fatal(err)
 	}
+	// The average pace of an erg interval.
+	row := uuid.New()
+	f.catalog.exercises[row] = catalog.Exercise{ID: row, Name: "Row Erg", Type: "endurance"}
+	interval := valid()
+	interval.ExerciseID, interval.LoadValue, interval.LoadUnit = row, ptr(42.0), &f.catalog.kg
+	interval.IntensityMetric, interval.IntensityValue = ptr("pace_500m"), ptr(115.0)
+	if _, err := f.s.LogSet(context.Background(), uuid.New(), f.repo.workout, interval); err != nil {
+		t.Fatal(err)
+	}
 	// On bodyweight with weight added, e.g. a weighted pull-up.
 	weighted := valid()
 	weighted.Bodyweight, weighted.LoadValue, weighted.LoadUnit = true, ptr(10.0), &f.catalog.kg
@@ -184,6 +193,9 @@ func TestLogSet(t *testing.T) {
 		{"bodyweight plus % 1RM", func(in *SetInput) {
 			in.Bodyweight, in.LoadValue, in.LoadUnit = true, ptr(10.0), &f.catalog.percentOfMax
 		}, f.repo.workout, errs.KindInvalid, "weight added to bodyweight needs a weight unit such as kg or lb"},
+		{"average without metric", func(in *SetInput) { in.IntensityValue = ptr(230.0) }, f.repo.workout, errs.KindInvalid, "an average needs a value and a metric"},
+		{"unknown intensity metric", func(in *SetInput) { in.IntensityMetric, in.IntensityValue = ptr("mph"), ptr(20.0) }, f.repo.workout, errs.KindInvalid, "unknown intensity metric"},
+		{"average of a strength exercise", func(in *SetInput) { in.IntensityMetric, in.IntensityValue = ptr("watts"), ptr(230.0) }, f.repo.workout, errs.KindInvalid, "an average pace or watts is only for endurance exercises"},
 		{"unknown load unit", func(in *SetInput) { in.LoadValue, in.LoadUnit = ptr(11.0), ptr(uuid.New()) }, f.repo.workout, errs.KindInvalid, "unknown load unit"},
 		{"another user's workout", func(*SetInput) {}, uuid.New(), errs.KindNotFound, "workout not found"},
 		{"another user's exercise", func(in *SetInput) { in.ExerciseID = uuid.New() }, f.repo.workout, errs.KindInvalid, "unknown exercise"},
