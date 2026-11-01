@@ -3,6 +3,7 @@ import { intensityText } from '../exercise/intensity'
 import { convertLoad, roundLoad, type MaxLoad } from '../exercise/maxes'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
 import { emomRounds, wodSummary } from '../training/wod'
+import { clampProgress, noProgress, progressEnabled, progressOfReps, progressReps, type Progress } from './wodProgress'
 
 // The workout screen as editable cards: the session's blocks and exercises in plan order, each
 // exercise with one row per planned set, filled with what was logged or else the plan. A WOD block
@@ -52,6 +53,7 @@ export interface ScoreDraft {
   reps: number | null
   calories: number | null
   capped: boolean
+  progress: Progress // how far a capped WOD got; the reps are calculated from it
   notes: string
 }
 
@@ -64,12 +66,15 @@ export interface WodLine {
   reps: string // e.g. "18" or "8–10 per side", with the unit unless it is plain reps
   load: string
   first: boolean
+  repsValue: number | null // the plain amount, a range with its lower value
+  repsUnit: string
 }
 
 export interface WodCard {
   blockPosition: number
   scoreType: ScoreType
   intervals: number | null // of an EMOM, e.g. 10; null when unknown
+  rounds: number // the block's rounds (sets), at least 1
   lines: WodLine[]
   draft: ScoreDraft
   result: WorkoutResult | null // as saved once logged
@@ -88,13 +93,16 @@ export interface BlockCard {
 }
 
 // The inputs of a score: what was logged, else empty.
-export function scoreDraft(result: WorkoutResult | null): ScoreDraft {
+export function scoreDraft(result: WorkoutResult | null, lines: WodLine[] = [], rounds = 1): ScoreDraft {
+  const capped = result?.score_type === 'for_time' && result.time_seconds === null
   return {
+    // A saved capped score shows as the progress that makes it, where the plan allows.
+    progress: capped && progressEnabled(lines) ? progressOfReps(lines, rounds, result?.reps ?? 0) : { ...noProgress },
     time_seconds: result?.time_seconds ?? null,
     rounds: result?.rounds ?? null,
     reps: result?.reps ?? null,
     calories: result?.calories ?? null,
-    capped: result?.score_type === 'for_time' && result.time_seconds === null,
+    capped,
     notes: result?.notes ?? '',
   }
 }
@@ -226,7 +234,7 @@ export function buildCards(
     const kind = kindOf(b.kind)
     const scored = !!kind?.scored && b.score_type !== null
     // What a WOD shows of each exercise, to group the repeated ones into movements.
-    const parts: { amount: string; weight: string; plannedLoad: number | null; loadUnit: string | null; bodyweight: boolean }[] = []
+    const parts: { amount: string; repsValue: number | null; repsUnit: string; weight: string; plannedLoad: number | null; loadUnit: string | null; bodyweight: boolean }[] = []
     const exercises = b.exercises.map((e, j): ExerciseCard => {
       const key = placeKey(i + 1, j + 1)
       // The server clears what the block's kind shares on the exercises, so whichever side is
@@ -257,6 +265,8 @@ export function buildCards(
       const text: string[] = []
       parts[j] = {
         amount: reps.reps_value !== null ? `${range(reps.reps_value, reps.reps_max)}${reps.per_side ? '/side' : ''}` : '',
+        repsValue: reps.reps_value,
+        repsUnit: reps.reps_unit_name,
         weight: '',
         plannedLoad,
         loadUnit,
@@ -318,6 +328,7 @@ export function buildCards(
         }
       }
     }
+    const lines = scored ? wodLines(exercises, parts) : []
     const sets = b.sets ?? 0
     const result = scored ? (resultByBlock.get(i + 1) ?? null) : null
     if (scored) resultByBlock.delete(i + 1)
@@ -339,8 +350,9 @@ export function buildCards(
             blockPosition: i + 1,
             scoreType: b.score_type!,
             intervals: emomRounds(b),
-            lines: scored ? wodLines(exercises, parts) : [],
-            draft: scoreDraft(result),
+            rounds: Math.max(b.sets ?? 1, 1),
+            lines,
+            draft: scoreDraft(result, lines, Math.max(b.sets ?? 1, 1)),
             result,
             saving: false,
           }
@@ -385,13 +397,13 @@ export function buildCards(
 }
 
 // The exercises of a WOD block in plan order, one line each.
-function wodLines(cards: ExerciseCard[], parts: { amount: string; weight: string }[]): WodLine[] {
+function wodLines(cards: ExerciseCard[], parts: { amount: string; weight: string; repsValue: number | null; repsUnit: string }[]): WodLine[] {
   const seen = new Set<string>()
   return cards.map((c, j) => {
     const first = !seen.has(c.exerciseId)
     seen.add(c.exerciseId)
     const unit = c.repsUnitName && c.repsUnitName !== 'reps' ? ` ${c.repsUnitName}` : ''
-    return { key: c.key, exerciseId: c.exerciseId, name: c.name, reps: parts[j].amount ? `${parts[j].amount}${unit}` : '', load: parts[j].weight, first }
+    return { key: c.key, exerciseId: c.exerciseId, name: c.name, reps: parts[j].amount ? `${parts[j].amount}${unit}` : '', load: parts[j].weight, first, repsValue: parts[j].repsValue, repsUnit: parts[j].repsUnit }
   })
 }
 
@@ -441,4 +453,20 @@ export function changed(card: ExerciseCard, row: SetRow): boolean {
     s.intensity_value !== intensity ||
     (intensity !== null && s.intensity_metric !== card.intensityMetric)
   )
+}
+
+// The reps a capped WOD's progress makes: what the capped score is, kept in the draft.
+export function progressTotal(wod: WodCard): number {
+  return progressReps(wod.lines, wod.rounds, wod.draft.progress)
+}
+
+// Whether a WOD takes its capped score as progress (full rounds, the next exercise, its reps)
+// rather than as reps typed in.
+export const takesProgress = (wod: WodCard): boolean => wod.scoreType === 'for_time' && progressEnabled(wod.lines)
+
+// What the list of a WOD marks as done: the lines before the next one, and the reps of that one.
+export function listMark(wod: WodCard): { step: number; reps: number } | null {
+  if (!wod.draft.capped || !takesProgress(wod)) return null
+  const p = clampProgress(wod.lines, wod.rounds, wod.draft.progress)
+  return { step: p.step, reps: p.reps }
 }

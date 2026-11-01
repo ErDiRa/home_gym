@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, changed, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
+import { buildCards, changed, listMark, progressTotal, scoreDraft, scoreValues, takesProgress, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -364,5 +364,40 @@ describe('a WOD', () => {
     expect(lines.map((l) => l.first)).toEqual([true, true, false, false])
     expect(lines[0].load).toBe('135 lb')
     expect(lines[1].load).toBe('15 ft')
+  })
+
+  describe('capped', () => {
+    const capped = (reps: number | null) => ({
+      id: 'r', workout_id: 'w', block_position: 1, score_type: 'for_time' as const, time_seconds: null, rounds: null, reps, calories: null, notes: '', completed_at: '',
+    })
+    // Lines of 18, 1, 15 and 2 reps: 36 reps in the round.
+    const cappedWod = (reps: number | null) =>
+      buildCards(wodSession, [], reps === null ? [] : [capped(reps)], () => wodKind, 'kg', wodContext).blocks[0].wod!
+
+    it('takes how far it got, for lines of plain reps', () => {
+      expect(takesProgress(cappedWod(null))).toBe(true)
+    })
+
+    it('shows a saved score as the progress that makes it, and sends the same reps', () => {
+      const wod = cappedWod(20) // 18 + 1 done, 1 of the next 15
+      expect(wod.draft.capped).toBe(true)
+      expect(wod.draft.progress).toEqual({ rounds: 0, step: 2, reps: 1 })
+      expect(progressTotal(wod)).toBe(20)
+      expect(scoreValues('for_time', wod.draft)).toEqual({ time_seconds: null, rounds: null, reps: 20, calories: null })
+      expect(listMark(wod)).toEqual({ step: 2, reps: 1 })
+    })
+
+    it('marks nothing without a capped score, and starts at the beginning', () => {
+      const wod = cappedWod(null)
+      expect(listMark(wod)).toBeNull()
+      expect(wod.draft.progress).toEqual({ rounds: 0, step: 0, reps: 0 })
+      expect(scoreDraft(null, wod.lines, wod.rounds).capped).toBe(false)
+    })
+
+    it('has no progress for a line that is not plain reps', () => {
+      const withFeet = { ...wodSession, blocks: [{ ...wodSession.blocks[0], exercises: [ladder('clean', 'Hang Clean', 18, 135), { ...ladder('walk', 'Handstand Walk', 25, null), reps_unit_name: 'ft' }] }] }
+      const wod = buildCards(withFeet, [], [], () => wodKind, 'kg', wodContext).blocks[0].wod!
+      expect(takesProgress(wod)).toBe(false)
+    })
   })
 })

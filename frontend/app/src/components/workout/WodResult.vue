@@ -13,7 +13,7 @@
           Time
           <DurationInput v-model="wod.draft.time_seconds" label="Time" size="touch" class="mt-1" />
         </label>
-        <label v-else class="text-xs font-medium text-slate-500">
+        <label v-else-if="!progress" class="text-xs font-medium text-slate-500">
           Reps done
           <TextInput v-model.number="wod.draft.reps" v-bind="countInput" aria-label="Reps done" class="mt-1 w-24!" />
         </label>
@@ -47,6 +47,34 @@
       </label>
     </div>
 
+    <!-- Capped: how far it got; the total reps and the finished exercises follow from the plan. -->
+    <div v-if="progress && wod.draft.capped" class="mt-3 space-y-2">
+      <div class="flex items-end gap-3">
+        <label v-if="wod.rounds > 1" class="text-xs font-medium text-slate-500">
+          Full rounds
+          <TextInput v-model.number="wod.draft.progress.rounds" v-bind="countInput" :max="wod.rounds - 1" aria-label="Full rounds done" class="mt-1 w-20!" />
+        </label>
+        <div class="min-w-0 flex-1">
+          <SelectField
+            v-model="step"
+            :options="stepOptions"
+            :searchable="false"
+            label="Next exercise"
+            size="touch"
+            option-size="touch"
+            aria-label="The exercise it got to"
+          />
+        </div>
+        <label class="text-xs font-medium text-slate-500">
+          Reps done
+          <TextInput v-model.number="wod.draft.progress.reps" v-bind="countInput" :max="repsMax" aria-label="Reps done of that exercise" class="mt-1 w-20!" />
+        </label>
+      </div>
+      <p class="text-sm text-slate-600">
+        <span class="font-semibold text-slate-900">{{ total }} reps</span> · {{ finished }} of {{ wod.rounds * wod.lines.length }} exercises finished
+      </p>
+    </div>
+
     <TextInput v-model="wod.draft.notes" size="touch" maxlength="1000" placeholder="Notes" aria-label="Score notes" class="mt-3" />
 
     <AppButton
@@ -65,18 +93,40 @@
 </template>
 
 <script setup lang="ts">
+import { computed, watch } from 'vue'
 import { ArrowPathIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import AppCheckbox from '../form/AppCheckbox.vue'
 import DurationInput from '../form/DurationInput.vue'
 import TextInput from '../form/TextInput.vue'
 import { scoreText } from '../training/wod'
-import { scoreChanged, type WodCard } from './workoutPlan'
+import SelectField from '../form/SelectField.vue'
+import { scoreChanged, takesProgress, progressTotal, type WodCard } from './workoutPlan'
+import { clampProgress, finishedSteps } from './wodProgress'
 
 // The score of a WOD block: inputs for its format and a note. The button logs it,
 // saves an edit (amber) or undoes it (green), like a set; saving is up to the parent.
 const wod = defineModel<WodCard>({ required: true })
 const emit = defineEmits<{ toggle: [] }>()
+
+// A capped "for time" takes how far it got instead of the reps: the inputs are clamped to the plan,
+// and the reps (the score) follow from them.
+const progress = computed(() => takesProgress(wod.value))
+const stepOptions = computed(() => wod.value.lines.map((l, i) => ({ id: String(i), name: `${i + 1} · ${l.reps ? `${l.reps} ` : ''}${l.name}` })))
+const step = computed({
+  get: () => String(wod.value.draft.progress.step),
+  set: (v: string | null) => (wod.value.draft.progress.step = Number(v ?? 0)),
+})
+const clamped = computed(() => clampProgress(wod.value.lines, wod.value.rounds, wod.value.draft.progress))
+const repsMax = computed(() => Math.max((wod.value.lines[clamped.value.step]?.repsValue ?? 1) - 1, 0))
+const total = computed(() => progressTotal(wod.value))
+const finished = computed(() => finishedSteps(wod.value.lines, clamped.value))
+watch(
+  () => [progress.value && wod.value.draft.capped, total.value] as const,
+  ([capped, reps]) => {
+    if (capped) wod.value.draft.reps = reps
+  },
+)
 
 const countInput = { type: 'number', inputmode: 'numeric', min: 0, step: 1, size: 'touch' } as const
 </script>

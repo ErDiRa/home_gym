@@ -55,7 +55,7 @@
         </button>
         <div v-show="expanded.has(block.key)">
           <ComplexSets v-if="block.complex" v-model="blocks[bi]" @toggle="toggleRound" />
-          <WodMovements v-else-if="block.wod" :lines="block.wod.lines" :notes="block.notes" />
+          <WodMovements v-else-if="block.wod" :lines="block.wod.lines" :notes="block.notes" :mark="listMark(block.wod)" />
           <div v-else class="divide-y divide-slate-100">
             <ExerciseSets
               v-for="(card, i) in block.exercises"
@@ -185,6 +185,7 @@ import {
   progressOf,
   roundState,
   scoreChanged,
+  listMark,
   scoreDraft,
   scoreValues,
   type BlockCard,
@@ -377,7 +378,7 @@ async function toggleScore(wod: WodCard) {
       ...scoreValues(wod.scoreType, wod.draft),
       notes: wod.draft.notes,
     })
-    wod.draft = scoreDraft(wod.result)
+    wod.draft = scoreDraft(wod.result, wod.lines, wod.rounds)
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the score.')
   } finally {
