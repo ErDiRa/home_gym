@@ -47,7 +47,7 @@ func (q *Queries) CountExercisesDone(ctx context.Context, userID uuid.UUID) ([]C
 }
 
 const getExerciseMax = `-- name: GetExerciseMax :one
-SELECT id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
+SELECT id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
 FROM tracking.exercise_maxes
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 `
@@ -60,6 +60,7 @@ type GetExerciseMaxParams struct {
 type GetExerciseMaxRow struct {
 	ID           uuid.UUID
 	ExerciseID   uuid.UUID
+	Reps         int32
 	LoadValue    float64
 	LoadUnit     uuid.UUID
 	AchievedOn   time.Time
@@ -74,6 +75,7 @@ func (q *Queries) GetExerciseMax(ctx context.Context, arg GetExerciseMaxParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.ExerciseID,
+		&i.Reps,
 		&i.LoadValue,
 		&i.LoadUnit,
 		&i.AchievedOn,
@@ -116,7 +118,7 @@ func (q *Queries) GetWorkout(ctx context.Context, arg GetWorkoutParams) (Trackin
 }
 
 const listExerciseMaxes = `-- name: ListExerciseMaxes :many
-SELECT id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
+SELECT id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
 FROM tracking.exercise_maxes
 WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY exercise_id, achieved_on DESC, created_at DESC
@@ -125,6 +127,7 @@ ORDER BY exercise_id, achieved_on DESC, created_at DESC
 type ListExerciseMaxesRow struct {
 	ID           uuid.UUID
 	ExerciseID   uuid.UUID
+	Reps         int32
 	LoadValue    float64
 	LoadUnit     uuid.UUID
 	AchievedOn   time.Time
@@ -147,6 +150,7 @@ func (q *Queries) ListExerciseMaxes(ctx context.Context, userID uuid.UUID) ([]Li
 		if err := rows.Scan(
 			&i.ID,
 			&i.ExerciseID,
+			&i.Reps,
 			&i.LoadValue,
 			&i.LoadUnit,
 			&i.AchievedOn,

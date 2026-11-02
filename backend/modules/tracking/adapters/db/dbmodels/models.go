@@ -237,6 +237,7 @@ type TrackingExerciseMax struct {
 	Notes        string
 	CreatedAt    time.Time
 	DeletedAt    *time.Time
+	Reps         int32
 }
 
 type TrackingWorkout struct {

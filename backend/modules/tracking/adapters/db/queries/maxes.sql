@@ -1,9 +1,9 @@
--- The 1RM history (MaxRepository).
+-- The 1RM and rep max history (MaxRepository).
 
 -- name: CreateExerciseMax :one
 -- The exercise is checked to be one of the user's live ones before (the catalog's contract).
-INSERT INTO tracking.exercise_maxes (user_id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO tracking.exercise_maxes (user_id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id;
 
 -- name: UserOwnsSet :one

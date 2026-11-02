@@ -159,7 +159,7 @@ func (m *ReadModel) Max(ctx context.Context, userID, id uuid.UUID) (trackinghttp
 
 func maxToAPI(r dbmodels.GetExerciseMaxRow, loadUnits map[uuid.UUID]string) trackinghttp.ExerciseMax {
 	return trackinghttp.ExerciseMax{
-		Id: r.ID, ExerciseId: r.ExerciseID, LoadValue: r.LoadValue, LoadUnit: r.LoadUnit, LoadUnitName: loadUnits[r.LoadUnit],
+		Id: r.ID, ExerciseId: r.ExerciseID, Reps: r.Reps, LoadValue: r.LoadValue, LoadUnit: r.LoadUnit, LoadUnitName: loadUnits[r.LoadUnit],
 		AchievedOn: openapi_types.Date{Time: r.AchievedOn}, WorkoutSetId: r.WorkoutSetID, Notes: r.Notes, CreatedAt: r.CreatedAt,
 	}
 }

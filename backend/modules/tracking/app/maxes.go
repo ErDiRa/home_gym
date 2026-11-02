@@ -11,9 +11,13 @@ import (
 	"github.com/erdira/homegym/backend/common/errs"
 )
 
-// MaxInput is a 1RM: the load in a weight unit, the day it was lifted and, when it was saved from
-// a logged single, that set.
+// maxMaxReps is the most reps a rep max can be for, as in the tracking.exercise_maxes CHECK.
+const maxMaxReps = 30
+
+// MaxInput is a max: the load in a weight unit lifted for Reps reps (1 = the 1RM, 3 or 5 = rep
+// maxes), the day it was lifted and, when it was saved from a logged set, that set.
 type MaxInput struct {
+	Reps         int32
 	LoadValue    float64
 	LoadUnit     uuid.UUID
 	AchievedOn   string // YYYY-MM-DD
@@ -52,6 +56,12 @@ func (s *Service) DeleteMax(ctx context.Context, userID, id uuid.UUID) error {
 
 // checkMax validates a 1RM, trimming its notes in place, and returns its day.
 func (s *Service) checkMax(ctx context.Context, userID, exerciseID uuid.UUID, in *MaxInput) (time.Time, error) {
+	if in.Reps == 0 {
+		in.Reps = 1 // a 1RM
+	}
+	if in.Reps < 1 || in.Reps > maxMaxReps {
+		return time.Time{}, errs.Invalid("reps must be between 1 and 30")
+	}
 	if in.LoadValue <= 0 || in.LoadValue >= maxAmount {
 		return time.Time{}, errs.Invalid("load must be between 0 and 99999")
 	}

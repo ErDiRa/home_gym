@@ -276,6 +276,12 @@ export interface components {
             done_at: string;
         };
         ExerciseMaxInput: {
+            /**
+             * Format: int32
+             * @description The reps the load was lifted for, 1-30: 1 is the 1RM, 3 or 5 are rep maxes. Defaults to 1.
+             * @default 1
+             */
+            reps: number;
             /** Format: double */
             load_value: number;
             /**
@@ -292,12 +298,17 @@ export interface components {
             workout_set_id?: string | null;
             notes: string;
         };
-        /** @description An entry of the 1RM history of an exercise, always in a weight unit. */
+        /** @description An entry of the 1RM and rep max history of an exercise, always in a weight unit. */
         ExerciseMax: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
             exercise_id: string;
+            /**
+             * Format: int32
+             * @description The reps it was lifted for: 1 is a 1RM.
+             */
+            reps: number;
             /** Format: double */
             load_value: number;
             /** Format: uuid */

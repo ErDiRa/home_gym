@@ -14,14 +14,15 @@ import (
 
 const createExerciseMax = `-- name: CreateExerciseMax :one
 
-INSERT INTO tracking.exercise_maxes (user_id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO tracking.exercise_maxes (user_id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id
 `
 
 type CreateExerciseMaxParams struct {
 	UserID       uuid.UUID
 	ExerciseID   uuid.UUID
+	Reps         int32
 	LoadValue    float64
 	LoadUnit     uuid.UUID
 	AchievedOn   time.Time
@@ -29,12 +30,13 @@ type CreateExerciseMaxParams struct {
 	Notes        string
 }
 
-// The 1RM history (MaxRepository).
+// The 1RM and rep max history (MaxRepository).
 // The exercise is checked to be one of the user's live ones before (the catalog's contract).
 func (q *Queries) CreateExerciseMax(ctx context.Context, arg CreateExerciseMaxParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, createExerciseMax,
 		arg.UserID,
 		arg.ExerciseID,
+		arg.Reps,
 		arg.LoadValue,
 		arg.LoadUnit,
 		arg.AchievedOn,

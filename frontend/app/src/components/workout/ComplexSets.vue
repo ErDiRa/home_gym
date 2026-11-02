@@ -126,7 +126,7 @@ function addWeight() {
 // The weight the first movement was last logged with, as the placeholder when the plan has none.
 const lastLoad = computed(() => {
   const unitOf = (id: string | null) => lookups.loadUnits.find((u) => u.id === id)
-  const max = exercises.currentMax(first.value.exerciseId)
+  const max = exercises.effectiveMax(first.value.exerciseId, unitOf)
   return suggestedLoad(first.value, unitOf, max ? { value: max.load_value, unit: unitOf(max.load_unit) } : null)
 })
 
@@ -140,7 +140,7 @@ function set(round: Round, field: 'reps' | 'load', value: unknown) {
 // movement's 1RM); logged rounds then show as edited until saved in the new unit.
 function switchUnit(to: string | null) {
   const unitOf = (id: string | null) => lookups.loadUnits.find((u) => u.id === id)
-  const max = exercises.currentMax(first.value.exerciseId)
+  const max = exercises.effectiveMax(first.value.exerciseId, unitOf)
   const maxLoad = max ? { value: max.load_value, unit: unitOf(max.load_unit) } : null
   const from = unitOf(first.value.loadUnit)
   for (const round of rounds.value) {

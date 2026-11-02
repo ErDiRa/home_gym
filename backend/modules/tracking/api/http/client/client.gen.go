@@ -107,7 +107,7 @@ type Error struct {
 	Error string `json:"error"`
 }
 
-// ExerciseMax An entry of the 1RM history of an exercise, always in a weight unit.
+// ExerciseMax An entry of the 1RM and rep max history of an exercise, always in a weight unit.
 type ExerciseMax struct {
 	AchievedOn   openapi_types.Date `json:"achieved_on"`
 	CreatedAt    time.Time          `json:"created_at"`
@@ -117,6 +117,9 @@ type ExerciseMax struct {
 	LoadUnitName string             `json:"load_unit_name"`
 	LoadValue    float64            `json:"load_value"`
 	Notes        string             `json:"notes"`
+
+	// Reps The reps it was lifted for: 1 is a 1RM.
+	Reps int32 `json:"reps"`
 
 	// WorkoutSetId The logged single it was saved from; null when entered by hand.
 	WorkoutSetId *openapi_types.UUID `json:"workout_set_id"`
@@ -131,6 +134,9 @@ type ExerciseMaxInput struct {
 	LoadUnit  openapi_types.UUID `json:"load_unit"`
 	LoadValue float64            `json:"load_value"`
 	Notes     string             `json:"notes"`
+
+	// Reps The reps the load was lifted for, 1-30: 1 is the 1RM, 3 or 5 are rep maxes. Defaults to 1.
+	Reps *int32 `json:"reps,omitempty"`
 
 	// WorkoutSetId The user's own logged set of that exercise it was saved from.
 	WorkoutSetId *openapi_types.UUID `json:"workout_set_id,omitempty"`

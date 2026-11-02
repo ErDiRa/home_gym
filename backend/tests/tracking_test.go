@@ -178,7 +178,28 @@ func TestMaxes(t *testing.T) {
 		t.Errorf("1RM of an unknown exercise = %d, want 404", resp.StatusCode())
 	}
 
+	// A rep max: the same exercise, for 5 reps. The 1RM defaults to 1 rep.
+	if added.JSON201.Reps != 1 {
+		t.Errorf("reps of the 1RM = %d, want 1", added.JSON201.Reps)
+	}
+	five := int32(5)
+	rm5, err := u.Tracking.AddExerciseMaxWithResponse(ctx, exercise, trackingclient.ExerciseMaxInput{Reps: &five, LoadValue: 150, LoadUnit: kg, AchievedOn: today})
+	if err != nil || rm5.StatusCode() != http.StatusCreated || rm5.JSON201.Reps != 5 {
+		t.Fatalf("add 5RM = %v %s", err, body(rm5.Body))
+	}
+	tooMany := int32(31)
+	if resp, _ := u.Tracking.AddExerciseMaxWithResponse(ctx, exercise, trackingclient.ExerciseMaxInput{Reps: &tooMany, LoadValue: 100, LoadUnit: kg, AchievedOn: today}); resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("31 reps = %d, want 400", resp.StatusCode())
+	}
+
 	list, _ := u.Tracking.ListExerciseMaxesWithResponse(ctx)
+	if len(*list.JSON200) != 2 {
+		t.Fatalf("maxes = %s", body(list.Body))
+	}
+	if resp, _ := u.Tracking.DeleteExerciseMaxWithResponse(ctx, rm5.JSON201.Id); resp.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete 5RM = %d", resp.StatusCode())
+	}
+	list, _ = u.Tracking.ListExerciseMaxesWithResponse(ctx)
 	if len(*list.JSON200) != 1 || (*list.JSON200)[0].LoadValue != 180 {
 		t.Fatalf("maxes = %s", body(list.Body))
 	}

@@ -168,7 +168,7 @@ import { ArrowLeftIcon, ChevronDownIcon, TrashIcon } from '@heroicons/vue/24/out
 import { ApiError } from '../../api'
 import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
-import { isNewMax } from '../../components/exercise/maxes'
+import { newMaxOffers } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
 import ComplexSets from '../../components/workout/ComplexSets.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
@@ -200,7 +200,7 @@ import { useLookupsStore } from '../../stores/lookups'
 import { useTrainingsStore } from '../../stores/trainings'
 import { useWhoopStore } from '../../stores/whoop'
 import { useWorkoutsStore } from '../../stores/workouts'
-import type { LoggedSet, TrainingDetail, Workout, WorkoutResult } from '../../types'
+import type { TrainingDetail, Workout, WorkoutResult } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -269,7 +269,7 @@ onMounted(async () => {
     const cards = buildCards(session.value, loaded.sets, loaded.results, lookups.kindOf, lookups.defaultUnit('load'), {
       unitOf: loadUnitOf,
       maxOf: (exerciseId) => {
-        const max = exercises.currentMax(exerciseId)
+        const max = exercises.effectiveMax(exerciseId, loadUnitOf)
         return max ? { value: max.load_value, unit: loadUnitOf(max.load_unit) } : null
       },
       lastOf: (exerciseId) => {
@@ -298,8 +298,8 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
   try {
     if (row.logged && !changed(card, row)) {
       await workouts.deleteSet(workout.value.id, row.logged.id)
-      if (card.newMax?.id === row.logged.id) card.newMax = null
       row.logged = null
+      if (offerMax) offerNewMax(card)
       return
     }
     // Whatever was entered is saved, also only the reps or only the load; just not nothing.
@@ -327,7 +327,7 @@ async function toggle(card: ExerciseCard, row: SetRow, offerMax = true) {
     row.reps = reps
     row.load = load
     row.intensity = intensity
-    if (offerMax) offerNewMax(card, row.logged)
+    if (offerMax) offerNewMax(card)
   } catch (e) {
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the set.')
   } finally {
@@ -350,16 +350,16 @@ async function toggleRound(round: Round) {
 
 const loadUnitOf = (id: string) => lookups.loadUnits.find((u) => u.id === id)
 
-// A single logged above the exercise's 1RM (or without one yet) is offered as the new 1RM; a
-// set corrected below it withdraws the offer.
-function offerNewMax(card: ExerciseCard, set: LoggedSet) {
-  // Weight added to bodyweight isn't a 1RM.
-  if (card.bodyweight) return
-  const max = exercises.currentMax(card.exerciseId)
-  const reps = card.repsUnitName === 'reps' ? set.reps_value : null
-  const unit = set.load_unit ? loadUnitOf(set.load_unit) : undefined
-  if (isNewMax(reps, set.load_value, unit, max ? { value: max.load_value, unit: loadUnitOf(max.load_unit) } : null)) card.newMax = set
-  else if (card.newMax?.id === set.id) card.newMax = null
+// The logged sets that beat the user's 1RM or a rep max (3RM, 5RM…) are offered as new ones: per
+// rep count the heaviest, whichever was logged first. Correcting or undoing a set updates the offers.
+function offerNewMax(card: ExerciseCard) {
+  // Weight added to bodyweight isn't a max; nor are the reps of another unit than reps.
+  if (card.bodyweight || card.repsUnitName !== 'reps') {
+    card.newMaxes = []
+    return
+  }
+  const logged = card.rows.flatMap((r) => (r.logged && !changed(card, r) ? [r.logged] : []))
+  card.newMaxes = newMaxOffers(logged, loadUnitOf, exercises.maxes.get(card.exerciseId) ?? [])
 }
 
 // Logs the score of a WOD block, saves its changed values, or undoes it when logged and unchanged.

@@ -11,8 +11,8 @@ import {
   rateExercise as apiRateExercise,
   updateExercise,
 } from '../api'
-import { newestFirst } from '../components/exercise/maxes'
-import type { Exercise, ExerciseMax, ExerciseMaxInput, ExerciseRating } from '../types'
+import { current1Rm, effectiveMax as effectiveMaxOf, newestFirst, repMaxes as repMaxesOf } from '../components/exercise/maxes'
+import type { Exercise, ExerciseMax, Unit, ExerciseMaxInput, ExerciseRating } from '../types'
 
 export const useExercisesStore = defineStore('exercises', () => {
   const exercises = ref<Exercise[]>([])
@@ -48,7 +48,7 @@ export const useExercisesStore = defineStore('exercises', () => {
     maxes.value = new Map([...byExercise].map(([id, list]) => [id, newestFirst(list)]))
   }
 
-  // Adds a 1RM to an exercise's history.
+  // Adds a 1RM or a rep max to an exercise's history.
   async function addMax(exerciseId: string, input: ExerciseMaxInput) {
     const saved = await addExerciseMax(exerciseId, input)
     maxes.value = new Map(maxes.value).set(exerciseId, newestFirst([...(maxes.value.get(exerciseId) ?? []), saved]))
@@ -61,8 +61,15 @@ export const useExercisesStore = defineStore('exercises', () => {
     maxes.value = new Map(maxes.value).set(max.exercise_id, left)
   }
 
-  // An exercise's current max (its newest entry), or null.
-  const currentMax = (exerciseId: string) => maxes.value.get(exerciseId)?.[0] ?? null
+  // An exercise's current 1RM (its newest entry of one rep), or null.
+  const currentMax = (exerciseId: string) => current1Rm(maxes.value.get(exerciseId) ?? [])
+
+  // The 1RM to calculate loads with: the current one, else an estimate from the rep maxes.
+  const effectiveMax = (exerciseId: string, unitOf: (id: string) => Unit | undefined) =>
+    effectiveMaxOf(maxes.value.get(exerciseId) ?? [], unitOf)
+
+  // The best entry of each rep count (1RM, 3RM, 5RM…) of an exercise.
+  const repMaxes = (exerciseId: string, unitOf: (id: string) => Unit | undefined) => repMaxesOf(maxes.value.get(exerciseId) ?? [], unitOf)
 
   return {
     exercises,
@@ -76,6 +83,8 @@ export const useExercisesStore = defineStore('exercises', () => {
     addMax,
     deleteMax,
     currentMax,
+    effectiveMax,
+    repMaxes,
     getExercise,
     createExercise,
     updateExercise,

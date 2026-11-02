@@ -22,7 +22,7 @@
         >
           <DialogPanel class="flex max-h-[90dvh] w-full max-w-md flex-col rounded-t-2xl bg-white shadow-2xl transition sm:rounded-2xl">
             <div class="flex items-center gap-2 border-b border-slate-100 py-2 pr-2 pl-4">
-              <DialogTitle class="min-w-0 flex-1 truncate font-semibold text-slate-900">1RM · {{ name }}</DialogTitle>
+              <DialogTitle class="min-w-0 flex-1 truncate font-semibold text-slate-900">Maxes · {{ name }}</DialogTitle>
               <AppButton variant="ghost" :size="touch ? 'touch' : 'md'" icon aria-label="Close" @click="emit('close')">
                 <XMarkIcon class="size-6" aria-hidden="true" />
               </AppButton>

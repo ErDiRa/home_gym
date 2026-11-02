@@ -1,6 +1,6 @@
 import type { BlockKind, IntensityMetric, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
 import { intensityText } from '../exercise/intensity'
-import { convertLoad, roundLoad, type MaxLoad } from '../exercise/maxes'
+import { convertLoad, roundLoad, type MaxLoad, type MaxOffer } from '../exercise/maxes'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
 import { emomRounds, wodSummary } from '../training/wod'
 import { clampProgress, noProgress, progressEnabled, progressOfReps, progressReps, type Progress } from './wodProgress'
@@ -39,7 +39,7 @@ export interface ExerciseCard {
   endurance: boolean // an erg, a run…: each set also takes its average (watts, cal/h or a pace)
   intensityMetric: IntensityMetric // what the average inputs are in
   percentPlan: { value: number; max: number | null } | null // a load planned in % 1RM (a range with max)
-  newMax: LoggedSet | null // a logged single above the current 1RM, offered to be saved as the new one
+  newMaxes: MaxOffer<WorkoutSet | LoggedSet>[] // logged sets that beat the user's 1RM or a rep max (3RM, 5RM…), offered to be saved
   lastLoad: MaxLoad | null // the load last logged in another workout, suggested when the plan has none
   scored: boolean // in a WOD block: no set rows, the block has one score
   rows: SetRow[]
@@ -305,7 +305,7 @@ export function buildCards(
         endurance,
         intensityMetric,
         percentPlan: planUnit?.percent_of_max && load.load_value !== null && !bodyweight ? { value: load.load_value, max: load.load_max } : null,
-        newMax: null,
+        newMaxes: [],
         lastLoad: scored ? null : last,
         scored,
         // Sets logged in a WOD block before it became one still show.
@@ -386,7 +386,7 @@ export function buildCards(
       endurance: logged.some((s) => s.intensity_metric),
       intensityMetric: logged.find((s) => s.intensity_metric)?.intensity_metric ?? 'watts',
       percentPlan: null,
-      newMax: null,
+      newMaxes: [],
       lastLoad: null,
       scored: false,
       rows: rowsFor(0, logged, null, null),

@@ -37,13 +37,13 @@ ORDER BY block_position;
 -- name: ListExerciseMaxes :many
 -- A user's 1RM history, newest first per exercise: the first entry of an exercise is its current
 -- max. Entries of deleted exercises are left out by the caller (the catalog knows them).
-SELECT id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
+SELECT id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
 FROM tracking.exercise_maxes
 WHERE user_id = $1 AND deleted_at IS NULL
 ORDER BY exercise_id, achieved_on DESC, created_at DESC;
 
 -- name: GetExerciseMax :one
-SELECT id, exercise_id, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
+SELECT id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
 FROM tracking.exercise_maxes
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 

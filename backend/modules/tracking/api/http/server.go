@@ -258,7 +258,7 @@ func (s *Server) DeleteResult(ctx context.Context, req DeleteResultRequestObject
 	return DeleteResult204Response{}, nil
 }
 
-// AddExerciseMax adds a 1RM to the history of one of the user's exercises; the newest is the
+// AddExerciseMax adds a 1RM (or a rep max) to the history of one of the user's exercises; the newest is the
 // current max.
 func (s *Server) AddExerciseMax(ctx context.Context, req AddExerciseMaxRequestObject) (AddExerciseMaxResponseObject, error) {
 	userID, err := web.CurrentUser(ctx)
@@ -266,8 +266,12 @@ func (s *Server) AddExerciseMax(ctx context.Context, req AddExerciseMaxRequestOb
 		return nil, err
 	}
 	b := req.Body
+	var reps int32 // 0: a 1RM
+	if b.Reps != nil {
+		reps = *b.Reps
+	}
 	id, err := s.service.AddMax(ctx, userID, req.Id, app.MaxInput{
-		LoadValue: b.LoadValue, LoadUnit: b.LoadUnit, AchievedOn: b.AchievedOn, WorkoutSetID: b.WorkoutSetId, Notes: b.Notes,
+		Reps: reps, LoadValue: b.LoadValue, LoadUnit: b.LoadUnit, AchievedOn: b.AchievedOn, WorkoutSetID: b.WorkoutSetId, Notes: b.Notes,
 	})
 	if err != nil {
 		return nil, err

@@ -109,7 +109,7 @@ func (r *Repo) DeleteResult(ctx context.Context, workoutID, resultID uuid.UUID) 
 
 func (r *Repo) CreateMax(ctx context.Context, userID, exerciseID uuid.UUID, in app.MaxInput, achievedOn time.Time) (uuid.UUID, error) {
 	return r.q.CreateExerciseMax(ctx, dbmodels.CreateExerciseMaxParams{
-		UserID: userID, ExerciseID: exerciseID, LoadValue: in.LoadValue, LoadUnit: in.LoadUnit, AchievedOn: achievedOn,
+		UserID: userID, ExerciseID: exerciseID, Reps: in.Reps, LoadValue: in.LoadValue, LoadUnit: in.LoadUnit, AchievedOn: achievedOn,
 		WorkoutSetID: in.WorkoutSetID, Notes: in.Notes,
 	})
 }

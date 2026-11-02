@@ -300,6 +300,15 @@ func TestAddMax(t *testing.T) {
 	if _, err := f.s.AddMax(context.Background(), uuid.New(), f.exercise, in); err != nil || f.repo.maxes[0].Notes != "belt" {
 		t.Fatalf("add = %v, saved %+v", err, f.repo.maxes)
 	}
+	// Without reps it is a 1RM; a rep max keeps its reps.
+	if f.repo.maxes[0].Reps != 1 {
+		t.Errorf("reps = %d, want 1", f.repo.maxes[0].Reps)
+	}
+	five := in
+	five.Reps = 5
+	if _, err := f.s.AddMax(context.Background(), uuid.New(), f.exercise, five); err != nil || f.repo.maxes[1].Reps != 5 {
+		t.Fatalf("add 5RM = %v, saved %+v", err, f.repo.maxes)
+	}
 
 	// From a logged single: the set must be the user's, of that exercise.
 	f.repo.ownedSet = uuid.New()
@@ -316,6 +325,8 @@ func TestAddMax(t *testing.T) {
 		in   MaxInput
 		msg  string
 	}{
+		{"no reps at all", MaxInput{Reps: -1, LoadValue: 100, LoadUnit: f.catalog.kg, AchievedOn: "2026-10-13"}, "reps must be between 1 and 30"},
+		{"too many reps", MaxInput{Reps: 31, LoadValue: 100, LoadUnit: f.catalog.kg, AchievedOn: "2026-10-13"}, "reps must be between 1 and 30"},
 		{"zero load", MaxInput{LoadValue: 0, LoadUnit: f.catalog.kg, AchievedOn: "2026-10-13"}, "load must be between 0 and 99999"},
 		{"too heavy", MaxInput{LoadValue: 100000, LoadUnit: f.catalog.kg, AchievedOn: "2026-10-13"}, "load must be between 0 and 99999"},
 		{"no date", MaxInput{LoadValue: 100, LoadUnit: f.catalog.kg}, "achieved_on must be a date (YYYY-MM-DD)"},

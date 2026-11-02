@@ -3542,7 +3542,7 @@
    "groupIds": [
     "table-workout_results"
    ],
-   "height": 214,
+   "height": 196,
    "id": "el-092",
    "isDeleted": false,
    "link": null,
@@ -3575,21 +3575,21 @@
    "groupIds": [
     "table-workout_results"
    ],
-   "height": 198,
+   "height": 180,
    "id": "el-093",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\n   block_position  int\n   score_type  text\n   time_seconds  int?\n   rounds  int?\n   reps  int?\n   calories  int?\n   rx  boolean\n   notes  text\n   completed_at  timestamptz",
+   "originalText": "PK id  uuid\nFK workout_id  uuid → workouts\n   block_position  int\n   score_type  text\n   time_seconds  int?\n   rounds  int?\n   reps  int?\n   calories  int?\n   notes  text\n   completed_at  timestamptz",
    "roughness": 0,
    "roundness": null,
    "seed": 1093,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK workout_id  uuid → workouts\n   block_position  int\n   score_type  text\n   time_seconds  int?\n   rounds  int?\n   reps  int?\n   calories  int?\n   rx  boolean\n   notes  text\n   completed_at  timestamptz",
+   "text": "PK id  uuid\nFK workout_id  uuid → workouts\n   block_position  int\n   score_type  text\n   time_seconds  int?\n   rounds  int?\n   reps  int?\n   calories  int?\n   notes  text\n   completed_at  timestamptz",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -3698,7 +3698,7 @@
    "groupIds": [
     "table-exercise_maxes"
    ],
-   "height": 160,
+   "height": 178,
    "id": "el-096",
    "isDeleted": false,
    "link": null,
@@ -3731,21 +3731,21 @@
    "groupIds": [
     "table-exercise_maxes"
    ],
-   "height": 144,
+   "height": 162,
    "id": "el-097",
    "isDeleted": false,
    "lineHeight": 1.25,
    "link": null,
    "locked": false,
    "opacity": 100,
-   "originalText": "PK id  uuid\nFK user_id  uuid → users\nFK exercise_id  uuid → exercises\n   load_value  numeric\nFK load_unit  uuid → load_units\n   achieved_on  date\nFK workout_set_id  uuid? → workout_sets\n   notes  text",
+   "originalText": "PK id  uuid\nFK user_id  uuid → users\nFK exercise_id  uuid → exercises\n   load_value  numeric\nFK load_unit  uuid → load_units\n   achieved_on  date\nFK workout_set_id  uuid? → workout_sets\n   notes  text\n   reps  int",
    "roughness": 0,
    "roundness": null,
    "seed": 1097,
    "strokeColor": "#1e1e1e",
    "strokeStyle": "solid",
    "strokeWidth": 1,
-   "text": "PK id  uuid\nFK user_id  uuid → users\nFK exercise_id  uuid → exercises\n   load_value  numeric\nFK load_unit  uuid → load_units\n   achieved_on  date\nFK workout_set_id  uuid? → workout_sets\n   notes  text",
+   "text": "PK id  uuid\nFK user_id  uuid → users\nFK exercise_id  uuid → exercises\n   load_value  numeric\nFK load_unit  uuid → load_units\n   achieved_on  date\nFK workout_set_id  uuid? → workout_sets\n   notes  text\n   reps  int",
    "textAlign": "left",
    "type": "text",
    "updated": 1,
@@ -6699,7 +6699,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 18.0,
+   "height": 9.0,
    "id": "el-162",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6713,7 +6713,7 @@
     ],
     [
      -72.0,
-     -18.0
+     -9.0
     ]
    ],
    "roughness": 0,
@@ -6736,7 +6736,7 @@
    "versionNonce": 2162,
    "width": 72.0,
    "x": 2820,
-   "y": 364.0
+   "y": 355.0
   },
   {
    "angle": 0,
@@ -6772,7 +6772,7 @@
    "verticalAlign": "middle",
    "width": 74,
    "x": 2744.0,
-   "y": 346.0
+   "y": 341.5
   },
   {
    "angle": 0,
@@ -6793,7 +6793,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 227.0,
+   "height": 236.0,
    "id": "el-164",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6807,7 +6807,7 @@
     ],
     [
      -180,
-     -227.0
+     -236.0
     ]
    ],
    "roughness": 0,
@@ -6830,7 +6830,7 @@
    "versionNonce": 2164,
    "width": 180,
    "x": 1260,
-   "y": 1855.0
+   "y": 1864.0
   },
   {
    "angle": 0,
@@ -6866,7 +6866,7 @@
    "verticalAlign": "middle",
    "width": 81,
    "x": 1130.0,
-   "y": 1732.5
+   "y": 1737.0
   },
   {
    "angle": 0,
@@ -6887,7 +6887,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 488.0,
+   "height": 497.0,
    "id": "el-166",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6901,7 +6901,7 @@
     ],
     [
      164.4000000000001,
-     -488.0
+     -497.0
     ]
    ],
    "roughness": 0,
@@ -6924,7 +6924,7 @@
    "versionNonce": 2166,
    "width": 164.4000000000001,
    "x": 1615.6,
-   "y": 1855.0
+   "y": 1864.0
   },
   {
    "angle": 0,
@@ -6960,7 +6960,7 @@
    "verticalAlign": "middle",
    "width": 67,
    "x": 1657.8,
-   "y": 1602.0
+   "y": 1606.5
   },
   {
    "angle": 0,
@@ -6981,7 +6981,7 @@
    "fillStyle": "solid",
    "frameId": null,
    "groupIds": [],
-   "height": 137.0,
+   "height": 146.0,
    "id": "el-168",
    "isDeleted": false,
    "lastCommittedPoint": null,
@@ -6995,7 +6995,7 @@
     ],
     [
      684.4000000000001,
-     -137.0
+     -146.0
     ]
    ],
    "roughness": 0,
@@ -7018,7 +7018,7 @@
    "versionNonce": 2168,
    "width": 684.4000000000001,
    "x": 1615.6,
-   "y": 1855.0
+   "y": 1864.0
   },
   {
    "angle": 0,
@@ -7054,7 +7054,7 @@
    "verticalAlign": "middle",
    "width": 102,
    "x": 1917.8,
-   "y": 1777.5
+   "y": 1782.0
   },
   {
    "angle": 0,

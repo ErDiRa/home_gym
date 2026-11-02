@@ -67,7 +67,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import ExerciseMaxDialog from '../../components/exercise/ExerciseMaxDialog.vue'
 import { searchExercises } from '../../components/exercise/exerciseSearch'
-import { formatLoad, inKg, prIds } from '../../components/exercise/maxes'
+import { effectiveMax, formatLoad, inKg, prIds, repMaxText, repsLabel, repsOf, type EffectiveMax } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
 import ExercisePickerDialog from '../../components/training/ExercisePickerDialog.vue'
 import { formatDate } from '../../dates'
@@ -88,28 +88,45 @@ const pickerOpen = ref(false)
 // The exercise whose 1RM history is open; logging closes it again once saved.
 const opened = ref<{ id: string; name: string; logging: boolean } | null>(null)
 
-// One row per exercise with a 1RM: the current one, the best and how many entries.
+// One row per exercise with a max: the 1RM to calculate with (the current one, else an estimate
+// from a rep max), the best 1RM, the rep maxes and how many entries.
 interface MaxRow {
   id: string
   name: string
-  current: ExerciseMax
+  current: EffectiveMax
   currentKg: number
-  best: ExerciseMax
+  since: string // the day of the newest entry
+  best: ExerciseMax | null // the best 1RM entry
   bestKg: number
+  repMaxes: string
   entries: number
 }
 
 const unitOf = (id: string) => lookups.loadUnits.find((u) => u.id === id)
-const kgOf = (m: ExerciseMax) => inKg(m.load_value, unitOf(m.load_unit)) ?? 0
+const kgOf = (m: { load_value: number; load_unit: string }) => inKg(m.load_value, unitOf(m.load_unit)) ?? 0
 
 const rows = computed<MaxRow[]>(() =>
   store.exercises.flatMap((e) => {
     const history = store.maxes.get(e.id) ?? []
-    if (!history.length) return []
-    const prs = prIds(history, unitOf)
-    // The last PR is the best entry; without the units yet, the current one stands in.
-    const best = history.find((m) => prs.has(m.id)) ?? history[0]
-    return [{ id: e.id, name: e.name, current: history[0], currentKg: kgOf(history[0]), best, bestKg: kgOf(best), entries: history.length }]
+    const current = effectiveMax(history, unitOf)
+    if (!current) return []
+    // The best 1RM is the last PR among the 1RM entries; without the units yet, the current one stands in.
+    const ones = history.filter((m) => repsOf(m) === 1)
+    const prs = prIds(ones, unitOf)
+    const best = ones.find((m) => prs.has(m.id)) ?? ones[0] ?? null
+    return [
+      {
+        id: e.id,
+        name: e.name,
+        current,
+        currentKg: kgOf(current),
+        since: history[0].achieved_on,
+        best,
+        bestKg: best ? kgOf(best) : 0,
+        repMaxes: repMaxText(history, unitOf),
+        entries: history.length,
+      },
+    ]
   }),
 )
 // The fuzzy search of the exercise list, over the exercises with a 1RM.
@@ -126,18 +143,21 @@ const columns: ColDef<MaxRow>[] = [
   { field: 'name', headerName: 'Exercise', flex: 2, minWidth: 180 },
   {
     colId: 'current',
-    headerName: 'Current 1RM',
+    headerName: '1RM',
     flex: 1,
     minWidth: 130,
     valueGetter: (p) => p.data?.currentKg ?? 0,
-    valueFormatter: (p) => (p.data ? formatLoad(p.data.current.load_value, p.data.current.load_unit_name) : ''),
+    // An estimate from a rep max shows with a ≈.
+    valueFormatter: (p) =>
+      p.data ? `${p.data.current.estimated ? '≈ ' : ''}${formatLoad(p.data.current.load_value, p.data.current.load_unit_name)}` : '',
   },
+  { colId: 'repMaxes', headerName: 'Rep maxes', flex: 2, minWidth: 190, valueGetter: (p) => p.data?.repMaxes ?? '' },
   {
     colId: 'since',
-    headerName: 'Lifted on',
+    headerName: 'Last entry',
     flex: 1,
     minWidth: 130,
-    valueGetter: (p) => p.data?.current.achieved_on ?? '',
+    valueGetter: (p) => p.data?.since ?? '',
     valueFormatter: (p) => (p.value ? formatDate(p.value as string) : ''),
   },
   {
@@ -147,7 +167,7 @@ const columns: ColDef<MaxRow>[] = [
     minWidth: 160,
     valueGetter: (p) => p.data?.bestKg ?? 0,
     valueFormatter: (p) =>
-      p.data ? `${formatLoad(p.data.best.load_value, p.data.best.load_unit_name)} · ${formatDate(p.data.best.achieved_on)}` : '',
+      p.data?.best ? `${formatLoad(p.data.best.load_value, p.data.best.load_unit_name)} · ${formatDate(p.data.best.achieved_on)}` : '',
   },
   { field: 'entries', headerName: 'Entries', width: 110 },
 ]
@@ -164,7 +184,7 @@ function open(id: string, name: string, logging: boolean) {
 // A PR logged through "Log PR" is done; one added to an opened row keeps its history open.
 function added(m: ExerciseMax) {
   const name = opened.value?.name ?? ''
-  toast.success(`Logged ${formatLoad(m.load_value, m.load_unit_name)} for ${name}.`)
+  toast.success(`Logged ${repsLabel(repsOf(m))} ${formatLoad(m.load_value, m.load_unit_name)} for ${name}.`)
   if (opened.value?.logging) opened.value = null
 }
 

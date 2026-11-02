@@ -14,7 +14,7 @@
           class="-my-1 min-h-8 text-left text-sm font-medium text-indigo-600 hover:text-indigo-800"
           @click="maxOpen = true"
         >
-          {{ max ? `1RM ${formatLoad(max.load_value, max.load_unit_name)}` : 'Set your 1RM to calculate the load' }}
+          {{ max ? (max.estimated ? `≈ 1RM ${formatLoad(max.load_value, max.load_unit_name)} (from your ${repsLabel(max.reps)})` : `1RM ${formatLoad(max.load_value, max.load_unit_name)}`) : 'Set your 1RM to calculate the load' }}
         </button>
         <p v-if="card.tempo || card.notes" class="text-sm text-slate-500">
           <span v-if="card.tempo">Tempo {{ card.tempo }}</span>
@@ -112,15 +112,16 @@
         </AppButton>
       </template>
     </div>
-    <!-- A logged single above the 1RM: saved as the new one only when confirmed. -->
-    <div v-if="card.newMax" class="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-green-50 p-3" role="status">
+    <!-- Logged sets above the 1RM or a rep max (3RM, 5RM…): saved as a new one only when confirmed. -->
+    <div v-for="o in card.newMaxes" :key="o.reps" class="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-green-50 p-3" role="status">
       <TrophyIcon class="size-5 shrink-0 text-green-600" aria-hidden="true" />
       <p class="min-w-0 flex-1 text-sm text-green-900">
-        New 1RM: <span class="font-semibold">{{ newMaxText }}</span>?
+        New {{ repsLabel(o.reps) }}: <span class="font-semibold">{{ offerText(o) }}</span>?
+        <span v-if="o.reps > 1 && estimateText(o)" class="block text-green-800">≈ {{ estimateText(o) }} 1RM</span>
       </p>
       <div class="flex gap-2">
-        <AppButton variant="ghost" size="touch" @click="card.newMax = null">Not now</AppButton>
-        <AppButton variant="success" size="touch" :disabled="savingMax" @click="saveNewMax">Save as 1RM</AppButton>
+        <AppButton variant="ghost" size="touch" @click="dismiss(o)">Not now</AppButton>
+        <AppButton variant="success" size="touch" :disabled="savingMax" @click="saveNewMax(o)">Save as {{ repsLabel(o.reps) }}</AppButton>
       </div>
     </div>
     <div v-if="!card.scored" class="mt-1 -ml-3 flex flex-wrap">
@@ -148,10 +149,10 @@ import ExerciseMaxDialog from '../exercise/ExerciseMaxDialog.vue'
 import ExerciseActions from './ExerciseActions.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
-import { convertLoad, formatLoad, roundLoad } from '../exercise/maxes'
+import { convertLoad, estimateOneRm, formatLoad, repsLabel, roundLoad, type MaxOffer } from '../exercise/maxes'
 import { intensityMetrics, intensityName } from '../exercise/intensity'
 import { changed, num, suggestedLoad, type ExerciseCard, type SetRow } from './workoutPlan'
-import type { IntensityMetric } from '../../types'
+import type { IntensityMetric, LoggedSet, WorkoutSet } from '../../types'
 
 // An exercise of the workout with its sets. Logging is up to the parent, which owns the card;
 // doneOn is the workout's day, the day a 1RM saved from it was lifted.
@@ -161,10 +162,11 @@ const emit = defineEmits<{ toggle: [row: SetRow] }>()
 const lookups = useLookupsStore()
 const exercises = useExercisesStore()
 
-// The current 1RM, and the load planned in % 1RM as a weight in the inputs' unit, e.g. "84–90 kg".
-const max = computed(() => exercises.currentMax(card.value.exerciseId))
-const maxOpen = ref(false)
+// The 1RM (else an estimate from a rep max), and the load planned in % 1RM as a weight in the
+// inputs' unit, e.g. "84–90 kg".
 const unitOf = (id: string | null) => lookups.loadUnits.find((u) => u.id === id)
+const max = computed(() => exercises.effectiveMax(card.value.exerciseId, unitOf))
+const maxOpen = ref(false)
 const maxLoad = computed(() => (max.value ? { value: max.value.load_value, unit: unitOf(max.value.load_unit) } : null))
 const approxLoad = computed(() => {
   const plan = card.value.percentPlan
@@ -210,29 +212,32 @@ watch(max, (now, before) => {
   if (now && !before && unitOf(card.value.loadUnit)?.percent_of_max) switchUnit(now.load_unit)
 })
 
-// A new 1RM shows its load as logged, e.g. "105 kg".
-const newMaxText = computed(() => {
-  const set = card.value.newMax
-  return set?.load_value != null ? formatLoad(set.load_value, unitOf(set.load_unit)?.name ?? '') : ''
-})
+// An offered max shows its load as logged, e.g. "105 kg", and, for a rep max, the 1RM it estimates.
+const offerText = (o: MaxOffer<WorkoutSet | LoggedSet>) =>
+  o.set.load_value != null ? formatLoad(o.set.load_value, unitOf(o.set.load_unit)?.name ?? '') : ''
+const estimateText = (o: MaxOffer<WorkoutSet | LoggedSet>) =>
+  o.set.load_value != null ? formatLoad(roundLoad(estimateOneRm(o.set.load_value, o.reps)), unitOf(o.set.load_unit)?.name ?? '') : ''
 const savingMax = ref(false)
 
-async function saveNewMax() {
-  const set = card.value.newMax
-  if (!set || set.load_value === null || !set.load_unit) return
+const dismiss = (o: MaxOffer<WorkoutSet | LoggedSet>) => (card.value.newMaxes = card.value.newMaxes.filter((x) => x !== o))
+
+async function saveNewMax(o: MaxOffer<WorkoutSet | LoggedSet>) {
+  const set = o.set
+  if (set.load_value === null || !set.load_unit) return
   savingMax.value = true
   try {
     await exercises.addMax(card.value.exerciseId, {
+      reps: o.reps,
       load_value: set.load_value,
       load_unit: set.load_unit,
       achieved_on: props.doneOn,
       workout_set_id: set.id,
       notes: '',
     })
-    card.value.newMax = null
-    toast.success(`New 1RM for ${card.value.name}: ${newMaxText.value}.`)
+    dismiss(o)
+    toast.success(`New ${repsLabel(o.reps)} for ${card.value.name}: ${offerText(o)}.`)
   } catch {
-    toast.error('Could not save the 1RM.')
+    toast.error(`Could not save the ${repsLabel(o.reps)}.`)
   } finally {
     savingMax.value = false
   }
