@@ -103,6 +103,19 @@ func (r *Repo) LogResult(ctx context.Context, workoutID uuid.UUID, in app.Result
 	return app.Result(res), err
 }
 
+func (r *Repo) NoteExercise(ctx context.Context, workoutID uuid.UUID, in app.ExerciseNoteInput) (app.ExerciseNote, error) {
+	n, err := r.q.UpsertExerciseNote(ctx, dbmodels.UpsertExerciseNoteParams{
+		WorkoutID: workoutID, ExerciseID: in.ExerciseID, BlockPosition: in.BlockPosition, ExercisePosition: in.ExercisePosition, Notes: in.Notes,
+	})
+	return app.ExerciseNote{
+		ID: n.ID, ExerciseID: n.ExerciseID, BlockPosition: n.BlockPosition, ExercisePosition: n.ExercisePosition, Notes: n.Notes, UpdatedAt: n.UpdatedAt,
+	}, err
+}
+
+func (r *Repo) DeleteExerciseNote(ctx context.Context, workoutID, noteID uuid.UUID) error {
+	return rowsAffected(r.q.DeleteExerciseNote(ctx, dbmodels.DeleteExerciseNoteParams{ID: noteID, WorkoutID: workoutID}))
+}
+
 func (r *Repo) DeleteResult(ctx context.Context, workoutID, resultID uuid.UUID) error {
 	return rowsAffected(r.q.DeleteWorkoutResult(ctx, dbmodels.DeleteWorkoutResultParams{ID: resultID, WorkoutID: workoutID}))
 }

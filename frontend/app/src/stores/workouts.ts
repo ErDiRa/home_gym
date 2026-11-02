@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
+  deleteExerciseNote,
   deleteResult,
   deleteSet,
   deleteWorkout,
@@ -11,13 +12,14 @@ import {
   listWorkouts,
   logResult,
   logSet,
+  noteExercise,
   startWorkout,
 } from '../api'
 import { nextWeek, startOf, toIso, weekStart } from '../dates'
 import type { LastLoad, Week } from '../types'
 
 // The tracker's data: the week shown, the load last logged of each exercise, and the api functions
-// for workouts, their sets and the scores of their WOD blocks.
+// for workouts, their sets, the scores of their WOD blocks and the notes on their exercises.
 export const useWorkoutsStore = defineStore('workouts', () => {
   const week = ref<Week | null>(null)
   const loading = ref(false)
@@ -57,6 +59,8 @@ export const useWorkoutsStore = defineStore('workouts', () => {
     logSet,
     deleteSet,
     logResult,
+    noteExercise,
+    deleteExerciseNote,
     deleteResult,
     finishWorkout,
     deleteWorkout,

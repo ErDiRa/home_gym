@@ -222,6 +222,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workouts/{id}/exercise-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Note an exercise as it was done in the workout, or replace the note it had. */
+        put: operations["NoteExercise"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workouts/{id}/exercise-notes/{noteID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+                noteID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["DeleteExerciseNote"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workouts/{id}/results/{resultID}": {
         parameters: {
             query?: never;
@@ -455,7 +493,8 @@ export interface components {
         /**
          * @description The score of a WOD block as done, at its place in the session (from 1). score_type is the
          *     format as planned and decides which values are kept: for_time time_seconds (or reps when
-         *     capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
+         *     capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds (+ the total
+         *     reps done in them, optional).
          */
         ResultInput: {
             /** Format: int32 */
@@ -491,6 +530,30 @@ export interface components {
             /** Format: date-time */
             completed_at: string;
         };
+        /** @description A note on an exercise as it was done, at its place in the session (from 1) like its sets. */
+        ExerciseNoteInput: {
+            /** Format: uuid */
+            exercise_id: string;
+            /** Format: int32 */
+            block_position: number;
+            /** Format: int32 */
+            exercise_position: number;
+            /** @description Not blank, at most 1000 characters. */
+            notes: string;
+        };
+        ExerciseNote: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            exercise_id: string;
+            /** Format: int32 */
+            block_position: number;
+            /** Format: int32 */
+            exercise_position: number;
+            notes: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         /** @description A session done, started from a slot of a week. The ids become null when the training, slot or session is deleted later. */
         Workout: {
             /** Format: uuid */
@@ -512,6 +575,7 @@ export interface components {
             notes: string;
             sets: components["schemas"]["WorkoutSet"][];
             results: components["schemas"]["WorkoutResult"][];
+            exercise_notes: components["schemas"]["ExerciseNote"][];
         };
         /** @description A finished workout as listed. */
         WorkoutSummary: {
@@ -999,6 +1063,59 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkoutResult"];
                 };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    NoteExercise: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseNoteInput"];
+            };
+        };
+        responses: {
+            /** @description The note as stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNote"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    DeleteExerciseNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+                noteID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];

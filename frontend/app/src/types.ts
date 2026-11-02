@@ -130,6 +130,9 @@ export type Workout = Tracking['Workout']
 // The score of a WOD block as done; score_type decides which values are set (see the spec).
 export type ResultInput = Tracking['ResultInput']
 export type WorkoutResult = Tracking['WorkoutResult']
+// A note on an exercise as it was done in a workout, at its place in the session.
+export type ExerciseNote = Tracking['ExerciseNote']
+export type ExerciseNoteInput = Tracking['ExerciseNoteInput']
 // A finished workout as listed.
 export type WorkoutSummary = Tracking['WorkoutSummary']
 // An active training as the tracker offers it.

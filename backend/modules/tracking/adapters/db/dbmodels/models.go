@@ -253,6 +253,16 @@ type TrackingWorkout struct {
 	DeletedAt     *time.Time
 }
 
+type TrackingWorkoutExerciseNote struct {
+	ID               uuid.UUID
+	WorkoutID        uuid.UUID
+	ExerciseID       uuid.UUID
+	BlockPosition    int32
+	ExercisePosition int32
+	Notes            string
+	UpdatedAt        time.Time
+}
+
 type TrackingWorkoutLog struct {
 	UserEmail     string
 	DoneOn        time.Time

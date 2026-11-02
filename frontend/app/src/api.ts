@@ -13,6 +13,7 @@ import type {
   CycleInput,
   ExerciseInput,
   ExerciseMaxInput,
+  ExerciseNoteInput,
   MacrosInput,
   NutritionProfileInput,
   ResultInput,
@@ -148,6 +149,11 @@ export const logResult = (workoutId: string, result: ResultInput) =>
   unwrap(tracking.PUT('/workouts/{id}/results', { ...byId(workoutId), body: result }))
 export const deleteResult = (workoutId: string, resultId: string) =>
   unwrap(tracking.DELETE('/workouts/{id}/results/{resultID}', { params: { path: { id: workoutId, resultID: resultId } } }))
+// A note on an exercise of a workout, at its place in the session; noting it again replaces it.
+export const noteExercise = (workoutId: string, input: ExerciseNoteInput) =>
+  unwrap(tracking.PUT('/workouts/{id}/exercise-notes', { ...byId(workoutId), body: input }))
+export const deleteExerciseNote = (workoutId: string, noteId: string) =>
+  unwrap(tracking.DELETE('/workouts/{id}/exercise-notes/{noteID}', { params: { path: { id: workoutId, noteID: noteId } } }))
 // completedAt (RFC 3339) dates the workout to another day than today; omitted keeps its date.
 export const finishWorkout = (id: string, notes: string, completedAt?: string) =>
   unwrap(tracking.POST('/workouts/{id}/finish', { ...byId(id), body: { notes, completed_at: completedAt } }))

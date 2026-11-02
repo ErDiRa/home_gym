@@ -1,4 +1,4 @@
-import type { BlockKind, IntensityMetric, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
+import type { BlockKind, ExerciseNote, IntensityMetric, LoggedSet, ScoreType, TrainingSession, Unit, WorkoutResult, WorkoutSet } from '../../types'
 import { intensityText } from '../exercise/intensity'
 import { convertLoad, roundLoad, type MaxLoad, type MaxOffer } from '../exercise/maxes'
 import { blockLetter, exerciseLabel } from '../training/trainingForm'
@@ -43,6 +43,7 @@ export interface ExerciseCard {
   lastLoad: MaxLoad | null // the load last logged in another workout, suggested when the plan has none
   scored: boolean // in a WOD block: no set rows, the block has one score
   rows: SetRow[]
+  note: ExerciseNote | null // the user's note on it in this workout, see attachNotes
 }
 
 // The score of a WOD block as in the inputs; capped marks a "for time" not finished in the cap,
@@ -118,7 +119,10 @@ export function scoreValues(scoreType: ScoreType, d: ScoreDraft) {
     v.reps = num(d.reps)
   } else if (scoreType === 'max_reps') v.reps = num(d.reps)
   else if (scoreType === 'max_calories') v.calories = num(d.calories)
-  else v.rounds = num(d.rounds)
+  else {
+    v.rounds = num(d.rounds)
+    v.reps = num(d.reps) // an EMOM's total, from the reps logged per movement
+  }
   return v
 }
 
@@ -158,8 +162,10 @@ export function roundState(round: Round): 'open' | 'logged' | 'edited' {
   return logged.length === round.sets.length && !logged.some((s) => changed(s.card, s.row)) ? 'logged' : 'edited'
 }
 
-// How much of a block is logged: its sets, or a complex's rounds.
+// How much of a block is logged: its sets, or a complex's rounds. A WOD counts by its score (an
+// EMOM's reps per movement are logged as sets, but not planned as such).
 export function progressOf(block: BlockCard): { logged: number; total: number } {
+  if (block.wod) return { logged: 0, total: 0 }
   if (block.complex) {
     const rounds = roundsOf(block)
     return { logged: rounds.filter((r) => roundState(r) === 'logged').length, total: rounds.length }
@@ -310,6 +316,7 @@ export function buildCards(
         scored,
         // Sets logged in a WOD block before it became one still show.
         rows: scored ? rowsFor(0, logged, null, null) : rowsFor(planned, logged, reps.reps_value, plannedLoad, plannedIntensity),
+        note: null,
       }
     })
     const complex = !!kind?.shared_load && !scored && exercises.length > 1
@@ -345,18 +352,7 @@ export function buildCards(
       notes: b.notes,
       exercises,
       complex,
-      wod: scored
-        ? {
-            blockPosition: i + 1,
-            scoreType: b.score_type!,
-            intervals: emomRounds(b),
-            rounds: Math.max(b.sets ?? 1, 1),
-            lines,
-            draft: scoreDraft(result, lines, Math.max(b.sets ?? 1, 1)),
-            result,
-            saving: false,
-          }
-        : null,
+      wod: scored ? wodCard(i + 1, b.score_type!, emomRounds(b), Math.max(b.sets ?? 1, 1), lines, result, exercises) : null,
     }
   })
   // A score logged for a block that is no longer a WOD, or no longer there, is kept apart too.
@@ -390,10 +386,26 @@ export function buildCards(
       lastLoad: null,
       scored: false,
       rows: rowsFor(0, logged, null, null),
+      note: null,
     })
   }
   extras.sort((a, b) => a.blockPosition - b.blockPosition || a.position - b.position)
   return { blocks, extras, extraResults }
+}
+
+// The score card of a WOD block; an EMOM not scored yet starts from the reps logged per movement.
+function wodCard(
+  blockPosition: number,
+  scoreType: ScoreType,
+  intervals: number | null,
+  rounds: number,
+  lines: WodLine[],
+  result: WorkoutResult | null,
+  exercises: ExerciseCard[],
+): WodCard {
+  const wod: WodCard = { blockPosition, scoreType, intervals, rounds, lines, draft: scoreDraft(result, lines, rounds), result, saving: false }
+  if (scoreType === 'emom' && !result) fillEmomScore(wod, exercises)
+  return wod
 }
 
 // The exercises of a WOD block in plan order, one line each.
@@ -469,4 +481,53 @@ export function listMark(wod: WodCard): { step: number; reps: number } | null {
   if (!wod.draft.capped || !takesProgress(wod)) return null
   const p = clampProgress(wod.lines, wod.rounds, wod.draft.progress)
   return { step: p.step, reps: p.reps }
+}
+
+// An EMOM is done one movement per interval, so a round is one pass through its movements (an
+// EMOM of 12:00 with 4 movements has 3 rounds); the last round is short when the intervals don't
+// divide evenly. Without known intervals, the block's rounds.
+export function emomRoundCount(wod: WodCard): number {
+  const n = wod.lines.length
+  return wod.intervals && n ? Math.ceil(wod.intervals / n) : wod.rounds
+}
+
+// The movements (indexes into lines) done in a round, from 1.
+export function emomLinesIn(wod: WodCard, round: number): number[] {
+  const n = wod.lines.length
+  const done = wod.intervals ? wod.intervals - (round - 1) * n : n
+  return wod.lines.map((_, i) => i).filter((i) => i < done)
+}
+
+// The reps logged per round and movement of an EMOM ([round - 1][line]): its exercises' sets, the
+// set number being the round.
+export function emomReps(wod: WodCard, cards: ExerciseCard[]): (number | null)[][] {
+  return Array.from({ length: emomRoundCount(wod) }, (_, r) =>
+    wod.lines.map((line) => {
+      const row = cards.find((c) => c.key === line.key)?.rows.find((x) => x.number === r + 1)
+      return row?.logged?.reps_value ?? null
+    }),
+  )
+}
+
+// The reps of all rounds together.
+export const repsTotal = (grid: (number | null)[][]): number => grid.flat().reduce<number>((sum, v) => sum + (v ?? 0), 0)
+
+// An EMOM with reps logged per movement is scored by them: their total, and as its rounds the
+// intervals that have reps (an interval without any wasn't done). Without reps logged it keeps the
+// rounds entered by hand, and no total.
+export function fillEmomScore(wod: WodCard, cards: ExerciseCard[]) {
+  const grid = emomReps(wod, cards)
+  if (!grid.flat().some((v) => v !== null)) {
+    wod.draft.reps = null
+    return
+  }
+  wod.draft.reps = repsTotal(grid)
+  wod.draft.rounds = grid.flatMap((r, n) => emomLinesIn(wod, n + 1).filter((i) => (r[i] ?? 0) > 0)).length
+}
+
+// Gives each card the note on the exercise at its place in the session, if any.
+export function attachNotes(cards: ExerciseCard[], notes: ExerciseNote[]) {
+  for (const card of cards) {
+    card.note = notes.find((n) => n.block_position === card.blockPosition && n.exercise_position === card.position && n.exercise_id === card.exerciseId) ?? null
+  }
 }

@@ -85,3 +85,17 @@ RETURNING *;
 -- name: DeleteWorkoutResult :execrows
 DELETE FROM tracking.workout_results
 WHERE id = $1 AND workout_id = $2;
+
+-- name: UpsertExerciseNote :one
+-- Notes an exercise of the workout, or replaces the note it had at that place.
+INSERT INTO tracking.workout_exercise_notes (workout_id, exercise_id, block_position, exercise_position, notes)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (workout_id, block_position, exercise_position)
+DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
+              notes = EXCLUDED.notes,
+              updated_at = now()
+RETURNING *;
+
+-- name: DeleteExerciseNote :execrows
+DELETE FROM tracking.workout_exercise_notes
+WHERE id = $1 AND workout_id = $2;

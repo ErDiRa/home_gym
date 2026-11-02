@@ -149,6 +149,47 @@ func TestWodScore(t *testing.T) {
 	}
 }
 
+// A note on an exercise of a workout: noting it again replaces it; it shows with the workout and
+// only the user's own workout takes one.
+func TestExerciseNotes(t *testing.T) {
+	t.Parallel()
+	u, other := newUser(t), newUser(t)
+	ctx := t.Context()
+	exercise, reps := createExercise(t, u, exerciseInput("Row Erg")), repsUnit(t, u)
+	activeTraining(t, u, exercise, reps)
+	started, _ := u.Tracking.StartWorkoutWithResponse(ctx, trackingclient.StartWorkoutRequest{WeekSessionId: week(t, u, nil).Planned[0].Id})
+	workout := started.JSON201.Id
+
+	note := func(u user, text string) *trackingclient.NoteExerciseResponse {
+		t.Helper()
+		resp, err := u.Tracking.NoteExerciseWithResponse(ctx, workout, trackingclient.ExerciseNoteInput{
+			ExerciseId: exercise, BlockPosition: 1, ExercisePosition: 1, Notes: text,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+	first := note(u, "BikeErg instead")
+	again := note(u, " BikeErg, avg HR 132 ")
+	if first.StatusCode() != http.StatusOK || again.StatusCode() != http.StatusOK || again.JSON200.Id != first.JSON200.Id {
+		t.Fatalf("note = %s, again %s", body(first.Body), body(again.Body))
+	}
+	got, _ := u.Tracking.GetWorkoutWithResponse(ctx, workout)
+	if n := got.JSON200.ExerciseNotes; len(n) != 1 || n[0].Notes != "BikeErg, avg HR 132" || n[0].ExerciseId != exercise {
+		t.Errorf("notes = %+v", n)
+	}
+	if resp := note(other, "x"); resp.StatusCode() != http.StatusNotFound {
+		t.Errorf("note another user's workout = %d", resp.StatusCode())
+	}
+	if resp := note(u, " "); resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("blank note = %d", resp.StatusCode())
+	}
+	if resp, _ := u.Tracking.DeleteExerciseNoteWithResponse(ctx, workout, first.JSON200.Id); resp.StatusCode() != http.StatusNoContent {
+		t.Errorf("delete note = %d", resp.StatusCode())
+	}
+}
+
 func TestMaxes(t *testing.T) {
 	t.Parallel()
 	u := newUser(t)

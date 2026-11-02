@@ -257,6 +257,42 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/exercise-notes:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    put:
+      operationId: NoteExercise
+      tags: [workouts]
+      summary: Note an exercise as it was done in the workout, or replace the note it had.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExerciseNoteInput" }
+      responses:
+        "200":
+          description: The note as stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseNote" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /workouts/{id}/exercise-notes/{noteID}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: noteID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: DeleteExerciseNote
+      tags: [workouts]
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /workouts/{id}/results/{resultID}:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -460,7 +496,8 @@ components:
       description: |
         The score of a WOD block as done, at its place in the session (from 1). score_type is the
         format as planned and decides which values are kept: for_time time_seconds (or reps when
-        capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
+        capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds (+ the total
+        reps done in them, optional).
       required: [block_position, score_type, time_seconds, rounds, reps, calories, notes]
       properties:
         block_position: { type: integer, format: int32 }
@@ -484,10 +521,29 @@ components:
         calories: { type: integer, format: int32, nullable: true }
         notes: { type: string }
         completed_at: { type: string, format: date-time }
+    ExerciseNoteInput:
+      type: object
+      description: A note on an exercise as it was done, at its place in the session (from 1) like its sets.
+      required: [exercise_id, block_position, exercise_position, notes]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        block_position: { type: integer, format: int32 }
+        exercise_position: { type: integer, format: int32 }
+        notes: { type: string, description: "Not blank, at most 1000 characters." }
+    ExerciseNote:
+      type: object
+      required: [id, exercise_id, block_position, exercise_position, notes, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        exercise_id: { type: string, format: uuid }
+        block_position: { type: integer, format: int32 }
+        exercise_position: { type: integer, format: int32 }
+        notes: { type: string }
+        updated_at: { type: string, format: date-time }
     Workout:
       type: object
       description: A session done, started from a slot of a week. The ids become null when the training, slot or session is deleted later.
-      required: [id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, sets, results]
+      required: [id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes, sets, results, exercise_notes]
       properties:
         id: { type: string, format: uuid }
         training_id: { type: string, format: uuid, nullable: true }
@@ -499,6 +555,7 @@ components:
         notes: { type: string }
         sets: { type: array, items: { $ref: "#/components/schemas/WorkoutSet" } }
         results: { type: array, items: { $ref: "#/components/schemas/WorkoutResult" } }
+        exercise_notes: { type: array, items: { $ref: "#/components/schemas/ExerciseNote" } }
     WorkoutSummary:
       type: object
       description: A finished workout as listed.

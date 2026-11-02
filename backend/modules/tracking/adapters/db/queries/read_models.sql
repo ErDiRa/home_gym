@@ -28,6 +28,12 @@ SELECT * FROM tracking.workout_sets
 WHERE workout_id = $1
 ORDER BY block_position, exercise_position, set_number;
 
+-- name: ListExerciseNotes :many
+-- The notes on a workout's exercises, in the order of the session.
+SELECT * FROM tracking.workout_exercise_notes
+WHERE workout_id = $1
+ORDER BY block_position, exercise_position;
+
 -- name: ListWorkoutResults :many
 -- The scores of a workout's WOD blocks, in the order of the session.
 SELECT * FROM tracking.workout_results

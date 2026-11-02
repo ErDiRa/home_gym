@@ -30,7 +30,7 @@ const (
 //	amrap         Rounds, plus the Reps of the unfinished round (optional)
 //	max_reps      Reps
 //	max_calories  Calories
-//	emom          Rounds: the intervals completed
+//	emom          Rounds: the intervals completed, plus the Reps done in them all (optional)
 //
 // The others are dropped.
 type ResultInput struct {
@@ -113,8 +113,11 @@ func checkResult(in *ResultInput) error {
 		in.TimeSeconds, in.Rounds, in.Reps = nil, nil, nil
 		msg = required("calories", "enter the calories", in.Calories, maxResultCount)
 	case scoreEMOM:
-		in.TimeSeconds, in.Reps, in.Calories = nil, nil, nil
+		in.TimeSeconds, in.Calories = nil, nil
 		msg = required("rounds", "enter the rounds completed", in.Rounds, maxResultRounds)
+		if msg == "" && in.Reps != nil {
+			msg = inRange("reps", in.Reps, 0, maxResultCount)
+		}
 	default:
 		return errs.Invalid("unknown score type")
 	}

@@ -58,7 +58,7 @@ func (m *ReadModel) Workouts(ctx context.Context, userID uuid.UUID, from, to tim
 }
 
 // Workout is one of the user's live workouts with its sets (with the names of their exercise and
-// units) and WOD scores, in the order of the session.
+// units), WOD scores and notes on exercises, in the order of the session.
 func (m *ReadModel) Workout(ctx context.Context, userID, id uuid.UUID) (trackinghttp.Workout, error) {
 	w, err := m.q.GetWorkout(ctx, dbmodels.GetWorkoutParams{ID: id, UserID: userID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -72,6 +72,10 @@ func (m *ReadModel) Workout(ctx context.Context, userID, id uuid.UUID) (tracking
 		return trackinghttp.Workout{}, err
 	}
 	results, err := m.q.ListWorkoutResults(ctx, id)
+	if err != nil {
+		return trackinghttp.Workout{}, err
+	}
+	notes, err := m.q.ListExerciseNotes(ctx, id)
 	if err != nil {
 		return trackinghttp.Workout{}, err
 	}
@@ -109,6 +113,12 @@ func (m *ReadModel) Workout(ctx context.Context, userID, id uuid.UUID) (tracking
 				Id: r.ID, WorkoutId: r.WorkoutID, BlockPosition: r.BlockPosition, ScoreType: trackinghttp.ScoreType(r.ScoreType),
 				TimeSeconds: r.TimeSeconds, Rounds: r.Rounds, Reps: r.Reps, Calories: r.Calories, Notes: r.Notes,
 				CompletedAt: r.CompletedAt,
+			}
+		}),
+		ExerciseNotes: mapSlice(notes, func(n dbmodels.TrackingWorkoutExerciseNote) trackinghttp.ExerciseNote {
+			return trackinghttp.ExerciseNote{
+				Id: n.ID, ExerciseId: n.ExerciseID, BlockPosition: n.BlockPosition, ExercisePosition: n.ExercisePosition,
+				Notes: n.Notes, UpdatedAt: n.UpdatedAt,
 			}
 		}),
 	}, nil

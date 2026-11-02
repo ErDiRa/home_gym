@@ -37,6 +37,7 @@ type fakeRepo struct {
 	done       []WorkoutSummary
 	sets       []SetInput
 	results    []ResultInput
+	notes      []ExerciseNoteInput
 	maxes      []MaxInput
 	ownedSet   uuid.UUID
 }
@@ -89,6 +90,15 @@ func (f *fakeRepo) LogResult(_ context.Context, workoutID uuid.UUID, in ResultIn
 }
 
 func (f *fakeRepo) DeleteResult(context.Context, uuid.UUID, uuid.UUID) error { return ErrNotFound }
+
+func (f *fakeRepo) NoteExercise(_ context.Context, _ uuid.UUID, in ExerciseNoteInput) (ExerciseNote, error) {
+	f.notes = append(f.notes, in)
+	return ExerciseNote{ID: uuid.New(), ExerciseID: in.ExerciseID, Notes: in.Notes}, nil
+}
+
+func (f *fakeRepo) DeleteExerciseNote(context.Context, uuid.UUID, uuid.UUID) error {
+	return ErrNotFound
+}
 
 func (f *fakeRepo) CreateMax(_ context.Context, _, _ uuid.UUID, in MaxInput, _ time.Time) (uuid.UUID, error) {
 	f.maxes = append(f.maxes, in)

@@ -38,6 +38,11 @@
         Calories
         <TextInput v-model.number="wod.draft.calories" v-bind="countInput" aria-label="Calories" class="mt-1 w-24!" />
       </label>
+      <!-- An EMOM with reps per movement is scored by them; else by the rounds completed. -->
+      <p v-else-if="wod.draft.reps !== null" class="text-base text-slate-600">
+        <span class="font-semibold text-slate-900">{{ wod.draft.reps }}</span> reps in {{ wod.draft.rounds ?? 0 }}
+        <template v-if="wod.intervals">of {{ wod.intervals }}</template> intervals
+      </p>
       <label v-else class="text-xs font-medium text-slate-500">
         Rounds completed
         <span class="mt-1 flex items-center gap-2">

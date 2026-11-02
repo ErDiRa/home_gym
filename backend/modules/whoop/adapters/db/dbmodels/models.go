@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type CatalogBlockKind struct {
@@ -238,6 +237,7 @@ type TrackingExerciseMax struct {
 	Notes        string
 	CreatedAt    time.Time
 	DeletedAt    *time.Time
+	Reps         int32
 }
 
 type TrackingWorkout struct {
@@ -253,6 +253,16 @@ type TrackingWorkout struct {
 	DeletedAt     *time.Time
 }
 
+type TrackingWorkoutExerciseNote struct {
+	ID               uuid.UUID
+	WorkoutID        uuid.UUID
+	ExerciseID       uuid.UUID
+	BlockPosition    int32
+	ExercisePosition int32
+	Notes            string
+	UpdatedAt        time.Time
+}
+
 type TrackingWorkoutLog struct {
 	UserEmail     string
 	DoneOn        time.Time
@@ -266,7 +276,6 @@ type TrackingWorkoutLog struct {
 	Reps          bool
 	Load          bool
 	Score         *string
-	Rx            pgtype.Bool
 	Notes         *string
 	WorkoutNotes  string
 	StartedAt     time.Time
@@ -291,7 +300,6 @@ type TrackingWorkoutResult struct {
 	Rounds        *int32
 	Reps          *int32
 	Calories      *int32
-	Rx            bool
 	Notes         string
 	CompletedAt   time.Time
 }

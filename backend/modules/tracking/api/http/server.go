@@ -246,6 +246,37 @@ func (s *Server) LogResult(ctx context.Context, req LogResultRequestObject) (Log
 	}, nil
 }
 
+// NoteExercise stores a note on an exercise of a workout, or replaces the one it had.
+func (s *Server) NoteExercise(ctx context.Context, req NoteExerciseRequestObject) (NoteExerciseResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b := req.Body
+	n, err := s.service.NoteExercise(ctx, userID, req.Id, app.ExerciseNoteInput{
+		ExerciseID: b.ExerciseId, BlockPosition: b.BlockPosition, ExercisePosition: b.ExercisePosition, Notes: b.Notes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return NoteExercise200JSONResponse{
+		Id: n.ID, ExerciseId: n.ExerciseID, BlockPosition: n.BlockPosition, ExercisePosition: n.ExercisePosition,
+		Notes: n.Notes, UpdatedAt: n.UpdatedAt,
+	}, nil
+}
+
+// DeleteExerciseNote removes a note from an exercise of a workout.
+func (s *Server) DeleteExerciseNote(ctx context.Context, req DeleteExerciseNoteRequestObject) (DeleteExerciseNoteResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.service.DeleteExerciseNote(ctx, userID, req.Id, req.NoteID); err != nil {
+		return nil, err
+	}
+	return DeleteExerciseNote204Response{}, nil
+}
+
 // DeleteResult removes the score of a WOD block from a workout.
 func (s *Server) DeleteResult(ctx context.Context, req DeleteResultRequestObject) (DeleteResultResponseObject, error) {
 	userID, err := web.CurrentUser(ctx)

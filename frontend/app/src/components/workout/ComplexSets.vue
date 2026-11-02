@@ -20,21 +20,21 @@
     <!-- One row per round: reps and load for every movement (on bodyweight only the reps, until
          weight is added), and a button that logs, saves or undoes the whole round. -->
     <div
-      :class="['mt-2 grid items-center gap-x-2 gap-y-1.5', first.showLoad ? 'grid-cols-[2rem_1fr_1fr_2.75rem]' : 'grid-cols-[2rem_1fr_2.75rem]']"
+      :class="['mt-3 grid items-center gap-x-3 gap-y-2', first.showLoad ? 'grid-cols-[2rem_1fr_1fr_2.75rem]' : 'grid-cols-[2rem_1fr_2.75rem]']"
     >
-      <span class="text-xs font-medium text-slate-500">Set</span>
-      <span class="text-xs font-medium text-slate-500">{{ first.repsUnitName || 'reps' }}{{ first.perSide ? ' / side' : '' }}</span>
+      <span class="text-center text-xs font-medium text-slate-500">Set</span>
+      <span class="pl-3 text-xs font-medium text-slate-500">{{ first.repsUnitName || 'reps' }}{{ first.perSide ? ' / side' : '' }}</span>
       <div v-if="first.showLoad" class="flex min-w-0 items-center gap-1">
-        <span v-if="first.bodyweight" class="shrink-0 text-xs font-medium text-slate-500">BW +</span>
+        <span v-if="first.bodyweight" class="shrink-0 pl-3 text-xs font-medium text-slate-500">BW +</span>
         <SelectField
           class="min-w-0 flex-1"
           :model-value="first.loadUnit"
+          :field-class="`h-7! border-transparent! bg-transparent! ${first.bodyweight ? 'pl-0!' : 'pl-3!'} text-xs! font-medium text-slate-500!`"
           :options="loadUnits"
           :searchable="false"
           size="sm"
           option-size="touch"
           :aria-label="`Block ${block.letter} load unit`"
-          field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
           @update:model-value="switchUnit"
         />
       </div>
@@ -81,7 +81,9 @@
         </AppButton>
       </template>
     </div>
-    <div class="mt-1 -ml-3 flex flex-wrap">
+    <!-- One note for the whole complex, kept on its first movement. -->
+    <ExerciseNote ref="noteRef" v-model="block.exercises[0]" :workout-id="workoutId" />
+    <div class="mt-2 -ml-3 flex flex-wrap">
       <AppButton variant="text" size="touch" @click="addRound">
         <PlusIcon class="size-4" aria-hidden="true" />
         Add set
@@ -90,17 +92,22 @@
         <PlusIcon class="size-4" aria-hidden="true" />
         Add weight
       </AppButton>
+      <AppButton v-if="!first.note && !noteRef?.editing" variant="text" size="touch" @click="noteRef?.edit()">
+        <ChatBubbleBottomCenterTextIcon class="size-4" aria-hidden="true" />
+        Add note
+      </AppButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ArrowPathIcon, CheckIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { computed, useTemplateRef } from 'vue'
+import { ArrowPathIcon, ChatBubbleBottomCenterTextIcon, CheckIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../button/AppButton.vue'
 import SelectField from '../form/SelectField.vue'
 import TextInput from '../form/TextInput.vue'
 import ExerciseActions from './ExerciseActions.vue'
+import ExerciseNote from './ExerciseNote.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { convertLoad, roundLoad } from '../exercise/maxes'
@@ -110,7 +117,9 @@ import { num, roundsOf, roundState, suggestedLoad, type BlockCard, type Round } 
 // round. Every movement keeps its own sets; a round's inputs write to all of them. Logging is up
 // to the parent, which owns the block.
 const block = defineModel<BlockCard>({ required: true })
+defineProps<{ workoutId: string }>()
 const emit = defineEmits<{ toggle: [round: Round] }>()
+const noteRef = useTemplateRef<InstanceType<typeof ExerciseNote>>('noteRef')
 const lookups = useLookupsStore()
 const exercises = useExercisesStore()
 

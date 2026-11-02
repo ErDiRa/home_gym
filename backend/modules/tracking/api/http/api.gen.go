@@ -141,6 +141,26 @@ type ExerciseMaxInput struct {
 	WorkoutSetId *openapi_types.UUID `json:"workout_set_id,omitempty"`
 }
 
+// ExerciseNote defines model for ExerciseNote.
+type ExerciseNote struct {
+	BlockPosition    int32              `json:"block_position"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExercisePosition int32              `json:"exercise_position"`
+	Id               openapi_types.UUID `json:"id"`
+	Notes            string             `json:"notes"`
+	UpdatedAt        time.Time          `json:"updated_at"`
+}
+
+// ExerciseNoteInput A note on an exercise as it was done, at its place in the session (from 1) like its sets.
+type ExerciseNoteInput struct {
+	BlockPosition    int32              `json:"block_position"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExercisePosition int32              `json:"exercise_position"`
+
+	// Notes Not blank, at most 1000 characters.
+	Notes string `json:"notes"`
+}
+
 // ExerciseStat defines model for ExerciseStat.
 type ExerciseStat struct {
 	ExerciseId     openapi_types.UUID `json:"exercise_id"`
@@ -202,7 +222,8 @@ type PlannedSlot struct {
 
 // ResultInput The score of a WOD block as done, at its place in the session (from 1). score_type is the
 // format as planned and decides which values are kept: for_time time_seconds (or reps when
-// capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
+// capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds (+ the total
+// reps done in them, optional).
 type ResultInput struct {
 	BlockPosition int32  `json:"block_position"`
 	Calories      *int32 `json:"calories"`
@@ -293,6 +314,7 @@ type WeekCycleGoal struct {
 type Workout struct {
 	// CompletedAt null while in progress
 	CompletedAt   *time.Time          `json:"completed_at"`
+	ExerciseNotes []ExerciseNote      `json:"exercise_notes"`
 	Id            openapi_types.UUID  `json:"id"`
 	Notes         string              `json:"notes"`
 	Results       []WorkoutResult     `json:"results"`
@@ -406,6 +428,9 @@ type AddExerciseMaxJSONRequestBody = ExerciseMaxInput
 // StartWorkoutJSONRequestBody defines body for StartWorkout for application/json ContentType.
 type StartWorkoutJSONRequestBody = StartWorkoutRequest
 
+// NoteExerciseJSONRequestBody defines body for NoteExercise for application/json ContentType.
+type NoteExerciseJSONRequestBody = ExerciseNoteInput
+
 // FinishWorkoutJSONRequestBody defines body for FinishWorkout for application/json ContentType.
 type FinishWorkoutJSONRequestBody = FinishWorkoutRequest
 
@@ -447,6 +472,12 @@ type ServerInterface interface {
 
 	// (GET /workouts/{id})
 	GetWorkout(w http.ResponseWriter, r *http.Request, id ID)
+	// NoteExercise Note an exercise as it was done in the workout, or replace the note it had.
+	// (PUT /workouts/{id}/exercise-notes)
+	NoteExercise(w http.ResponseWriter, r *http.Request, id ID)
+
+	// (DELETE /workouts/{id}/exercise-notes/{noteID})
+	DeleteExerciseNote(w http.ResponseWriter, r *http.Request, id ID, noteID openapi_types.UUID)
 	// FinishWorkout Finish a workout (a finished one only gets the notes), optionally dated to another day.
 	// (POST /workouts/{id}/finish)
 	FinishWorkout(w http.ResponseWriter, r *http.Request, id ID)
@@ -523,6 +554,17 @@ func (_ Unimplemented) DeleteWorkout(w http.ResponseWriter, r *http.Request, id 
 
 // (GET /workouts/{id})
 func (_ Unimplemented) GetWorkout(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// NoteExercise Note an exercise as it was done in the workout, or replace the note it had.
+// (PUT /workouts/{id}/exercise-notes)
+func (_ Unimplemented) NoteExercise(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /workouts/{id}/exercise-notes/{noteID})
+func (_ Unimplemented) DeleteExerciseNote(w http.ResponseWriter, r *http.Request, id ID, noteID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -841,6 +883,67 @@ func (siw *ServerInterfaceWrapper) GetWorkout(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// NoteExercise operation middleware
+func (siw *ServerInterfaceWrapper) NoteExercise(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.NoteExercise(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteExerciseNote operation middleware
+func (siw *ServerInterfaceWrapper) DeleteExerciseNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "noteID" -------------
+	var noteID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "noteID", chi.URLParam(r, "noteID"), &noteID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "noteID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteExerciseNote(w, r, id, noteID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // FinishWorkout operation middleware
 func (siw *ServerInterfaceWrapper) FinishWorkout(w http.ResponseWriter, r *http.Request) {
 
@@ -1143,6 +1246,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/workouts/{id}/results", wrapper.LogResult)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/workouts/{id}/exercise-notes", wrapper.NoteExercise)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/workouts/{id}/exercise-notes/{noteID}", wrapper.DeleteExerciseNote)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/workouts/{id}/results/{resultID}", wrapper.DeleteResult)
@@ -1671,6 +1780,130 @@ func (response GetWorkout404JSONResponse) VisitGetWorkoutResponse(w http.Respons
 	return err
 }
 
+type NoteExerciseRequestObject struct {
+	Id   ID `json:"id"`
+	Body *NoteExerciseJSONRequestBody
+}
+
+type NoteExerciseResponseObject interface {
+	VisitNoteExerciseResponse(w http.ResponseWriter) error
+}
+
+type NoteExercise200JSONResponse ExerciseNote
+
+func (response NoteExercise200JSONResponse) VisitNoteExerciseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type NoteExercise400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response NoteExercise400JSONResponse) VisitNoteExerciseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type NoteExercise401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response NoteExercise401JSONResponse) VisitNoteExerciseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type NoteExercise404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response NoteExercise404JSONResponse) VisitNoteExerciseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExerciseNoteRequestObject struct {
+	Id     ID                 `json:"id"`
+	NoteID openapi_types.UUID `json:"noteID"`
+}
+
+type DeleteExerciseNoteResponseObject interface {
+	VisitDeleteExerciseNoteResponse(w http.ResponseWriter) error
+}
+
+type DeleteExerciseNote204Response struct {
+}
+
+func (response DeleteExerciseNote204Response) VisitDeleteExerciseNoteResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteExerciseNote400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteExerciseNote400JSONResponse) VisitDeleteExerciseNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExerciseNote401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteExerciseNote401JSONResponse) VisitDeleteExerciseNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExerciseNote404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteExerciseNote404JSONResponse) VisitDeleteExerciseNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type FinishWorkoutRequestObject struct {
 	Id   ID `json:"id"`
 	Body *FinishWorkoutJSONRequestBody
@@ -2016,6 +2249,12 @@ type StrictServerInterface interface {
 
 	// (GET /workouts/{id})
 	GetWorkout(ctx context.Context, request GetWorkoutRequestObject) (GetWorkoutResponseObject, error)
+	// NoteExercise Note an exercise as it was done in the workout, or replace the note it had.
+	// (PUT /workouts/{id}/exercise-notes)
+	NoteExercise(ctx context.Context, request NoteExerciseRequestObject) (NoteExerciseResponseObject, error)
+
+	// (DELETE /workouts/{id}/exercise-notes/{noteID})
+	DeleteExerciseNote(ctx context.Context, request DeleteExerciseNoteRequestObject) (DeleteExerciseNoteResponseObject, error)
 	// FinishWorkout Finish a workout (a finished one only gets the notes), optionally dated to another day.
 	// (POST /workouts/{id}/finish)
 	FinishWorkout(ctx context.Context, request FinishWorkoutRequestObject) (FinishWorkoutResponseObject, error)
@@ -2331,6 +2570,66 @@ func (sh *strictHandler) GetWorkout(w http.ResponseWriter, r *http.Request, id I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetWorkoutResponseObject); ok {
 		if err := validResponse.VisitGetWorkoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// NoteExercise operation middleware
+func (sh *strictHandler) NoteExercise(w http.ResponseWriter, r *http.Request, id ID) {
+	var request NoteExerciseRequestObject
+
+	request.Id = id
+
+	var body NoteExerciseJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.NoteExercise(ctx, request.(NoteExerciseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "NoteExercise")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(NoteExerciseResponseObject); ok {
+		if err := validResponse.VisitNoteExerciseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteExerciseNote operation middleware
+func (sh *strictHandler) DeleteExerciseNote(w http.ResponseWriter, r *http.Request, id ID, noteID openapi_types.UUID) {
+	var request DeleteExerciseNoteRequestObject
+
+	request.Id = id
+	request.NoteID = noteID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteExerciseNote(ctx, request.(DeleteExerciseNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteExerciseNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteExerciseNoteResponseObject); ok {
+		if err := validResponse.VisitDeleteExerciseNoteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

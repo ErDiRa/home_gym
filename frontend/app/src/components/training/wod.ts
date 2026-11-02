@@ -94,7 +94,8 @@ export function emomRounds(score: Score): number | null {
 }
 
 // A logged score as text: "8:42", "Capped · 81 reps", "14 rounds + 7 reps", "31 reps", "48 cal",
-// "9 rounds" (or "9/10 rounds" for an EMOM of known length).
+// "9 rounds" (or "9/10 rounds" for an EMOM of known length; "164 reps · 12/12 intervals" when
+// scored by its reps per movement).
 export function scoreText(r: Pick<ResultInput, 'score_type' | 'time_seconds' | 'rounds' | 'reps' | 'calories'>, of?: number | null) {
   const n = (v: number | null, unit: string) => `${v ?? 0} ${unit}${v === 1 ? '' : 's'}`
   switch (r.score_type) {
@@ -106,8 +107,10 @@ export function scoreText(r: Pick<ResultInput, 'score_type' | 'time_seconds' | '
       return n(r.reps, 'rep')
     case 'max_calories':
       return `${r.calories ?? 0} cal`
-    case 'emom':
+    case 'emom': {
+      if (r.reps !== null) return `${n(r.reps, 'rep')} · ${of ? `${r.rounds ?? 0}/${of} intervals` : n(r.rounds, 'interval')}`
       return of ? `${r.rounds ?? 0}/${of} rounds` : n(r.rounds, 'round')
+    }
   }
 }
 

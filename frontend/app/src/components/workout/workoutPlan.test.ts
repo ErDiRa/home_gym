@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, changed, listMark, progressTotal, scoreDraft, scoreValues, takesProgress, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
+import { buildCards, changed, emomLinesIn, emomReps, emomRoundCount, fillEmomScore, listMark, progressTotal, repsTotal, scoreDraft, scoreValues, takesProgress, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -399,5 +399,62 @@ describe('a WOD', () => {
       const wod = buildCards(withFeet, [], [], () => wodKind, 'kg', wodContext).blocks[0].wod!
       expect(takesProgress(wod)).toBe(false)
     })
+  })
+})
+
+// An EMOM of 10 minutes rotating hang cleans, rope climbs and the hang cleans again: one movement a
+// minute, so 4 rounds, the last with only the first movement.
+describe('an EMOM', () => {
+  const emomSession: TrainingSession = {
+    ...wodSession,
+    blocks: [{ ...wodSession.blocks[0], score_type: 'emom', time_seconds: 600, interval_seconds: 60, exercises: wodSession.blocks[0].exercises.slice(0, 3) }],
+  }
+  const set = (position: number, round: number, reps: number): WorkoutSet => ({
+    ...cleanSet,
+    exercise_id: position === 2 ? 'rope' : 'clean',
+    exercise_position: position,
+    set_number: round,
+    reps_value: reps,
+    load_value: null,
+    load_unit: null,
+  })
+  const block = (sets: WorkoutSet[] = []) => buildCards(emomSession, sets, [], () => wodKind, 'kg', wodContext).blocks[0]
+
+  it('has a round per pass through its movements', () => {
+    const wod = block().wod!
+    expect(wod.intervals).toBe(10)
+    expect(emomRoundCount(wod)).toBe(4)
+    expect(emomLinesIn(wod, 1)).toEqual([0, 1, 2])
+    expect(emomLinesIn(wod, 4)).toEqual([0])
+  })
+
+  it('reads the reps logged per round and movement from the sets, and counts them up', () => {
+    const b = block([set(1, 1, 9), set(2, 1, 2), set(1, 2, 8), set(3, 4, 6)])
+    const grid = emomReps(b.wod!, b.exercises)
+    expect(grid).toEqual([
+      [9, 2, null],
+      [8, null, null],
+      [null, null, null],
+      [null, null, 6],
+    ])
+    expect(repsTotal(grid)).toBe(25)
+    // The sets don't count as planned sets of the block: it is done when scored.
+    expect(progressOf(b)).toEqual({ logged: 0, total: 0 })
+  })
+
+  it('is scored by the reps: their total, and the intervals with reps as its rounds', () => {
+    const b = block([set(1, 1, 9), set(2, 1, 2), set(1, 2, 8), set(2, 2, 0), set(1, 4, 6)])
+    expect(b.wod!.draft.reps).toBe(25)
+    expect(b.wod!.draft.rounds).toBe(4) // the 0 reps interval wasn't done
+    // Without reps it keeps the rounds entered by hand.
+    const empty = block()
+    empty.wod!.draft.rounds = 8
+    fillEmomScore(empty.wod!, empty.exercises)
+    expect(empty.wod!.draft).toMatchObject({ rounds: 8, reps: null })
+  })
+
+  it('sends the total reps with the rounds', () => {
+    const draft = { ...scoreDraft(null), rounds: 10, reps: 164 }
+    expect(scoreValues('emom', draft)).toEqual({ time_seconds: null, rounds: 10, reps: 164, calories: null })
   })
 })

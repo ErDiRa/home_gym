@@ -168,6 +168,41 @@ func (q *Queries) ListExerciseMaxes(ctx context.Context, userID uuid.UUID) ([]Li
 	return items, nil
 }
 
+const listExerciseNotes = `-- name: ListExerciseNotes :many
+SELECT id, workout_id, exercise_id, block_position, exercise_position, notes, updated_at FROM tracking.workout_exercise_notes
+WHERE workout_id = $1
+ORDER BY block_position, exercise_position
+`
+
+// The notes on a workout's exercises, in the order of the session.
+func (q *Queries) ListExerciseNotes(ctx context.Context, workoutID uuid.UUID) ([]TrackingWorkoutExerciseNote, error) {
+	rows, err := q.db.Query(ctx, listExerciseNotes, workoutID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TrackingWorkoutExerciseNote{}
+	for rows.Next() {
+		var i TrackingWorkoutExerciseNote
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkoutID,
+			&i.ExerciseID,
+			&i.BlockPosition,
+			&i.ExercisePosition,
+			&i.Notes,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLastLoads = `-- name: ListLastLoads :many
 SELECT DISTINCT ON (ws.exercise_id) ws.exercise_id, ws.load_value, ws.load_unit, w.completed_at
 FROM tracking.workout_sets ws

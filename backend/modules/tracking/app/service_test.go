@@ -237,8 +237,8 @@ func TestLogResult(t *testing.T) {
 			ResultInput{ScoreType: scoreMaxReps, Reps: ptr[int32](150)}},
 		{"max calories", ResultInput{ScoreType: scoreMaxCalories, Calories: ptr[int32](42), Reps: ptr[int32](1)},
 			ResultInput{ScoreType: scoreMaxCalories, Calories: ptr[int32](42)}},
-		{"emom", ResultInput{ScoreType: scoreEMOM, Rounds: ptr[int32](10), Reps: ptr[int32](4)},
-			ResultInput{ScoreType: scoreEMOM, Rounds: ptr[int32](10)}},
+		{"emom", ResultInput{ScoreType: scoreEMOM, Rounds: ptr[int32](10), Reps: ptr[int32](164), TimeSeconds: ptr[int32](600)},
+			ResultInput{ScoreType: scoreEMOM, Rounds: ptr[int32](10), Reps: ptr[int32](164)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -344,4 +344,34 @@ func TestAddMax(t *testing.T) {
 	_, err = f.s.AddMax(context.Background(), uuid.New(), uuid.New(), MaxInput{LoadValue: 100, LoadUnit: f.catalog.kg, AchievedOn: "2026-10-13"})
 	wantError(t, err, errs.KindNotFound, "exercise not found")
 	wantError(t, f.s.DeleteMax(context.Background(), uuid.New(), uuid.New()), errs.KindNotFound, "1RM not found")
+}
+
+func TestNoteExercise(t *testing.T) {
+	f := newFixture()
+	ctx := context.Background()
+	in := ExerciseNoteInput{ExerciseID: f.exercise, BlockPosition: 7, ExercisePosition: 1, Notes: "  BikeErg instead "}
+	n, err := f.s.NoteExercise(ctx, uuid.New(), f.repo.workout, in)
+	if err != nil || n.Notes != "BikeErg instead" || f.repo.notes[0].BlockPosition != 7 {
+		t.Fatalf("note = %+v, %v", n, err)
+	}
+
+	tests := []struct {
+		name    string
+		kind    errs.Kind
+		msg     string
+		workout uuid.UUID
+		in      ExerciseNoteInput
+	}{
+		{"blank", errs.KindInvalid, "enter a note", f.repo.workout, ExerciseNoteInput{ExerciseID: f.exercise, BlockPosition: 1, ExercisePosition: 1, Notes: "  "}},
+		{"no place", errs.KindInvalid, "block_position and exercise_position must be 1 or more", f.repo.workout, ExerciseNoteInput{ExerciseID: f.exercise, Notes: "x"}},
+		{"another user's exercise", errs.KindInvalid, "unknown exercise", f.repo.workout, ExerciseNoteInput{ExerciseID: uuid.New(), BlockPosition: 1, ExercisePosition: 1, Notes: "x"}},
+		{"another user's workout", errs.KindNotFound, "workout not found", uuid.New(), ExerciseNoteInput{ExerciseID: f.exercise, BlockPosition: 1, ExercisePosition: 1, Notes: "x"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := f.s.NoteExercise(ctx, uuid.New(), tt.workout, tt.in)
+			wantError(t, err, tt.kind, tt.msg)
+		})
+	}
+	wantError(t, f.s.DeleteExerciseNote(ctx, uuid.New(), f.repo.workout, uuid.New()), errs.KindNotFound, "note not found")
 }

@@ -62,6 +62,9 @@ type WorkoutRepository interface {
 	LogResult(ctx context.Context, workoutID uuid.UUID, in ResultInput) (Result, error)
 	// DeleteResult removes a score of the workout, or returns ErrNotFound.
 	DeleteResult(ctx context.Context, workoutID, resultID uuid.UUID) error
+	NoteExercise(ctx context.Context, workoutID uuid.UUID, in ExerciseNoteInput) (ExerciseNote, error)
+	// DeleteExerciseNote removes a note of the workout, or returns ErrNotFound.
+	DeleteExerciseNote(ctx context.Context, workoutID, noteID uuid.UUID) error
 }
 
 // MaxRepository saves the 1RM history.

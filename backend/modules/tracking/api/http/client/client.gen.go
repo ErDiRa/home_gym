@@ -142,6 +142,26 @@ type ExerciseMaxInput struct {
 	WorkoutSetId *openapi_types.UUID `json:"workout_set_id,omitempty"`
 }
 
+// ExerciseNote defines model for ExerciseNote.
+type ExerciseNote struct {
+	BlockPosition    int32              `json:"block_position"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExercisePosition int32              `json:"exercise_position"`
+	Id               openapi_types.UUID `json:"id"`
+	Notes            string             `json:"notes"`
+	UpdatedAt        time.Time          `json:"updated_at"`
+}
+
+// ExerciseNoteInput A note on an exercise as it was done, at its place in the session (from 1) like its sets.
+type ExerciseNoteInput struct {
+	BlockPosition    int32              `json:"block_position"`
+	ExerciseId       openapi_types.UUID `json:"exercise_id"`
+	ExercisePosition int32              `json:"exercise_position"`
+
+	// Notes Not blank, at most 1000 characters.
+	Notes string `json:"notes"`
+}
+
 // ExerciseStat defines model for ExerciseStat.
 type ExerciseStat struct {
 	ExerciseId     openapi_types.UUID `json:"exercise_id"`
@@ -203,7 +223,8 @@ type PlannedSlot struct {
 
 // ResultInput The score of a WOD block as done, at its place in the session (from 1). score_type is the
 // format as planned and decides which values are kept: for_time time_seconds (or reps when
-// capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds.
+// capped), amrap rounds + reps, max_reps reps, max_calories calories, emom rounds (+ the total
+// reps done in them, optional).
 type ResultInput struct {
 	BlockPosition int32  `json:"block_position"`
 	Calories      *int32 `json:"calories"`
@@ -294,6 +315,7 @@ type WeekCycleGoal struct {
 type Workout struct {
 	// CompletedAt null while in progress
 	CompletedAt   *time.Time          `json:"completed_at"`
+	ExerciseNotes []ExerciseNote      `json:"exercise_notes"`
 	Id            openapi_types.UUID  `json:"id"`
 	Notes         string              `json:"notes"`
 	Results       []WorkoutResult     `json:"results"`
@@ -406,6 +428,9 @@ type AddExerciseMaxJSONRequestBody = ExerciseMaxInput
 
 // StartWorkoutJSONRequestBody defines body for StartWorkout for application/json ContentType.
 type StartWorkoutJSONRequestBody = StartWorkoutRequest
+
+// NoteExerciseJSONRequestBody defines body for NoteExercise for application/json ContentType.
+type NoteExerciseJSONRequestBody = ExerciseNoteInput
 
 // FinishWorkoutJSONRequestBody defines body for FinishWorkout for application/json ContentType.
 type FinishWorkoutJSONRequestBody = FinishWorkoutRequest
@@ -553,6 +578,23 @@ type ClientInterface interface {
 
 	// GetWorkout performs a GET /workouts/{id} (the `GetWorkout` operationId) request.
 	GetWorkout(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// NoteExerciseWithBody Note an exercise as it was done in the workout, or replace the note it had.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+	NoteExerciseWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// NoteExercise Note an exercise as it was done in the workout, or replace the note it had.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+	NoteExercise(ctx context.Context, id ID, body NoteExerciseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteExerciseNote performs a DELETE /workouts/{id}/exercise-notes/{noteID} (the `DeleteExerciseNote` operationId) request.
+	DeleteExerciseNote(ctx context.Context, id ID, noteID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FinishWorkoutWithBody Finish a workout (a finished one only gets the notes), optionally dated to another day.
 	//
@@ -777,6 +819,53 @@ func (c *Client) DeleteWorkout(ctx context.Context, id ID, reqEditors ...Request
 // GetWorkout performs a GET /workouts/{id} (the `GetWorkout` operationId) request.
 func (c *Client) GetWorkout(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetWorkoutRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NoteExerciseWithBody Note an exercise as it was done in the workout, or replace the note it had.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+func (c *Client) NoteExerciseWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNoteExerciseRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NoteExercise Note an exercise as it was done in the workout, or replace the note it had.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+func (c *Client) NoteExercise(ctx context.Context, id ID, body NoteExerciseJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNoteExerciseRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteExerciseNote performs a DELETE /workouts/{id}/exercise-notes/{noteID} (the `DeleteExerciseNote` operationId) request.
+func (c *Client) DeleteExerciseNote(ctx context.Context, id ID, noteID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteExerciseNoteRequest(c.Server, id, noteID)
 	if err != nil {
 		return nil, err
 	}
@@ -1321,6 +1410,94 @@ func NewGetWorkoutRequest(server string, id ID) (*http.Request, error) {
 	return req, nil
 }
 
+// NewNoteExerciseRequest calls the generic NoteExercise builder with application/json body
+func NewNoteExerciseRequest(server string, id ID, body NoteExerciseJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewNoteExerciseRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewNoteExerciseRequestWithBody constructs an http.Request for the NoteExercise method, with any body, and a specified content type
+func NewNoteExerciseRequestWithBody(server string, id ID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workouts/%s/exercise-notes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteExerciseNoteRequest constructs an http.Request for the DeleteExerciseNote method
+func NewDeleteExerciseNoteRequest(server string, id ID, noteID openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "noteID", noteID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/workouts/%s/exercise-notes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewFinishWorkoutRequest calls the generic FinishWorkout builder with application/json body
 func NewFinishWorkoutRequest(server string, id ID, body FinishWorkoutJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1667,6 +1844,25 @@ type ClientWithResponsesInterface interface {
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetWorkoutWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetWorkoutResponse, error)
+
+	// NoteExerciseWithBodyWithResponse Note an exercise as it was done in the workout, or replace the note it had.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+	NoteExerciseWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NoteExerciseResponse, error)
+
+	// NoteExerciseWithResponse Note an exercise as it was done in the workout, or replace the note it had.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+	NoteExerciseWithResponse(ctx context.Context, id ID, body NoteExerciseJSONRequestBody, reqEditors ...RequestEditorFn) (*NoteExerciseResponse, error)
+
+	// DeleteExerciseNoteWithResponse performs a DELETE /workouts/{id}/exercise-notes/{noteID} (the `DeleteExerciseNote` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	DeleteExerciseNoteWithResponse(ctx context.Context, id ID, noteID openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteExerciseNoteResponse, error)
 
 	// FinishWorkoutWithBodyWithResponse Finish a workout (a finished one only gets the notes), optionally dated to another day.
 	//
@@ -2271,6 +2467,123 @@ func (r GetWorkoutResponse) ContentType() string {
 	return ""
 }
 
+type NoteExerciseResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExerciseNote
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r NoteExerciseResponse) GetJSON200() *ExerciseNote {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r NoteExerciseResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r NoteExerciseResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r NoteExerciseResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r NoteExerciseResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r NoteExerciseResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r NoteExerciseResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r NoteExerciseResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteExerciseNoteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteExerciseNoteResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteExerciseNoteResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteExerciseNoteResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteExerciseNoteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteExerciseNoteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteExerciseNoteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteExerciseNoteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type FinishWorkoutResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2717,6 +3030,43 @@ func (c *ClientWithResponses) GetWorkoutWithResponse(ctx context.Context, id ID,
 		return nil, err
 	}
 	return ParseGetWorkoutResponse(rsp)
+}
+
+// NoteExerciseWithBodyWithResponse Note an exercise as it was done in the workout, or replace the note it had.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+func (c *ClientWithResponses) NoteExerciseWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NoteExerciseResponse, error) {
+	rsp, err := c.NoteExerciseWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseNoteExerciseResponse(rsp)
+}
+
+// NoteExerciseWithResponse Note an exercise as it was done in the workout, or replace the note it had.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /workouts/{id}/exercise-notes (the `NoteExercise` operationId).
+func (c *ClientWithResponses) NoteExerciseWithResponse(ctx context.Context, id ID, body NoteExerciseJSONRequestBody, reqEditors ...RequestEditorFn) (*NoteExerciseResponse, error) {
+	rsp, err := c.NoteExercise(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseNoteExerciseResponse(rsp)
+}
+
+// DeleteExerciseNoteWithResponse performs a DELETE /workouts/{id}/exercise-notes/{noteID} (the `DeleteExerciseNote` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DeleteExerciseNoteWithResponse(ctx context.Context, id ID, noteID openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteExerciseNoteResponse, error) {
+	rsp, err := c.DeleteExerciseNote(ctx, id, noteID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteExerciseNoteResponse(rsp)
 }
 
 // FinishWorkoutWithBodyWithResponse Finish a workout (a finished one only gets the notes), optionally dated to another day.
@@ -3198,6 +3548,96 @@ func ParseGetWorkoutResponse(rsp *http.Response) (*GetWorkoutResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseNoteExerciseResponse parses an HTTP response from a NoteExerciseWithResponse call
+func ParseNoteExerciseResponse(rsp *http.Response) (*NoteExerciseResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &NoteExerciseResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExerciseNote
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteExerciseNoteResponse parses an HTTP response from a DeleteExerciseNoteWithResponse call
+func ParseDeleteExerciseNoteResponse(rsp *http.Response) (*DeleteExerciseNoteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteExerciseNoteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest

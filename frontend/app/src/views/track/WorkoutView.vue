@@ -54,7 +54,7 @@
           />
         </button>
         <div v-show="expanded.has(block.key)">
-          <ComplexSets v-if="block.complex" v-model="blocks[bi]" @toggle="toggleRound" />
+          <ComplexSets v-if="block.complex" v-model="blocks[bi]" :workout-id="workout.id" @toggle="toggleRound" />
           <WodMovements v-else-if="block.wod" :lines="block.wod.lines" :notes="block.notes" :mark="listMark(block.wod)" />
           <div v-else class="divide-y divide-slate-100">
             <ExerciseSets
@@ -62,9 +62,16 @@
               :key="card.key"
               v-model="block.exercises[i]"
               :done-on="doneOn"
+              :workout-id="workout.id"
               @toggle="toggle(card, $event)"
             />
           </div>
+          <EmomReps
+            v-if="block.wod?.scoreType === 'emom'"
+            :wod="block.wod"
+            :cards="block.exercises"
+            :save="(grid) => saveEmomReps(block, grid)"
+          />
           <WodResult v-if="block.wod" v-model="block.wod" @toggle="toggleScore(block.wod)" />
         </div>
       </section>
@@ -90,6 +97,7 @@
             :key="card.key"
             v-model="extras[i]"
             :done-on="doneOn"
+            :workout-id="workout.id"
             @toggle="toggle(card, $event)"
           />
           <p v-for="r in extraResults" :key="r.id" class="py-3 text-sm text-slate-700">
@@ -174,6 +182,7 @@ import { newMaxOffers } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
 import WorkoutMacros from '../../components/nutrition/WorkoutMacros.vue'
 import ComplexSets from '../../components/workout/ComplexSets.vue'
+import EmomReps from '../../components/workout/EmomReps.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'
 import WodMovements from '../../components/workout/WodMovements.vue'
@@ -182,8 +191,11 @@ import { blockLetter } from '../../components/training/trainingForm'
 import { scoreFormat, scoreText } from '../../components/training/wod'
 import { confirmDialog } from '../../confirm'
 import {
+  attachNotes,
   buildCards,
   changed,
+  emomLinesIn,
+  fillEmomScore,
   num,
   progressOf,
   roundState,
@@ -281,6 +293,7 @@ onMounted(async () => {
       },
       weightUnit: lookups.defaultUnit('load', true),
     })
+    attachNotes([...cards.blocks.flatMap((b) => b.exercises), ...cards.extras], loaded.exercise_notes)
     blocks.value = cards.blocks
     extras.value = cards.extras
     extraResults.value = cards.extraResults
@@ -387,6 +400,57 @@ async function toggleScore(wod: WodCard) {
   } finally {
     wod.saving = false
   }
+}
+
+// Logs the reps of an EMOM per round and movement as sets of its exercises (the set number is the
+// round; in reps, whatever the movement was planned in, e.g. the reps of a 20 s station), removes
+// the ones cleared, and scores the EMOM by them (fillEmomScore): saved right away when the score
+// was logged. Resolves to whether everything was saved.
+async function saveEmomReps(block: BlockCard, grid: (number | null)[][]): Promise<boolean> {
+  const wod = block.wod
+  if (!workout.value || !wod) return false
+  const id = workout.value.id
+  const repsUnit = lookups.repUnits.find((u) => u.name === 'reps')?.id
+  try {
+    await Promise.all(
+      grid.flatMap((values, r) =>
+        emomLinesIn(wod, r + 1).map(async (i) => {
+          const card = block.exercises.find((c) => c.key === wod.lines[i].key)
+          if (!card) return
+          const value = num(values[i])
+          const row = card.rows.find((x) => x.number === r + 1)
+          if (value === row?.logged?.reps_value || (value === null && !row?.logged)) return
+          if (value === null) {
+            await workouts.deleteSet(id, row!.logged!.id)
+            card.rows = card.rows.filter((x) => x !== row)
+            return
+          }
+          const logged = await workouts.logSet(id, {
+            exercise_id: card.exerciseId,
+            block_position: card.blockPosition,
+            exercise_position: card.position,
+            set_number: r + 1,
+            reps_value: value,
+            reps_unit: repsUnit ?? card.repsUnit,
+            per_side: card.perSide,
+            load_value: null,
+            load_unit: null,
+            bodyweight: false,
+            intensity_metric: null,
+            intensity_value: null,
+          })
+          if (row) Object.assign(row, { reps: value, logged })
+          else card.rows = [...card.rows, { number: r + 1, reps: value, load: null, intensity: null, logged, saving: false }].sort((a, b) => a.number - b.number)
+        }),
+      ),
+    )
+  } catch (e) {
+    toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the reps.')
+    return false
+  }
+  fillEmomScore(wod, block.exercises)
+  if (wod.result && scoreChanged(wod)) await toggleScore(wod)
+  return true
 }
 
 function toggleExpanded(key: string) {

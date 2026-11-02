@@ -32,22 +32,22 @@
          each set's average as the machine showed it (watts, cal/h or a pace). -->
     <div
       v-if="!card.scored || card.rows.length"
-      class="mt-2 grid items-center gap-x-2 gap-y-1.5"
+      class="mt-3 grid items-center gap-x-3 gap-y-2"
       :style="{ gridTemplateColumns: columns }"
     >
-      <span class="text-xs font-medium text-slate-500">Set</span>
-      <span class="text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
+      <span class="text-center text-xs font-medium text-slate-500">Set</span>
+      <span class="pl-3 text-xs font-medium text-slate-500">{{ card.repsUnitName || 'reps' }}{{ card.perSide ? ' / side' : '' }}</span>
       <div v-if="card.showLoad" class="flex min-w-0 items-center gap-1">
-        <span v-if="card.bodyweight" class="shrink-0 text-xs font-medium text-slate-500">BW +</span>
+        <span v-if="card.bodyweight" class="shrink-0 pl-3 text-xs font-medium text-slate-500">BW +</span>
         <SelectField
           class="min-w-0 flex-1"
           :model-value="card.loadUnit"
+          :field-class="`h-7! border-transparent! bg-transparent! ${card.bodyweight ? 'pl-0!' : 'pl-3!'} text-xs! font-medium text-slate-500!`"
           :options="loadUnits"
           :searchable="false"
           size="sm"
           option-size="touch"
           :aria-label="`${card.label} load unit`"
-          field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
           @update:model-value="switchUnit"
         />
       </div>
@@ -59,7 +59,7 @@
         size="sm"
         option-size="touch"
         :aria-label="`${card.label} average in`"
-        field-class="h-7! border-transparent! bg-transparent! pl-0! text-xs! font-medium text-slate-500!"
+        field-class="h-7! border-transparent! bg-transparent! pl-3! text-xs! font-medium text-slate-500!"
         @update:model-value="switchMetric"
       />
       <span />
@@ -124,7 +124,8 @@
         <AppButton variant="success" size="touch" :disabled="savingMax" @click="saveNewMax(o)">Save as {{ repsLabel(o.reps) }}</AppButton>
       </div>
     </div>
-    <div v-if="!card.scored" class="mt-1 -ml-3 flex flex-wrap">
+    <ExerciseNote ref="noteRef" v-model="card" :workout-id="workoutId" />
+    <div v-if="!card.scored" class="mt-2 -ml-3 flex flex-wrap">
       <AppButton variant="text" size="touch" @click="addSet">
         <PlusIcon class="size-4" aria-hidden="true" />
         Add set
@@ -133,13 +134,17 @@
         <PlusIcon class="size-4" aria-hidden="true" />
         Add weight
       </AppButton>
+      <AppButton v-if="!card.note && !noteRef?.editing" variant="text" size="touch" @click="noteRef?.edit()">
+        <ChatBubbleBottomCenterTextIcon class="size-4" aria-hidden="true" />
+        Add note
+      </AppButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ArrowPathIcon, CheckIcon, PlusIcon, TrophyIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, useTemplateRef, watch } from 'vue'
+import { ArrowPathIcon, ChatBubbleBottomCenterTextIcon, CheckIcon, PlusIcon, TrophyIcon } from '@heroicons/vue/24/outline'
 import { toast } from 'vue-sonner'
 import AppButton from '../button/AppButton.vue'
 import SelectField from '../form/SelectField.vue'
@@ -147,6 +152,7 @@ import IntensityInput from '../form/IntensityInput.vue'
 import TextInput from '../form/TextInput.vue'
 import ExerciseMaxDialog from '../exercise/ExerciseMaxDialog.vue'
 import ExerciseActions from './ExerciseActions.vue'
+import ExerciseNote from './ExerciseNote.vue'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { convertLoad, estimateOneRm, formatLoad, repsLabel, roundLoad, type MaxOffer } from '../exercise/maxes'
@@ -157,7 +163,8 @@ import type { IntensityMetric, LoggedSet, WorkoutSet } from '../../types'
 // An exercise of the workout with its sets. Logging is up to the parent, which owns the card;
 // doneOn is the workout's day, the day a 1RM saved from it was lifted.
 const card = defineModel<ExerciseCard>({ required: true })
-const props = defineProps<{ doneOn: string }>()
+const props = defineProps<{ doneOn: string; workoutId: string }>()
+const noteRef = useTemplateRef<InstanceType<typeof ExerciseNote>>('noteRef')
 const emit = defineEmits<{ toggle: [row: SetRow] }>()
 const lookups = useLookupsStore()
 const exercises = useExercisesStore()

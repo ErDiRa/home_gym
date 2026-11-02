@@ -1,6 +1,13 @@
 <template>
   <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="body-heading">
-    <h2 id="body-heading" class="font-semibold text-slate-900">Body</h2>
+    <div class="flex items-baseline justify-between gap-2">
+      <h2 id="body-heading" class="font-semibold text-slate-900">Body</h2>
+      <!-- Changes save on their own; this confirms it. -->
+      <p class="flex items-center gap-1 text-xs text-slate-500" aria-live="polite">
+        <template v-if="status === 'saving'">Saving…</template>
+        <template v-else-if="status === 'saved'"><CheckIcon class="size-4 text-emerald-600" aria-hidden="true" /> Saved</template>
+      </p>
+    </div>
     <p class="mt-1 text-sm text-slate-600">
       For the daily nutrition targets: an estimate to keep your weight, from your body, your weight and body fat, your
       workouts and, when connected, the energy WHOOP measured. Not medical advice.
@@ -8,19 +15,31 @@
 
     <p v-if="!store.profileLoaded" class="mt-3 text-sm text-slate-500">Loading…</p>
     <form v-else class="mt-3 space-y-3" @submit.prevent="saveProfile">
+      <p v-if="!store.profile" class="text-sm text-slate-500">Saved once height, birth date and sex are entered.</p>
       <div class="grid grid-cols-2 gap-3">
         <label class="block text-sm font-medium text-slate-800">
           Height (cm)
-          <TextInput v-model.number="draft.height_cm" type="number" inputmode="decimal" min="100" max="250" step="any" required size="touch" class="mt-1" />
+          <TextInput
+            v-model.number="draft.height_cm"
+            type="number"
+            inputmode="decimal"
+            min="100"
+            max="250"
+            step="any"
+            required
+            size="touch"
+            class="mt-1"
+            @change="saveProfile"
+          />
         </label>
         <label class="block text-sm font-medium text-slate-800">
           Born on
-          <TextInput v-model="draft.birth_date" type="date" required size="touch" :max="today()" class="mt-1" />
+          <TextInput v-model="draft.birth_date" type="date" required size="touch" :max="today()" class="mt-1" @change="saveProfile" />
         </label>
       </div>
       <div class="text-sm font-medium text-slate-800">
         <p>Sex</p>
-        <SegmentedControl v-model="draft.sex" :options="sexOptions" label="Sex" class="mt-1" />
+        <SegmentedControl v-model="draft.sex" :options="sexOptions" label="Sex" class="mt-1" @update:model-value="saveProfile" />
       </div>
       <SelectField
         v-model="activity"
@@ -28,10 +47,8 @@
         :searchable="false"
         label="Your day outside training"
         size="touch"
+        @update:model-value="saveProfile"
       />
-      <AppButton type="submit" size="touch" class="w-full" :disabled="!draft.sex || saving">
-        {{ saving ? 'Saving…' : store.profile ? 'Save body' : 'Save' }}
-      </AppButton>
     </form>
 
     <!-- The weight history: the newest weight (and body fat) is the one the targets use from its day
@@ -75,7 +92,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { TrashIcon } from '@heroicons/vue/24/outline'
+import { CheckIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { toast } from 'vue-sonner'
 import { ApiError } from '../../api'
 import { confirmDialog } from '../../confirm'
@@ -116,7 +133,8 @@ const activityOptions = computed(() =>
     ? ACTIVITY
     : [...ACTIVITY, { id: activity.value, name: `Factor ${activity.value}` }],
 )
-const saving = ref(false)
+// Whether the last change is being saved or was saved.
+const status = ref<'' | 'saving' | 'saved'>('')
 
 const weightKg = ref<number | null>(null)
 const bodyFat = ref<number | null>(null)
@@ -139,21 +157,28 @@ onMounted(async () => {
   }
 })
 
+// Saves the profile after a change, once it is complete and valid (a height being typed or no
+// birth date yet waits for the next change) and differs from the one saved.
 async function saveProfile() {
-  if (!draft.sex || draft.height_cm === null) return
-  saving.value = true
+  const height = draft.height_cm
+  if (!draft.sex || !draft.birth_date || height === null || height < 100 || height > 250) return
+  const input = {
+    height_cm: height,
+    birth_date: draft.birth_date,
+    sex: draft.sex,
+    activity_factor: activity.value ? Number(activity.value) : undefined,
+  }
+  const p = store.profile
+  if (p && p.height_cm === input.height_cm && p.birth_date === input.birth_date && p.sex === input.sex && p.activity_factor === input.activity_factor) {
+    return
+  }
+  status.value = 'saving'
   try {
-    await store.saveProfile({
-      height_cm: draft.height_cm,
-      birth_date: draft.birth_date,
-      sex: draft.sex,
-      activity_factor: activity.value ? Number(activity.value) : undefined,
-    })
-    toast.success('Saved.')
+    await store.saveProfile(input)
+    status.value = 'saved'
   } catch (e) {
+    status.value = ''
     toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save your body.')
-  } finally {
-    saving.value = false
   }
 }
 

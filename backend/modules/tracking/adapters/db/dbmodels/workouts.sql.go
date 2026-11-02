@@ -42,6 +42,24 @@ func (q *Queries) CreateWorkout(ctx context.Context, arg CreateWorkoutParams) (u
 	return id, err
 }
 
+const deleteExerciseNote = `-- name: DeleteExerciseNote :execrows
+DELETE FROM tracking.workout_exercise_notes
+WHERE id = $1 AND workout_id = $2
+`
+
+type DeleteExerciseNoteParams struct {
+	ID        uuid.UUID
+	WorkoutID uuid.UUID
+}
+
+func (q *Queries) DeleteExerciseNote(ctx context.Context, arg DeleteExerciseNoteParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExerciseNote, arg.ID, arg.WorkoutID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteWorkout = `-- name: DeleteWorkout :execrows
 UPDATE tracking.workouts SET deleted_at = now()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
@@ -190,6 +208,46 @@ func (q *Queries) ListFinishedWorkouts(ctx context.Context, arg ListFinishedWork
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertExerciseNote = `-- name: UpsertExerciseNote :one
+INSERT INTO tracking.workout_exercise_notes (workout_id, exercise_id, block_position, exercise_position, notes)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (workout_id, block_position, exercise_position)
+DO UPDATE SET exercise_id = EXCLUDED.exercise_id,
+              notes = EXCLUDED.notes,
+              updated_at = now()
+RETURNING id, workout_id, exercise_id, block_position, exercise_position, notes, updated_at
+`
+
+type UpsertExerciseNoteParams struct {
+	WorkoutID        uuid.UUID
+	ExerciseID       uuid.UUID
+	BlockPosition    int32
+	ExercisePosition int32
+	Notes            string
+}
+
+// Notes an exercise of the workout, or replaces the note it had at that place.
+func (q *Queries) UpsertExerciseNote(ctx context.Context, arg UpsertExerciseNoteParams) (TrackingWorkoutExerciseNote, error) {
+	row := q.db.QueryRow(ctx, upsertExerciseNote,
+		arg.WorkoutID,
+		arg.ExerciseID,
+		arg.BlockPosition,
+		arg.ExercisePosition,
+		arg.Notes,
+	)
+	var i TrackingWorkoutExerciseNote
+	err := row.Scan(
+		&i.ID,
+		&i.WorkoutID,
+		&i.ExerciseID,
+		&i.BlockPosition,
+		&i.ExercisePosition,
+		&i.Notes,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertWorkoutResult = `-- name: UpsertWorkoutResult :one
