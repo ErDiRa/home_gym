@@ -22,6 +22,7 @@ import (
 	"github.com/erdira/homegym/backend/common/web"
 	"github.com/erdira/homegym/backend/modules/catalog"
 	"github.com/erdira/homegym/backend/modules/identity"
+	"github.com/erdira/homegym/backend/modules/nutrition"
 	"github.com/erdira/homegym/backend/modules/planning"
 	"github.com/erdira/homegym/backend/modules/tracking"
 	"github.com/erdira/homegym/backend/modules/whoop"
@@ -71,6 +72,7 @@ func New(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, cfg Confi
 		planning.NewModule(pool, moduleContracts),
 		tracking.NewModule(pool, moduleContracts),
 		whoop.NewModule(pool, moduleContracts, whoop.Config{API: cfg.Whoop, SecureCookies: cfg.CookieSecure}),
+		nutrition.NewModule(pool, moduleContracts),
 	}
 	for _, m := range modules {
 		start := time.Now()

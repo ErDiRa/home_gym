@@ -31,6 +31,7 @@
                 {{ formatDay(w.completed_at) }} · {{ w.set_count }} {{ w.set_count === 1 ? 'set' : 'sets' }}
               </span>
               <span v-if="w.notes" class="mt-0.5 block truncate text-sm text-slate-600">{{ w.notes }}</span>
+              <span v-if="macrosOf(w)" class="mt-0.5 block truncate text-xs text-slate-500">{{ macrosOf(w) }}</span>
             </span>
             <ChevronRightIcon class="size-5 shrink-0 text-slate-400" aria-hidden="true" />
           </RouterLink>
@@ -48,11 +49,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import AppButton from '../../components/button/AppButton.vue'
-import { formatDay, nextWeek, weekStart } from '../../dates'
+import { macrosLine } from '../../components/nutrition/macros'
+import { formatDay, nextWeek, toIso, today, weekStart } from '../../dates'
+import { useNutritionStore } from '../../stores/nutrition'
 import { useWorkoutsStore } from '../../stores/workouts'
-import type { WorkoutSummary } from '../../types'
+import type { DayMacros, WorkoutSummary } from '../../types'
 
 const store = useWorkoutsStore()
+const nutrition = useNutritionStore()
 const STEP = 8 // weeks loaded at a time
 const MAX_WEEKS = 52 // the server lists at most a year at once
 
@@ -60,6 +64,14 @@ const weeks = ref(STEP)
 const workouts = ref<WorkoutSummary[]>([])
 const loading = ref(false)
 const error = ref('')
+// The macros logged per day (YYYY-MM-DD) of the weeks shown.
+const macros = ref(new Map<string, DayMacros>())
+
+// The macros of a workout's day, as a compact line.
+function macrosOf(w: WorkoutSummary): string {
+  const m = macros.value.get(toIso(new Date(w.completed_at)))
+  return m ? `Ate ${macrosLine(m)}` : ''
+}
 
 // The local Monday a moment's week starts on, as a timestamp.
 function startOfWeek(at: string): number {
@@ -89,11 +101,23 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    workouts.value = await store.listWorkouts(weekStart(1 - weeks.value), nextWeek(weekStart()))
+    const from = weekStart(1 - weeks.value)
+    workouts.value = await store.listWorkouts(from, nextWeek(weekStart()))
+    loadMacros(toIso(from))
   } catch {
     error.value = 'Could not load your workouts.'
   } finally {
     loading.value = false
+  }
+}
+
+// The macros are an extra: without them the history just doesn't show them.
+async function loadMacros(from: string) {
+  try {
+    const days = await nutrition.listNutritionDays(from, today())
+    macros.value = new Map(days.filter((d) => d.macros).map((d) => [d.date, d.macros as DayMacros]))
+  } catch {
+    macros.value = new Map()
   }
 }
 

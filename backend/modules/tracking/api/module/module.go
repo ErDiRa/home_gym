@@ -3,6 +3,7 @@ package module
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,4 +27,19 @@ func New(pool *pgxpool.Pool) *Tracking {
 
 func (t *Tracking) UserOwnsWorkout(ctx context.Context, userID, workoutID uuid.UUID) (bool, error) {
 	return t.q.UserOwnsWorkout(ctx, dbmodels.UserOwnsWorkoutParams{ID: workoutID, UserID: userID})
+}
+
+func (t *Tracking) FinishedWorkouts(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]client.FinishedWorkout, error) {
+	rows, err := t.q.ListFinishedWorkouts(ctx, dbmodels.ListFinishedWorkoutsParams{UserID: userID, FromTime: &from, ToTime: &to})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]client.FinishedWorkout, len(rows))
+	for i, r := range rows {
+		out[i] = client.FinishedWorkout{ID: r.ID, SessionName: r.SessionName, StartedAt: r.StartedAt}
+		if r.CompletedAt != nil {
+			out[i].CompletedAt = *r.CompletedAt
+		}
+	}
+	return out, nil
 }

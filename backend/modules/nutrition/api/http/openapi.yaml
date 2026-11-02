@@ -1,0 +1,288 @@
+openapi: 3.0.3
+info:
+  title: HomeGym API – nutrition
+  version: "1.0"
+  description: |
+    What a user ate: the macros (protein, fat, carbs) per day as totals, the user's body (profile and
+    weight history) and the daily targets estimated from them for keeping the weight: the energy
+    WHOOP measured that day when connected, else an estimate from the body and the workouts
+    finished that day. Every route needs the session cookie and acts on the user's own data only.
+    Errors are `{"error": "message"}`.
+
+    This module's part of the API contract: the Go server (package http) and client (http/client)
+    and the frontend's src/openapi/nutrition.d.ts are generated from it (`task api:gen`).
+servers:
+  - url: /api
+security:
+  - cookieAuth: []
+
+paths:
+  /nutrition/profile:
+    get:
+      operationId: GetNutritionProfile
+      tags: [body]
+      summary: The user's body for the targets; null until it was entered.
+      responses:
+        "200":
+          description: The profile, or null.
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf: [{ $ref: "#/components/schemas/Profile" }]
+                nullable: true
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      operationId: SaveNutritionProfile
+      tags: [body]
+      summary: Set the user's body, replacing it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /body-weights:
+    get:
+      operationId: ListBodyWeights
+      tags: [body]
+      summary: The user's weight and body fat history, newest first.
+      responses:
+        "200":
+          description: The weights.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BodyWeight" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      operationId: SaveBodyWeight
+      tags: [body]
+      summary: Log the weight (and body fat) of a day, replacing the one logged for that day before.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BodyWeightInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BodyWeight" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /body-weights/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    delete:
+      operationId: DeleteBodyWeight
+      tags: [body]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /nutrition/days:
+    get:
+      operationId: ListNutritionDays
+      tags: [days]
+      summary: The user's days from from to to (both included, at most a year), each with its macros, target and workouts.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: The first day, YYYY-MM-DD.
+          schema: { type: string }
+        - name: to
+          in: query
+          required: true
+          description: The last day, YYYY-MM-DD.
+          schema: { type: string }
+        - name: tz
+          in: query
+          required: true
+          description: The client's time zone (IANA, e.g. Europe/Zurich), deciding the day a workout belongs to.
+          schema: { type: string }
+      responses:
+        "200":
+          description: One entry per day, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NutritionDay" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /nutrition/days/{date}:
+    parameters:
+      - name: date
+        in: path
+        required: true
+        description: The day, YYYY-MM-DD.
+        schema: { type: string }
+    put:
+      operationId: SaveDayMacros
+      tags: [days]
+      summary: Log the macros eaten on a day, replacing the ones logged for it before.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MacrosInput" }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DayMacros" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      operationId: DeleteDayMacros
+      tags: [days]
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Invalid input or a reference to something unknown.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Not signed in, or wrong credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Missing (or another user's).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: "Safe to show to the user." }
+    Sex:
+      type: string
+      description: What the energy estimate tells apart.
+      enum: [male, female]
+    ProfileInput:
+      type: object
+      required: [height_cm, birth_date, sex]
+      properties:
+        height_cm: { type: number, format: double, description: "100-250." }
+        birth_date: { type: string, description: "YYYY-MM-DD." }
+        sex: { $ref: "#/components/schemas/Sex" }
+        activity_factor: { type: number, format: double, description: "1.0-2.0: the day outside training (1.2 at a desk). Defaults to 1.3." }
+    Profile:
+      type: object
+      required: [height_cm, birth_date, sex, activity_factor, updated_at]
+      properties:
+        height_cm: { type: number, format: double }
+        birth_date: { type: string, format: date }
+        sex: { $ref: "#/components/schemas/Sex" }
+        activity_factor: { type: number, format: double }
+        updated_at: { type: string, format: date-time }
+    BodyWeightInput:
+      type: object
+      required: [measured_on, weight_kg]
+      properties:
+        measured_on: { type: string, description: "YYYY-MM-DD, not in the future." }
+        weight_kg: { type: number, format: double, description: "20-400." }
+        body_fat_percent: { type: number, format: double, nullable: true, description: "3-60, when measured too; the newest on or before a day lets the resting energy come from the lean mass." }
+        notes: { type: string }
+    BodyWeight:
+      type: object
+      required: [id, measured_on, weight_kg, body_fat_percent, notes]
+      properties:
+        id: { type: string, format: uuid }
+        measured_on: { type: string, format: date }
+        weight_kg: { type: number, format: double }
+        body_fat_percent: { type: number, format: double, nullable: true }
+        notes: { type: string }
+    MacrosInput:
+      type: object
+      description: A day's totals in grams (0-2000); each may be null, not all.
+      properties:
+        protein_g: { type: number, format: double, nullable: true }
+        fat_g: { type: number, format: double, nullable: true }
+        carbs_g: { type: number, format: double, nullable: true }
+        notes: { type: string }
+    DayMacros:
+      type: object
+      required: [date, protein_g, fat_g, carbs_g, kcal, notes, updated_at]
+      properties:
+        date: { type: string, format: date }
+        protein_g: { type: number, format: double, nullable: true }
+        fat_g: { type: number, format: double, nullable: true }
+        carbs_g: { type: number, format: double, nullable: true }
+        kcal: { type: number, format: double, description: "From the macros: 4/9/4 kcal per gram." }
+        notes: { type: string }
+        updated_at: { type: string, format: date-time }
+    EnergySource:
+      type: string
+      description: "Where a target's energy comes from: WHOOP's measurement of the day or the estimate."
+      enum: [whoop, estimate]
+    MacroTarget:
+      type: object
+      description: What to eat on a day to keep the weight (an estimate, not medical advice).
+      required: [kcal, protein_g, fat_g, carbs_g, source, weight_kg]
+      properties:
+        kcal: { type: number, format: double }
+        protein_g: { type: number, format: double }
+        fat_g: { type: number, format: double }
+        carbs_g: { type: number, format: double }
+        source: { $ref: "#/components/schemas/EnergySource" }
+        weight_kg: { type: number, format: double, description: "The weight it was computed for." }
+    DayWorkout:
+      type: object
+      required: [id, session_name, started_at, completed_at]
+      properties:
+        id: { type: string, format: uuid }
+        session_name: { type: string }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+    NutritionDay:
+      type: object
+      required: [date, macros, target, workouts]
+      properties:
+        date: { type: string, format: date }
+        macros:
+          type: object
+          allOf: [{ $ref: "#/components/schemas/DayMacros" }]
+          nullable: true
+          description: Null when none were logged.
+        target:
+          type: object
+          allOf: [{ $ref: "#/components/schemas/MacroTarget" }]
+          nullable: true
+          description: Null without a profile or a weight.
+        workouts:
+          type: array
+          description: The workouts finished that day.
+          items: { $ref: "#/components/schemas/DayWorkout" }

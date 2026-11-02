@@ -17,6 +17,7 @@ import (
 	whoopdb "github.com/erdira/homegym/backend/modules/whoop/adapters/db"
 	"github.com/erdira/homegym/backend/modules/whoop/adapters/whoopapi"
 	whoophttp "github.com/erdira/homegym/backend/modules/whoop/api/http"
+	whoopmodule "github.com/erdira/homegym/backend/modules/whoop/api/module"
 	"github.com/erdira/homegym/backend/modules/whoop/app"
 )
 
@@ -34,7 +35,8 @@ type Module struct {
 	contracts *contracts.Contracts
 	cfg       Config
 
-	server *whoophttp.Server
+	service *app.Service
+	server  *whoophttp.Server
 }
 
 // NewModule builds the module; it calls the other modules through contracts, filled in by the
@@ -50,12 +52,15 @@ func (m *Module) Init(ctx context.Context) error {
 		return err
 	}
 	repo := whoopdb.NewRepo(m.pool)
-	service := app.NewService(whoopapi.NewClient(m.cfg.API), repo, repo, trackingContract{m.contracts})
-	m.server = whoophttp.NewServer(service, m.cfg.SecureCookies)
+	m.service = app.NewService(whoopapi.NewClient(m.cfg.API), repo, repo, trackingContract{m.contracts})
+	m.server = whoophttp.NewServer(m.service, m.cfg.SecureCookies)
 	return nil
 }
 
-func (m *Module) RegisterContracts(context.Context, *contracts.Contracts) error { return nil }
+func (m *Module) RegisterContracts(_ context.Context, c *contracts.Contracts) error {
+	c.Whoop = whoopmodule.New(m.service)
+	return nil
+}
 
 func (m *Module) RegisterHTTP(_ context.Context, api chi.Router, requireUser func(http.Handler) http.Handler) error {
 	whoophttp.Register(api, m.server, requireUser)

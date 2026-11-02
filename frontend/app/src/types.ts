@@ -2,6 +2,7 @@
 // openapi.yaml) into src/openapi/<module>.d.ts (npm run gen:api); the descriptions are in the specs. This file names them for the app and adds what only the UI
 // needs (labels). Never redefine a type the server sends or receives here: change the spec.
 import type { components as catalog } from './openapi/catalog'
+import type { components as nutrition } from './openapi/nutrition'
 import type { components as planning } from './openapi/planning'
 import type { components as tracking } from './openapi/tracking'
 import type { components as whoop } from './openapi/whoop'
@@ -10,6 +11,7 @@ type Catalog = catalog['schemas']
 type Planning = planning['schemas']
 type Tracking = tracking['schemas']
 type Whoop = whoop['schemas']
+type Nutrition = nutrition['schemas']
 
 // Whether an exercise mainly improves mobility, strength or endurance.
 export type ExerciseType = Catalog['ExerciseType']
@@ -144,3 +146,15 @@ export type WhoopStatus = Whoop['WhoopStatus']
 export type WhoopCandidate = Whoop['WhoopCandidate']
 // The WHOOP activity linked to a workout, with the recovery of that day.
 export type WhoopData = Whoop['WhoopData']
+
+// Nutrition: a day with its macros, target and workouts.
+export type NutritionDay = Nutrition['NutritionDay']
+export type DayMacros = Nutrition['DayMacros']
+export type MacrosInput = Nutrition['MacrosInput']
+export type MacroTarget = Nutrition['MacroTarget']
+export type NutritionProfile = Nutrition['Profile']
+export type NutritionProfileInput = Nutrition['ProfileInput']
+// An entry of the weight history, with the body fat when it was measured too.
+export type BodyWeight = Nutrition['BodyWeight']
+export type BodyWeightInput = Nutrition['BodyWeightInput']
+export type Sex = Nutrition['Sex']

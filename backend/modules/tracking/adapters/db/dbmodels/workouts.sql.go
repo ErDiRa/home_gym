@@ -146,6 +146,52 @@ func (q *Queries) GetSlotWorkoutInProgress(ctx context.Context, arg GetSlotWorko
 	return id, err
 }
 
+const listFinishedWorkouts = `-- name: ListFinishedWorkouts :many
+SELECT id, session_name, started_at, completed_at FROM tracking.workouts
+WHERE user_id = $1 AND deleted_at IS NULL
+  AND completed_at >= $2 AND completed_at < $3
+ORDER BY completed_at
+`
+
+type ListFinishedWorkoutsParams struct {
+	UserID   uuid.UUID
+	FromTime *time.Time
+	ToTime   *time.Time
+}
+
+type ListFinishedWorkoutsRow struct {
+	ID          uuid.UUID
+	SessionName string
+	StartedAt   time.Time
+	CompletedAt *time.Time
+}
+
+// The user's workouts finished in [from, to), oldest first (the tracking contract).
+func (q *Queries) ListFinishedWorkouts(ctx context.Context, arg ListFinishedWorkoutsParams) ([]ListFinishedWorkoutsRow, error) {
+	rows, err := q.db.Query(ctx, listFinishedWorkouts, arg.UserID, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFinishedWorkoutsRow{}
+	for rows.Next() {
+		var i ListFinishedWorkoutsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionName,
+			&i.StartedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertWorkoutResult = `-- name: UpsertWorkoutResult :one
 INSERT INTO tracking.workout_results (
     workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes

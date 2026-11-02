@@ -43,6 +43,16 @@ type Recovery struct {
 	HrvMs     float64
 }
 
+// Cycle is a WHOOP physiological cycle: about a day, from falling asleep to falling asleep again.
+// End is nil while it is the current one; Kilojoule (the energy spent over the whole cycle) is nil
+// while WHOOP hasn't scored it.
+type Cycle struct {
+	Start      time.Time
+	End        *time.Time
+	ScoreState string
+	Kilojoule  *float64
+}
+
 // Data is the WHOOP activity linked to a workout, with the recovery of that day.
 type Data struct {
 	WorkoutID uuid.UUID
@@ -65,6 +75,8 @@ type API interface {
 	Activity(ctx context.Context, accessToken string, id uuid.UUID) (Activity, error)
 	// LatestRecovery returns the newest scored recovery in [from, to), or nil.
 	LatestRecovery(ctx context.Context, accessToken string, from, to time.Time) (*Recovery, error)
+	// Cycles lists the user's cycles that started in [from, to), newest first.
+	Cycles(ctx context.Context, accessToken string, from, to time.Time) ([]Cycle, error)
 }
 
 var (

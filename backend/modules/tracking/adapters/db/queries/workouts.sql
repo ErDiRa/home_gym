@@ -14,6 +14,13 @@ WHERE week_session_id = $1 AND user_id = $2 AND completed_at IS NULL AND deleted
 -- name: UserOwnsWorkout :one
 SELECT EXISTS (SELECT 1 FROM tracking.workouts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL);
 
+-- name: ListFinishedWorkouts :many
+-- The user's workouts finished in [from, to), oldest first (the tracking contract).
+SELECT id, session_name, started_at, completed_at FROM tracking.workouts
+WHERE user_id = $1 AND deleted_at IS NULL
+  AND completed_at >= sqlc.arg(from_time) AND completed_at < sqlc.arg(to_time)
+ORDER BY completed_at;
+
 -- name: FinishWorkout :execrows
 -- Finishing again keeps the first completion time and only replaces the notes, unless a
 -- completion time is given (the workout was done on another day): then the start moves along,

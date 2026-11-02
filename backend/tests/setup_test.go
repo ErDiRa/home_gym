@@ -25,6 +25,7 @@ import (
 	catalogclient "github.com/erdira/homegym/backend/modules/catalog/api/http/client"
 	identitydb "github.com/erdira/homegym/backend/modules/identity/adapters/db"
 	identityclient "github.com/erdira/homegym/backend/modules/identity/api/http/client"
+	nutritionclient "github.com/erdira/homegym/backend/modules/nutrition/api/http/client"
 	planningclient "github.com/erdira/homegym/backend/modules/planning/api/http/client"
 	trackingclient "github.com/erdira/homegym/backend/modules/tracking/api/http/client"
 	whoopclient "github.com/erdira/homegym/backend/modules/whoop/api/http/client"
@@ -85,14 +86,15 @@ var passwordHash = func() string {
 // user is a test user: its id, an HTTP client carrying its session cookie and a client of each
 // module's API on top of it.
 type user struct {
-	ID       uuid.UUID
-	Email    string
-	HTTP     *http.Client
-	Identity *identityclient.ClientWithResponses
-	Catalog  *catalogclient.ClientWithResponses
-	Planning *planningclient.ClientWithResponses
-	Tracking *trackingclient.ClientWithResponses
-	Whoop    *whoopclient.ClientWithResponses
+	ID        uuid.UUID
+	Email     string
+	HTTP      *http.Client
+	Identity  *identityclient.ClientWithResponses
+	Catalog   *catalogclient.ClientWithResponses
+	Planning  *planningclient.ClientWithResponses
+	Tracking  *trackingclient.ClientWithResponses
+	Whoop     *whoopclient.ClientWithResponses
+	Nutrition *nutritionclient.ClientWithResponses
 }
 
 // newUser creates a user of the test's own (random email) and signs them in.
@@ -132,6 +134,9 @@ func newUserSignedOut(t *testing.T) user {
 		t.Fatal(err)
 	}
 	if u.Whoop, err = whoopclient.NewClientWithResponses(apiURL(), whoopclient.WithHTTPClient(httpClient)); err != nil {
+		t.Fatal(err)
+	}
+	if u.Nutrition, err = nutritionclient.NewClientWithResponses(apiURL(), nutritionclient.WithHTTPClient(httpClient)); err != nil {
 		t.Fatal(err)
 	}
 	return u

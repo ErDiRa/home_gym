@@ -16,12 +16,18 @@
               : 'Connect your WHOOP account to add strain, heart rate and recovery to finished workouts.'
           }}
         </p>
+        <p v-if="whoop.status.connected" class="mt-2 text-sm text-slate-500">
+          Connected before the nutrition targets? Disconnect and connect again, so the targets can use the energy WHOOP
+          measured each day.
+        </p>
         <AppButton v-if="whoop.status.connected" variant="secondary" size="touch" class="mt-3 w-full" @click="disconnect">
           Disconnect
         </AppButton>
         <AppButton v-else size="touch" class="mt-3 w-full" @click="whoop.connectWhoop">Connect WHOOP</AppButton>
       </template>
     </section>
+
+    <BodySettings />
   </section>
 </template>
 
@@ -30,6 +36,7 @@ import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import BodySettings from '../../components/nutrition/BodySettings.vue'
 import { confirmDialog } from '../../confirm'
 import { useWhoopStore } from '../../stores/whoop'
 

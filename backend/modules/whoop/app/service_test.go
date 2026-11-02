@@ -18,6 +18,8 @@ type fakeAPI struct {
 	refreshed    []string // the refresh tokens used
 	reject       bool     // WHOOP rejects the refresh token
 	recoveryFrom time.Time
+	cycles       []Cycle
+	cyclesErr    error
 }
 
 func (f *fakeAPI) Configured() bool      { return true }
@@ -48,6 +50,10 @@ func (f *fakeAPI) Activity(_ context.Context, _ string, id uuid.UUID) (Activity,
 func (f *fakeAPI) LatestRecovery(_ context.Context, _ string, from, _ time.Time) (*Recovery, error) {
 	f.recoveryFrom = from
 	return f.recovery, nil
+}
+
+func (f *fakeAPI) Cycles(context.Context, string, time.Time, time.Time) ([]Cycle, error) {
+	return f.cycles, f.cyclesErr
 }
 
 // fakeRepos stores one user's connection and the saved data; workout is the user's workout.
@@ -171,4 +177,47 @@ func TestDataIsTheUsers(t *testing.T) {
 	}
 	_, err := s.Candidates(context.Background(), uuid.New(), repos.workout, time.Now(), time.Now().Add(72*time.Hour))
 	wantKind(t, err, errs.KindInvalid)
+}
+
+func TestDailyEnergy(t *testing.T) {
+	zurich, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(day, hour int) time.Time { return time.Date(2026, 10, day, hour, 0, 0, 0, zurich) }
+	ptr := func(t time.Time) *time.Time { return &t }
+	kj := func(v float64) *float64 { return &v }
+	s, api, _ := newTestService(valid())
+	api.cycles = []Cycle{
+		// Asleep at 23:00 on the 19th, so mostly the 20th.
+		{Start: at(19, 23), End: ptr(at(20, 23)), ScoreState: "SCORED", Kilojoule: kj(11000)},
+		// Mostly the 21st, but not scored yet.
+		{Start: at(20, 23), End: ptr(at(21, 22)), ScoreState: "PENDING_SCORE"},
+		// The current cycle has no end.
+		{Start: at(21, 22), ScoreState: "SCORED", Kilojoule: kj(4000)},
+	}
+	energy, err := s.DailyEnergy(context.Background(), uuid.New(), at(20, 0), at(23, 0), zurich)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(energy) != 1 || energy["2026-10-20"] != 11000 {
+		t.Errorf("energy = %v", energy)
+	}
+
+	// Outside the period asked for.
+	if energy, _ := s.DailyEnergy(context.Background(), uuid.New(), at(21, 0), at(23, 0), zurich); len(energy) != 0 {
+		t.Errorf("energy outside = %v", energy)
+	}
+
+	// WHOOP failing (e.g. a connection made without the cycles scope) leaves it empty.
+	api.cyclesErr = ErrRejected
+	if energy, err := s.DailyEnergy(context.Background(), uuid.New(), at(20, 0), at(23, 0), zurich); err != nil || len(energy) != 0 {
+		t.Errorf("energy when WHOOP fails = %v, %v", energy, err)
+	}
+
+	// Without a connection there is none.
+	s, _, _ = newTestService(nil)
+	if energy, err := s.DailyEnergy(context.Background(), uuid.New(), at(20, 0), at(23, 0), zurich); err != nil || len(energy) != 0 {
+		t.Errorf("energy unconnected = %v, %v", energy, err)
+	}
 }

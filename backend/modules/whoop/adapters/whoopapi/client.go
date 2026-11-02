@@ -1,4 +1,5 @@
-// Package whoopapi is the client of the WHOOP API (v2): OAuth tokens, workouts and recoveries.
+// Package whoopapi is the client of the WHOOP API (v2): OAuth tokens, workouts, recoveries and
+// cycles.
 package whoopapi
 
 import (
@@ -45,7 +46,7 @@ func (c *Client) AuthURL(state string) string {
 		"response_type": {"code"},
 		"client_id":     {c.cfg.ClientID},
 		"redirect_uri":  {c.cfg.RedirectURL},
-		"scope":         {"read:workout read:recovery offline"},
+		"scope":         {"read:workout read:recovery read:cycles offline"},
 		"state":         {state},
 	}.Encode()
 }
@@ -158,6 +159,42 @@ func (c *Client) LatestRecovery(ctx context.Context, accessToken string, from, t
 	return &app.Recovery{
 		Score: int32(math.Round(r.RecoveryScore)), RestingHR: int32(math.Round(r.RestingHeartRate)), HrvMs: r.HrvRmssdMilli,
 	}, nil
+}
+
+// maxCyclePages caps the pages of cycles fetched for one period (25 cycles each, so a year).
+const maxCyclePages = 15
+
+func (c *Client) Cycles(ctx context.Context, accessToken string, from, to time.Time) ([]app.Cycle, error) {
+	var out []app.Cycle
+	query := url.Values{"start": {from.Format(time.RFC3339)}, "end": {to.Format(time.RFC3339)}, "limit": {"25"}}
+	for range maxCyclePages {
+		var page struct {
+			Records []struct {
+				Start      time.Time  `json:"start"`
+				End        *time.Time `json:"end"`
+				ScoreState string     `json:"score_state"`
+				Score      *struct {
+					Kilojoule float64 `json:"kilojoule"`
+				} `json:"score"`
+			} `json:"records"`
+			NextToken string `json:"next_token"`
+		}
+		if err := c.get(ctx, accessToken, "/developer/v2/cycle", query, &page); err != nil {
+			return nil, err
+		}
+		for _, r := range page.Records {
+			cycle := app.Cycle{Start: r.Start, End: r.End, ScoreState: r.ScoreState}
+			if r.Score != nil {
+				cycle.Kilojoule = &r.Score.Kilojoule
+			}
+			out = append(out, cycle)
+		}
+		if page.NextToken == "" {
+			break
+		}
+		query.Set("nextToken", page.NextToken)
+	}
+	return out, nil
 }
 
 // get calls an API path with the user's access token and decodes the answer into dst.

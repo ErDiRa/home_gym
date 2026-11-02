@@ -2,15 +2,19 @@ import createClient, { type Middleware } from 'openapi-fetch'
 import { toast } from 'vue-sonner'
 import type { paths as catalogPaths } from './openapi/catalog'
 import type { paths as identityPaths } from './openapi/identity'
+import type { paths as nutritionPaths } from './openapi/nutrition'
 import type { paths as planningPaths } from './openapi/planning'
 import type { paths as trackingPaths } from './openapi/tracking'
 import type { paths as whoopPaths } from './openapi/whoop'
 import { state } from './session'
 import type {
+  BodyWeightInput,
   CycleImportInput,
   CycleInput,
   ExerciseInput,
   ExerciseMaxInput,
+  MacrosInput,
+  NutritionProfileInput,
   ResultInput,
   SetInput,
   TrainingInput,
@@ -51,6 +55,7 @@ const catalog = newClient<catalogPaths>()
 const planning = newClient<planningPaths>()
 const tracking = newClient<trackingPaths>()
 const whoop = newClient<whoopPaths>()
+const nutrition = newClient<nutritionPaths>()
 
 // The data of a successful response; a failed one throws ApiError. A non-JSON error body (e.g. a
 // proxy's HTML error page) falls back to the status text.
@@ -160,6 +165,24 @@ export const getWorkoutWhoop = (workoutId: string) => unwrap(whoop.GET('/workout
 export const linkWhoop = (workoutId: string, whoopWorkoutId: string) =>
   unwrap(whoop.PUT('/workouts/{id}/whoop', { ...byId(workoutId), body: { whoop_workout_id: whoopWorkoutId } }))
 export const unlinkWhoop = (workoutId: string) => unwrap(whoop.DELETE('/workouts/{id}/whoop', byId(workoutId)))
+
+// Nutrition: the days are local dates; the time zone decides the day a workout or WHOOP's energy
+// belongs to.
+const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone
+// The days from from to to (both included), each with its macros, target and workouts.
+export const listNutritionDays = (from: string, to: string) =>
+  unwrap(nutrition.GET('/nutrition/days', { params: { query: { from, to, tz: timeZone() } } }))
+// Logs a day's macros, replacing the ones logged for it before.
+export const saveDayMacros = (date: string, input: MacrosInput) =>
+  unwrap(nutrition.PUT('/nutrition/days/{date}', { params: { path: { date } }, body: input }))
+export const deleteDayMacros = (date: string) => unwrap(nutrition.DELETE('/nutrition/days/{date}', { params: { path: { date } } }))
+// The user's body, or null before it was entered.
+export const getNutritionProfile = () => unwrap(nutrition.GET('/nutrition/profile'))
+export const saveNutritionProfile = (input: NutritionProfileInput) => unwrap(nutrition.PUT('/nutrition/profile', { body: input }))
+// The weight (and body fat) history, newest first; saving a day again replaces its entry.
+export const listBodyWeights = () => unwrap(nutrition.GET('/body-weights'))
+export const saveBodyWeight = (input: BodyWeightInput) => unwrap(nutrition.PUT('/body-weights', { body: input }))
+export const deleteBodyWeight = (id: string) => unwrap(nutrition.DELETE('/body-weights/{id}', byId(id)))
 
 export async function login(email: string, password: string, remember: boolean) {
   state.user = await unwrap(identity.POST('/auth/login', { body: { email, password, remember } }))

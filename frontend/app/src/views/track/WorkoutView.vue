@@ -100,6 +100,8 @@
         </div>
       </section>
 
+      <WorkoutMacros :day="workout.completed_at ? toIso(new Date(workout.completed_at)) : today()" />
+
       <WhoopCard v-if="workout.completed_at && whoop.status?.connected" :workout-id="workout.id" :done-at="workout.completed_at" />
 
       <!-- Finishing: notes on how it went and, optionally, a rating per exercise. -->
@@ -170,6 +172,7 @@ import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
 import { newMaxOffers } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
+import WorkoutMacros from '../../components/nutrition/WorkoutMacros.vue'
 import ComplexSets from '../../components/workout/ComplexSets.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'

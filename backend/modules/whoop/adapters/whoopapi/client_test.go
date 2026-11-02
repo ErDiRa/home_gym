@@ -114,3 +114,29 @@ func TestRefresh(t *testing.T) {
 		t.Errorf("a revoked refresh token: %v", err)
 	}
 }
+
+func TestCycles(t *testing.T) {
+	var pages []string
+	c := newTestClient(t, map[string]http.HandlerFunc{
+		"/developer/v2/cycle": func(w http.ResponseWriter, r *http.Request) {
+			pages = append(pages, r.URL.Query().Get("nextToken"))
+			if r.URL.Query().Get("nextToken") == "" {
+				_, _ = w.Write([]byte(`{"records":[{"start":"2026-10-20T21:30:00Z","end":null,"score_state":"PENDING_SCORE"}],"next_token":"p2"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"records":[{"start":"2026-10-19T22:00:00Z","end":"2026-10-20T21:30:00Z","score_state":"SCORED",
+"score":{"strain":12.1,"kilojoule":10250.5,"average_heart_rate":68,"max_heart_rate":171}}]}`))
+		},
+	})
+	cycles, err := c.Cycles(context.Background(), "valid", time.Now().Add(-48*time.Hour), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cycles) != 2 || cycles[0].End != nil || cycles[0].Kilojoule != nil ||
+		cycles[1].End == nil || *cycles[1].Kilojoule != 10250.5 || cycles[1].ScoreState != "SCORED" {
+		t.Errorf("cycles = %+v", cycles)
+	}
+	if len(pages) != 2 || pages[1] != "p2" {
+		t.Errorf("pages = %v", pages)
+	}
+}

@@ -78,6 +78,7 @@ const router = createRouter({
         { path: 'cycles/:id', name: 'track-cycle', component: () => import('./views/track/CycleView.vue') },
         { path: 'history', name: 'history', component: () => import('./views/track/HistoryView.vue') },
         { path: 'prs', name: 'track-prs', component: () => import('./views/track/PrsView.vue') },
+        { path: 'nutrition', name: 'track-nutrition', component: () => import('./views/track/NutritionView.vue') },
         { path: 'settings', name: 'track-settings', component: () => import('./views/track/SettingsView.vue') },
       ],
     },

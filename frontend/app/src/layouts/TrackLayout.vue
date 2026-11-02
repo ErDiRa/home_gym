@@ -63,6 +63,7 @@ import {
   CalendarDaysIcon,
   ClockIcon,
   Cog6ToothIcon,
+  FireIcon,
   Squares2X2Icon,
   TrophyIcon,
 } from '@heroicons/vue/24/outline'
@@ -76,5 +77,6 @@ const tabs = [
   { name: 'This week', to: { name: 'track' }, icon: CalendarDaysIcon },
   { name: 'History', to: { name: 'history' }, icon: ClockIcon },
   { name: 'PRs', to: { name: 'track-prs' }, icon: TrophyIcon },
+  { name: 'Nutrition', to: { name: 'track-nutrition' }, icon: FireIcon },
 ]
 </script>

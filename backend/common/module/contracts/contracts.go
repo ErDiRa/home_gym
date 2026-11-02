@@ -10,6 +10,7 @@ import (
 	identity "github.com/erdira/homegym/backend/modules/identity/api/module/client"
 	planning "github.com/erdira/homegym/backend/modules/planning/api/module/client"
 	tracking "github.com/erdira/homegym/backend/modules/tracking/api/module/client"
+	whoop "github.com/erdira/homegym/backend/modules/whoop/api/module/client"
 )
 
 // Contracts holds every module's contract.
@@ -18,6 +19,7 @@ type Contracts struct {
 	Catalog  catalog.Catalog
 	Planning planning.Planning
 	Tracking tracking.Tracking
+	Whoop    whoop.Whoop
 }
 
 // Verify reports the contracts no module has set.
@@ -34,6 +36,9 @@ func (c *Contracts) Verify() error {
 	}
 	if c.Tracking == nil {
 		err = errors.Join(err, errors.New("tracking contract is not set"))
+	}
+	if c.Whoop == nil {
+		err = errors.Join(err, errors.New("whoop contract is not set"))
 	}
 	return err
 }

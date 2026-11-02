@@ -18,11 +18,12 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 - **Trainings:** sessions made of blocks (single, superset, complex, WOD with for time, AMRAP, EMOM, max reps or calories), each exercise with sets, reps, load and tempo, and an explicit plan for every week. Several trainings can be active side by side.
 - **Cycles:** a planned period of weeks with goals (e.g. "Mobility, 8 weeks: better hips"), grouping trainings that may run in parallel. The dashboard shows them on a week-by-week timeline; the tracker shows the cycle's week and goals above the training.
 - **Tracker:** this week's sessions as cards, logging sets and WOD scores as you go, and the history.
+- **Nutrition:** the protein, fat and carbs eaten per day (totals) in the tracker, against a daily target for keeping your weight, estimated from your body (height, age, sex, weight and body fat history) and that day's workouts, or from the energy WHOOP measured. A workout shows the macros of its day and the day before.
 - **Import:** a training week or a whole cycle from a JSON file (see [Import formats](#import-formats)).
 
 ## Tech stack
 
-- **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries. A modular monolith: five modules (identity, catalog, planning, tracking, whoop) in one binary, each with its own Postgres schema and its own layers (api, app, adapters); modules call each other through small Go contracts, never over the network or each other's tables
+- **Backend:** Go, [chi](https://github.com/go-chi/chi), PostgreSQL 18, [sqlc](https://sqlc.dev) for type-safe queries. A modular monolith: six modules (identity, catalog, planning, tracking, whoop, nutrition) in one binary, each with its own Postgres schema and its own layers (api, app, adapters); modules call each other through small Go contracts, never over the network or each other's tables
 - **API:** API first: one [OpenAPI](https://www.openapis.org) spec per module, from which [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) generates the Go server interface, models and a client, and [openapi-typescript](https://openapi-ts.dev) the frontend types (client: openapi-fetch)
 - **Frontend:** Vue 3, TypeScript, Vite, Tailwind CSS (one app: dashboard and tracker)
 - **Dev setup:** Docker Compose (Postgres + API with hot reload via [air](https://github.com/air-verse/air)), [Task](https://taskfile.dev) as the task runner
@@ -66,7 +67,7 @@ The backend works out of the box with dev defaults. To override them, copy `back
 
 ### WHOOP
 
-Finished workouts can show the strain, heart rate, energy and heart-rate zones of a WHOOP activity plus that day's recovery. To turn it on, create an app in the [WHOOP Developer Dashboard](https://developer.whoop.com) with the scopes `read:workout`, `read:recovery` and `offline`. Register the redirect URL `http://localhost:5173/api/whoop/callback` (dev) or `https://<DOMAIN>/api/whoop/callback` (production; `deploy/docker-compose.yml` sets it), and set `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`. Then connect under Tracker → Settings, and on a finished workout tap **Retrieve WHOOP data** to pick that day's activity.
+Finished workouts can show the strain, heart rate, energy and heart-rate zones of a WHOOP activity plus that day's recovery. To turn it on, create an app in the [WHOOP Developer Dashboard](https://developer.whoop.com) with the scopes `read:workout`, `read:recovery`, `read:cycles` and `offline` (`read:cycles` gives the nutrition targets the energy WHOOP measured each day; a connection made before it asked for that scope needs to be connected again). Register the redirect URL `http://localhost:5173/api/whoop/callback` (dev) or `https://<DOMAIN>/api/whoop/callback` (production; `deploy/docker-compose.yml` sets it), and set `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`. Then connect under Tracker → Settings, and on a finished workout tap **Retrieve WHOOP data** to pick that day's activity.
 
 ## Production
 
@@ -116,7 +117,8 @@ backend/
     catalog/          exercises, ratings and the shared lists (joints, focuses, units, block kinds)
     planning/         cycles, trainings with their week plans, the session library
     tracking/         the week, workouts with sets and WOD scores, 1RMs, stats
-    whoop/            the WHOOP connection and the activity linked to a workout
+    whoop/            the WHOOP connection, the activity linked to a workout, the energy of a day
+    nutrition/        the body (profile, weight history), the macros per day and their targets
       module.go       the module's wiring (migrations, contract, routes)
       app/            business logic: usecases, validation, the interfaces it needs
       adapters/db/    migrations, sqlc queries and generated code, repositories, read model
