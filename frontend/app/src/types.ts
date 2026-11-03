@@ -115,6 +115,8 @@ export type ExerciseMax = Tracking['ExerciseMax']
 export type ExerciseMaxInput = Tracking['ExerciseMaxInput']
 // The load last logged of an exercise, which the tracker suggests where the plan has none.
 export type LastLoad = Tracking['LastLoad']
+export type LoadHistoryWorkout = Tracking['LoadHistoryWorkout']
+export type LoadHistorySet = Tracking['LoadHistorySet']
 // How the user rated an exercise (1-5), with their notes.
 export type ExerciseRating = Catalog['ExerciseRating']
 

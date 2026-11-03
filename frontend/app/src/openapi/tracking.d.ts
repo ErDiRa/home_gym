@@ -23,6 +23,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exercises/{id}/loads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+         * @description Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+         */
+        get: operations["ListExerciseLoads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exercise-maxes": {
         parameters: {
             query?: never;
@@ -312,6 +334,31 @@ export interface components {
              * @description When that workout was finished.
              */
             done_at: string;
+        };
+        /** @description A finished workout that logged an exercise with a load, with those sets. */
+        LoadHistoryWorkout: {
+            /** Format: uuid */
+            workout_id: string;
+            session_name: string;
+            /**
+             * Format: date-time
+             * @description When the workout was finished.
+             */
+            done_at: string;
+            sets: components["schemas"]["LoadHistorySet"][];
+        };
+        LoadHistorySet: {
+            /** Format: int32 */
+            set_number: number;
+            /** Format: double */
+            reps_value: number | null;
+            reps_unit_name: string;
+            per_side: boolean;
+            /** Format: double */
+            load_value: number;
+            /** Format: uuid */
+            load_unit: string;
+            load_unit_name: string;
         };
         ExerciseMaxInput: {
             /**
@@ -729,6 +776,30 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    ListExerciseLoads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One per workout, its sets in session order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoadHistoryWorkout"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
     ListExerciseMaxes: {

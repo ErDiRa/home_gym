@@ -195,6 +195,7 @@ import { addDays, formatDate, formatPeriod, isMonday, nextMonday } from '../../d
 import { useCyclesStore } from '../../stores/cycles'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
+import { useWorkoutsStore } from '../../stores/workouts'
 import { useSessionsStore } from '../../stores/sessions'
 import { useTrainingsStore } from '../../stores/trainings'
 
@@ -203,6 +204,7 @@ const route = useRoute()
 const trainingsStore = useTrainingsStore()
 const exercisesStore = useExercisesStore()
 const lookups = useLookupsStore()
+const workouts = useWorkoutsStore()
 const library = useSessionsStore()
 const cyclesStore = useCyclesStore()
 // Set when editing an existing training (route /trainings/:id), absent when creating one.
@@ -305,6 +307,8 @@ onMounted(async () => {
       exercisesStore.loadExercises(),
       exercisesStore.loadRatings(),
       lookups.loadTrainingLookups(),
+      // Without the last loads the loads just suggest none.
+      workouts.loadLastLoads().catch(() => {}),
       library.loadSessions(),
       cyclesStore.loadCycles(),
     ])

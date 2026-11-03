@@ -69,3 +69,24 @@ FROM tracking.workout_sets ws
 JOIN tracking.workouts w ON w.id = ws.workout_id
 WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL AND ws.load_value IS NOT NULL AND NOT ws.bodyweight
 ORDER BY ws.exercise_id, w.completed_at DESC, ws.block_position DESC, ws.exercise_position DESC, ws.set_number DESC;
+
+-- name: ListExerciseLoads :many
+-- The sets with a load of an exercise in a user's newest finished workouts that logged one (at
+-- most workout_limit workouts), newest first, the sets in session order. Weight added to
+-- bodyweight isn't such a load.
+WITH recent AS (
+    SELECT w.id, w.session_name, w.completed_at
+    FROM tracking.workouts w
+    WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL
+      AND EXISTS (
+          SELECT 1 FROM tracking.workout_sets s
+          WHERE s.workout_id = w.id AND s.exercise_id = $2 AND s.load_value IS NOT NULL AND NOT s.bodyweight
+      )
+    ORDER BY w.completed_at DESC
+    LIMIT sqlc.arg(workout_limit)
+)
+SELECT r.id AS workout_id, r.session_name, r.completed_at, ws.set_number, ws.reps_value, ws.reps_unit, ws.per_side, ws.load_value, ws.load_unit
+FROM recent r
+JOIN tracking.workout_sets ws ON ws.workout_id = r.id
+WHERE ws.exercise_id = $2 AND ws.load_value IS NOT NULL AND NOT ws.bodyweight
+ORDER BY r.completed_at DESC, ws.block_position, ws.exercise_position, ws.set_number;

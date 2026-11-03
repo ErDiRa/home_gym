@@ -194,6 +194,26 @@ type LastLoad struct {
 	LoadValue    float64            `json:"load_value"`
 }
 
+// LoadHistorySet defines model for LoadHistorySet.
+type LoadHistorySet struct {
+	LoadUnit     openapi_types.UUID `json:"load_unit"`
+	LoadUnitName string             `json:"load_unit_name"`
+	LoadValue    float64            `json:"load_value"`
+	PerSide      bool               `json:"per_side"`
+	RepsUnitName string             `json:"reps_unit_name"`
+	RepsValue    *float64           `json:"reps_value"`
+	SetNumber    int32              `json:"set_number"`
+}
+
+// LoadHistoryWorkout A finished workout that logged an exercise with a load, with those sets.
+type LoadHistoryWorkout struct {
+	// DoneAt When the workout was finished.
+	DoneAt      time.Time          `json:"done_at"`
+	SessionName string             `json:"session_name"`
+	Sets        []LoadHistorySet   `json:"sets"`
+	WorkoutId   openapi_types.UUID `json:"workout_id"`
+}
+
 // LoggedSet A set as stored.
 type LoggedSet struct {
 	BlockPosition    int32               `json:"block_position"`
@@ -448,6 +468,9 @@ type ServerInterface interface {
 
 	// (DELETE /exercise-maxes/{id})
 	DeleteExerciseMax(w http.ResponseWriter, r *http.Request, id ID)
+	// ListExerciseLoads The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+	// (GET /exercises/{id}/loads)
+	ListExerciseLoads(w http.ResponseWriter, r *http.Request, id ID)
 	// AddExerciseMax Add a 1RM to an exercise's history; the newest is the current max.
 	// (POST /exercises/{id}/maxes)
 	AddExerciseMax(w http.ResponseWriter, r *http.Request, id ID)
@@ -507,6 +530,12 @@ func (_ Unimplemented) ListExerciseMaxes(w http.ResponseWriter, r *http.Request)
 
 // (DELETE /exercise-maxes/{id})
 func (_ Unimplemented) DeleteExerciseMax(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListExerciseLoads The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+// (GET /exercises/{id}/loads)
+func (_ Unimplemented) ListExerciseLoads(w http.ResponseWriter, r *http.Request, id ID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -636,6 +665,32 @@ func (siw *ServerInterfaceWrapper) DeleteExerciseMax(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteExerciseMax(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListExerciseLoads operation middleware
+func (siw *ServerInterfaceWrapper) ListExerciseLoads(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListExerciseLoads(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1209,6 +1264,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/exercises/{id}/maxes", wrapper.AddExerciseMax)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/exercises/{id}/loads", wrapper.ListExerciseLoads)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/exercise-maxes", wrapper.ListExerciseMaxes)
 	})
 	r.Group(func(r chi.Router) {
@@ -1355,6 +1413,56 @@ func (response DeleteExerciseMax404JSONResponse) VisitDeleteExerciseMaxResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExerciseLoadsRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type ListExerciseLoadsResponseObject interface {
+	VisitListExerciseLoadsResponse(w http.ResponseWriter) error
+}
+
+type ListExerciseLoads200JSONResponse []LoadHistoryWorkout
+
+func (response ListExerciseLoads200JSONResponse) VisitListExerciseLoadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExerciseLoads400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListExerciseLoads400JSONResponse) VisitListExerciseLoadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExerciseLoads401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListExerciseLoads401JSONResponse) VisitListExerciseLoadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2225,6 +2333,9 @@ type StrictServerInterface interface {
 
 	// (DELETE /exercise-maxes/{id})
 	DeleteExerciseMax(ctx context.Context, request DeleteExerciseMaxRequestObject) (DeleteExerciseMaxResponseObject, error)
+	// ListExerciseLoads The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+	// (GET /exercises/{id}/loads)
+	ListExerciseLoads(ctx context.Context, request ListExerciseLoadsRequestObject) (ListExerciseLoadsResponseObject, error)
 	// AddExerciseMax Add a 1RM to an exercise's history; the newest is the current max.
 	// (POST /exercises/{id}/maxes)
 	AddExerciseMax(ctx context.Context, request AddExerciseMaxRequestObject) (AddExerciseMaxResponseObject, error)
@@ -2354,6 +2465,32 @@ func (sh *strictHandler) DeleteExerciseMax(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteExerciseMaxResponseObject); ok {
 		if err := validResponse.VisitDeleteExerciseMaxResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListExerciseLoads operation middleware
+func (sh *strictHandler) ListExerciseLoads(w http.ResponseWriter, r *http.Request, id ID) {
+	var request ListExerciseLoadsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListExerciseLoads(ctx, request.(ListExerciseLoadsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListExerciseLoads")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListExerciseLoadsResponseObject); ok {
+		if err := validResponse.VisitListExerciseLoadsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

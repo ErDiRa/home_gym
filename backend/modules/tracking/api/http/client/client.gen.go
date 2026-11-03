@@ -195,6 +195,26 @@ type LastLoad struct {
 	LoadValue    float64            `json:"load_value"`
 }
 
+// LoadHistorySet defines model for LoadHistorySet.
+type LoadHistorySet struct {
+	LoadUnit     openapi_types.UUID `json:"load_unit"`
+	LoadUnitName string             `json:"load_unit_name"`
+	LoadValue    float64            `json:"load_value"`
+	PerSide      bool               `json:"per_side"`
+	RepsUnitName string             `json:"reps_unit_name"`
+	RepsValue    *float64           `json:"reps_value"`
+	SetNumber    int32              `json:"set_number"`
+}
+
+// LoadHistoryWorkout A finished workout that logged an exercise with a load, with those sets.
+type LoadHistoryWorkout struct {
+	// DoneAt When the workout was finished.
+	DoneAt      time.Time          `json:"done_at"`
+	SessionName string             `json:"session_name"`
+	Sets        []LoadHistorySet   `json:"sets"`
+	WorkoutId   openapi_types.UUID `json:"workout_id"`
+}
+
 // LoggedSet A set as stored.
 type LoggedSet struct {
 	BlockPosition    int32               `json:"block_position"`
@@ -523,6 +543,13 @@ type ClientInterface interface {
 	// DeleteExerciseMax performs a DELETE /exercise-maxes/{id} (the `DeleteExerciseMax` operationId) request.
 	DeleteExerciseMax(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListExerciseLoads The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+	//
+	// Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+	//
+	// Corresponds with GET /exercises/{id}/loads (the `ListExerciseLoads` operationId).
+	ListExerciseLoads(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AddExerciseMaxWithBody Add a 1RM to an exercise's history; the newest is the current max.
 	//
 	// Takes any type of body and a specified content type.
@@ -663,6 +690,23 @@ func (c *Client) ListExerciseMaxes(ctx context.Context, reqEditors ...RequestEdi
 // DeleteExerciseMax performs a DELETE /exercise-maxes/{id} (the `DeleteExerciseMax` operationId) request.
 func (c *Client) DeleteExerciseMax(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteExerciseMaxRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListExerciseLoads The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+//
+// Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+//
+// Corresponds with GET /exercises/{id}/loads (the `ListExerciseLoads` operationId).
+func (c *Client) ListExerciseLoads(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListExerciseLoadsRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1058,6 +1102,40 @@ func NewDeleteExerciseMaxRequest(server string, id ID) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListExerciseLoadsRequest constructs an http.Request for the ListExerciseLoads method
+func NewListExerciseLoadsRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/exercises/%s/loads", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1777,6 +1855,15 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	DeleteExerciseMaxWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteExerciseMaxResponse, error)
 
+	// ListExerciseLoadsWithResponse The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+	//
+	// Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /exercises/{id}/loads (the `ListExerciseLoads` operationId).
+	ListExerciseLoadsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListExerciseLoadsResponse, error)
+
 	// AddExerciseMaxWithBodyWithResponse Add a 1RM to an exercise's history; the newest is the current max.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -2014,6 +2101,61 @@ func (r DeleteExerciseMaxResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteExerciseMaxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListExerciseLoadsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]LoadHistoryWorkout
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListExerciseLoadsResponse) GetJSON200() *[]LoadHistoryWorkout {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ListExerciseLoadsResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListExerciseLoadsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r ListExerciseLoadsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListExerciseLoadsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListExerciseLoadsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListExerciseLoadsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2904,6 +3046,21 @@ func (c *ClientWithResponses) DeleteExerciseMaxWithResponse(ctx context.Context,
 	return ParseDeleteExerciseMaxResponse(rsp)
 }
 
+// ListExerciseLoadsWithResponse The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+//
+// Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /exercises/{id}/loads (the `ListExerciseLoads` operationId).
+func (c *ClientWithResponses) ListExerciseLoadsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListExerciseLoadsResponse, error) {
+	rsp, err := c.ListExerciseLoads(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListExerciseLoadsResponse(rsp)
+}
+
 // AddExerciseMaxWithBodyWithResponse Add a 1RM to an exercise's history; the newest is the current max.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -3239,6 +3396,46 @@ func ParseDeleteExerciseMaxResponse(rsp *http.Response) (*DeleteExerciseMaxRespo
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListExerciseLoadsResponse parses an HTTP response from a ListExerciseLoadsWithResponse call
+func ParseListExerciseLoadsResponse(rsp *http.Response) (*ListExerciseLoadsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListExerciseLoadsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []LoadHistoryWorkout
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	}
 

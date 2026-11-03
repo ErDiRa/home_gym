@@ -306,6 +306,15 @@ func TestLastLoads(t *testing.T) {
 	if resp, _ := u.Tracking.ListLastLoadsWithResponse(ctx); len(*resp.JSON200) != 1 || (*resp.JSON200)[0].LoadValue != 60 {
 		t.Errorf("last loads with a set on bodyweight = %s", body(resp.Body))
 	}
+
+	// The history lists the finished workout's sets with a load, in order.
+	history, err := u.Tracking.ListExerciseLoadsWithResponse(ctx, exercise)
+	if err != nil || history.StatusCode() != http.StatusOK {
+		t.Fatalf("loads = %v %s", err, body(history.Body))
+	}
+	if h := *history.JSON200; len(h) != 1 || h[0].WorkoutId != finished || len(h[0].Sets) != 2 || h[0].Sets[0].LoadValue != 70 || h[0].Sets[1].LoadValue != 60 {
+		t.Errorf("loads = %s", body(history.Body))
+	}
 }
 
 // The week offers the active trainings; a cycle's shows its cycle and goals.

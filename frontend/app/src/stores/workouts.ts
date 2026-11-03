@@ -8,6 +8,7 @@ import {
   finishWorkout,
   getWeek,
   getWorkout,
+  listExerciseLoads,
   listLastLoads,
   listWorkouts,
   logResult,
@@ -18,8 +19,9 @@ import {
 import { nextWeek, startOf, toIso, weekStart } from '../dates'
 import type { LastLoad, Week } from '../types'
 
-// The tracker's data: the week shown, the load last logged of each exercise, and the api functions
-// for workouts, their sets, the scores of their WOD blocks and the notes on their exercises.
+// The tracker's data: the week shown, the load last logged of each exercise (also suggested when
+// planning), and the api functions for workouts, their sets, the scores of their WOD blocks and the
+// notes on their exercises.
 export const useWorkoutsStore = defineStore('workouts', () => {
   const week = ref<Week | null>(null)
   const loading = ref(false)
@@ -53,6 +55,7 @@ export const useWorkoutsStore = defineStore('workouts', () => {
     loadWeek,
     lastLoads,
     loadLastLoads,
+    listExerciseLoads,
     listWorkouts,
     getWorkout,
     startWorkout,

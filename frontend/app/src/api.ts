@@ -91,6 +91,8 @@ export const addExerciseMax = (exerciseId: string, input: ExerciseMaxInput) =>
 export const deleteExerciseMax = (id: string) => unwrap(tracking.DELETE('/exercise-maxes/{id}', byId(id)))
 // The load last logged of each exercise in a finished workout.
 export const listLastLoads = () => unwrap(tracking.GET('/stats/last-loads'))
+// The loads logged of an exercise in the newest workouts that have one, newest first.
+export const listExerciseLoads = (exerciseId: string) => unwrap(tracking.GET('/exercises/{id}/loads', byId(exerciseId)))
 
 export const listBlockKinds = () => unwrap(catalog.GET('/block-kinds'))
 export const listRepUnits = () => unwrap(catalog.GET('/rep-units'))

@@ -25,6 +25,7 @@ type ReadModel interface {
 	Max(ctx context.Context, userID, id uuid.UUID) (ExerciseMax, error)
 	ExerciseStats(ctx context.Context, userID uuid.UUID) ([]ExerciseStat, error)
 	LastLoads(ctx context.Context, userID uuid.UUID) ([]LastLoad, error)
+	ExerciseLoads(ctx context.Context, userID, exerciseID uuid.UUID) ([]LoadHistoryWorkout, error)
 }
 
 // Server implements the tracking part of the API (StrictServerInterface).
@@ -353,6 +354,17 @@ func (s *Server) ListLastLoads(ctx context.Context, _ ListLastLoadsRequestObject
 	}
 	loads, err := s.readModel.LastLoads(ctx, userID)
 	return ListLastLoads200JSONResponse(loads), err
+}
+
+// ListExerciseLoads returns the loads the user logged of an exercise in their newest workouts, to
+// pick a load from when planning.
+func (s *Server) ListExerciseLoads(ctx context.Context, req ListExerciseLoadsRequestObject) (ListExerciseLoadsResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	loads, err := s.readModel.ExerciseLoads(ctx, userID, req.Id)
+	return ListExerciseLoads200JSONResponse(loads), err
 }
 
 // WorkoutSummaryToAPI maps a finished workout as listed.

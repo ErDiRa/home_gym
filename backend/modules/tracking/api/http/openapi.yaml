@@ -37,6 +37,24 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /exercises/{id}/loads:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: ListExerciseLoads
+      tags: [exercises]
+      summary: The loads logged of an exercise in the newest finished workouts (at most 10), newest first.
+      description: Only sets with a load; weight added to bodyweight isn't such a load. Empty for an exercise never logged with one.
+      responses:
+        "200":
+          description: One per workout, its sets in session order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LoadHistoryWorkout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
   /exercise-maxes:
     get:
       operationId: ListExerciseMaxes
@@ -375,6 +393,28 @@ components:
         load_unit: { type: string, format: uuid }
         load_unit_name: { type: string }
         done_at: { type: string, format: date-time, description: "When that workout was finished." }
+    LoadHistoryWorkout:
+      type: object
+      description: A finished workout that logged an exercise with a load, with those sets.
+      required: [workout_id, session_name, done_at, sets]
+      properties:
+        workout_id: { type: string, format: uuid }
+        session_name: { type: string }
+        done_at: { type: string, format: date-time, description: "When the workout was finished." }
+        sets:
+          type: array
+          items: { $ref: "#/components/schemas/LoadHistorySet" }
+    LoadHistorySet:
+      type: object
+      required: [set_number, reps_value, reps_unit_name, per_side, load_value, load_unit, load_unit_name]
+      properties:
+        set_number: { type: integer, format: int32 }
+        reps_value: { type: number, format: double, nullable: true }
+        reps_unit_name: { type: string }
+        per_side: { type: boolean }
+        load_value: { type: number, format: double }
+        load_unit: { type: string, format: uuid }
+        load_unit_name: { type: string }
     ExerciseMaxInput:
       type: object
       required: [load_value, load_unit, achieved_on, notes]

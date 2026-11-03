@@ -47,6 +47,7 @@ import { newSession, sessionProblem, toSessionInput, toSessionRow, type SessionR
 import { confirmDialog } from '../../confirm'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
+import { useWorkoutsStore } from '../../stores/workouts'
 import { useSessionsStore } from '../../stores/sessions'
 
 const router = useRouter()
@@ -54,6 +55,7 @@ const route = useRoute()
 const store = useSessionsStore()
 const exercisesStore = useExercisesStore()
 const lookups = useLookupsStore()
+const workouts = useWorkoutsStore()
 // Set when editing a template (route /sessions/:id), absent when creating one.
 const sessionId = route.params.id as string | undefined
 
@@ -71,6 +73,8 @@ onMounted(async () => {
       exercisesStore.loadExercises(),
       exercisesStore.loadRatings(),
       lookups.loadTrainingLookups(),
+      // Without the last loads the loads just suggest none.
+      workouts.loadLastLoads().catch(() => {}),
     ])
     if (loaded) session.value = toSessionRow(loaded, false)
   } catch (e) {

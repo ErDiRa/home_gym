@@ -136,7 +136,7 @@ Dockerfile            production image (frontend build + Go binary)
 
 ## Import formats
 
-Trainings → Import (or Cycles → Import) reads two kinds of JSON files. Exercises, units and block kinds are named, not referenced by id; the dialog lets you map unknown exercises to yours or create them (prefilled from the file's optional `new_exercises`), and creates unknown units.
+Trainings → Import (or Cycles → Import) reads two kinds of JSON files, Exercises → Import a third. Exercises, units and block kinds are named, not referenced by id; the dialog lets you map unknown exercises to yours or create them (prefilled from the file's optional `new_exercises`), and creates unknown units.
 
 **`training-import/1`: one training of one week.** It opens in the training form as a draft, so you check it before saving. With an optional `"cycle": "<name>"`, the form preselects your cycle of that name.
 
@@ -180,6 +180,27 @@ Trainings → Import (or Cycles → Import) reads two kinds of JSON files. Exerc
 ```
 
 Complete examples are `training-week.json` and `training-week-into-cycle.json` in `frontend/app/src/components/training/__fixtures__/`, and `cycle.json` in `frontend/app/src/components/cycle/__fixtures__/`; the parsers and their rules are `trainingImport.ts` and `cycleImport.ts` in those folders.
+
+**`exercise-import/1`: exercises for your library.** Exercises → Import shows what will be created before saving anything. Exercises you already have (same name, ignoring case) are skipped, so the same file can be imported again. Joints, muscle groups and focuses are matched by name, a focus also by its alias; names nothing matches are left out, and the preview lists them.
+
+```jsonc
+{
+  "format": "exercise-import/1",
+  "exercises": [                    // at least one; each name once
+    {
+      "name": "Copenhagen Plank",
+      "type": "strength",           // strength (default), mobility or endurance
+      "description": "Side plank with the top leg on a bench.",  // optional
+      "joints": ["Hip"],            // optional, by name
+      "muscle_groups": ["Core"],    // optional, by name
+      "focuses": ["Hip stability"], // optional, by name or alias
+      "video_urls": ["https://www.youtube.com/watch?v=…"]  // optional, http(s), at most 10
+    }
+  ]
+}
+```
+
+A complete example is `exercises.json` in `frontend/app/src/components/exercise/__fixtures__/`; the parser is `exerciseImport.ts` next to it.
 
 ## Development
 

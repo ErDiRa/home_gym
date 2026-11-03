@@ -117,6 +117,76 @@ func (q *Queries) GetWorkout(ctx context.Context, arg GetWorkoutParams) (Trackin
 	return i, err
 }
 
+const listExerciseLoads = `-- name: ListExerciseLoads :many
+WITH recent AS (
+    SELECT w.id, w.session_name, w.completed_at
+    FROM tracking.workouts w
+    WHERE w.user_id = $1 AND w.completed_at IS NOT NULL AND w.deleted_at IS NULL
+      AND EXISTS (
+          SELECT 1 FROM tracking.workout_sets s
+          WHERE s.workout_id = w.id AND s.exercise_id = $2 AND s.load_value IS NOT NULL AND NOT s.bodyweight
+      )
+    ORDER BY w.completed_at DESC
+    LIMIT $3
+)
+SELECT r.id AS workout_id, r.session_name, r.completed_at, ws.set_number, ws.reps_value, ws.reps_unit, ws.per_side, ws.load_value, ws.load_unit
+FROM recent r
+JOIN tracking.workout_sets ws ON ws.workout_id = r.id
+WHERE ws.exercise_id = $2 AND ws.load_value IS NOT NULL AND NOT ws.bodyweight
+ORDER BY r.completed_at DESC, ws.block_position, ws.exercise_position, ws.set_number
+`
+
+type ListExerciseLoadsParams struct {
+	UserID       uuid.UUID
+	ExerciseID   uuid.UUID
+	WorkoutLimit int32
+}
+
+type ListExerciseLoadsRow struct {
+	WorkoutID   uuid.UUID
+	SessionName string
+	CompletedAt *time.Time
+	SetNumber   int32
+	RepsValue   *float64
+	RepsUnit    uuid.UUID
+	PerSide     bool
+	LoadValue   *float64
+	LoadUnit    *uuid.UUID
+}
+
+// The sets with a load of an exercise in a user's newest finished workouts that logged one (at
+// most workout_limit workouts), newest first, the sets in session order. Weight added to
+// bodyweight isn't such a load.
+func (q *Queries) ListExerciseLoads(ctx context.Context, arg ListExerciseLoadsParams) ([]ListExerciseLoadsRow, error) {
+	rows, err := q.db.Query(ctx, listExerciseLoads, arg.UserID, arg.ExerciseID, arg.WorkoutLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExerciseLoadsRow{}
+	for rows.Next() {
+		var i ListExerciseLoadsRow
+		if err := rows.Scan(
+			&i.WorkoutID,
+			&i.SessionName,
+			&i.CompletedAt,
+			&i.SetNumber,
+			&i.RepsValue,
+			&i.RepsUnit,
+			&i.PerSide,
+			&i.LoadValue,
+			&i.LoadUnit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExerciseMaxes = `-- name: ListExerciseMaxes :many
 SELECT id, exercise_id, reps, load_value, load_unit, achieved_on, workout_set_id, notes, created_at
 FROM tracking.exercise_maxes

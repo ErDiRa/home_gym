@@ -81,7 +81,14 @@
           />
         </label>
         <AmountInput v-if="kind?.shared_reps" v-model="block" part="reps" :label="`Block ${letter}`" hint="same for all" />
-        <AmountInput v-if="kind?.shared_load" v-model="block" part="load" :label="`Block ${letter}`" hint="same for all" />
+        <AmountInput
+          v-if="kind?.shared_load"
+          v-model="block"
+          part="load"
+          :label="`Block ${letter}`"
+          hint="same for all"
+          :last="blockLastLoad"
+        />
       </div>
       <TextInput
         v-model="block.notes"
@@ -133,6 +140,7 @@
               v-model="block.exercises[i]"
               part="load"
               :label="exerciseLabel(block.exercises.length, index, i)"
+              :last="lastLoads.get(item.exercise_id)"
             />
             <IntensityTargetInput
               v-if="item.type === 'endurance'"
@@ -195,6 +203,7 @@ import { emptyIntensity } from '../exercise/intensity'
 import { DEFAULT_INTERVAL, scoreFormat, scoreFormats, wodSummary } from './wod'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
+import { useWorkoutsStore } from '../../stores/workouts'
 import type { Exercise, ScoreType } from '../../types'
 
 // A block with its exercises; it folds to its header and a summary line.
@@ -208,6 +217,8 @@ const block = defineModel<BlockRow>({ required: true })
 const lookups = useLookupsStore()
 // The user's ratings by exercise id.
 const { ratings } = storeToRefs(useExercisesStore())
+// The load last logged of each exercise, suggested for the planned loads.
+const { lastLoads } = storeToRefs(useWorkoutsStore())
 
 const kindOptions = computed(() => lookups.blockKinds.map((k) => ({ value: k.code, label: k.name, title: k.description })))
 
@@ -225,6 +236,8 @@ const summary = computed(() => {
   const names = b.exercises.length ? b.exercises.map((e) => e.name).join(', ') : 'No exercises'
   return head ? `${head} · ${names}` : names
 })
+// A shared load (a complex) is one weight for all its movements: the first one's last load.
+const blockLastLoad = computed(() => block.value.exercises.map((e) => lastLoads.value.get(e.exercise_id)).find(Boolean) ?? null)
 const full = computed(() => kind.value?.max_exercises != null && block.value.exercises.length >= kind.value.max_exercises)
 // How many more exercises the kind takes; null = no limit.
 const remaining = computed(() =>

@@ -239,6 +239,40 @@ func (m *ReadModel) LastLoads(ctx context.Context, userID uuid.UUID) ([]tracking
 	return out, nil
 }
 
+// loadHistoryWorkouts is how many of the newest workouts ExerciseLoads lists.
+const loadHistoryWorkouts = 10
+
+// ExerciseLoads lists the sets with a load the user logged of an exercise, grouped by workout,
+// in their newest finished workouts that have one.
+func (m *ReadModel) ExerciseLoads(ctx context.Context, userID, exerciseID uuid.UUID) ([]trackinghttp.LoadHistoryWorkout, error) {
+	rows, err := m.q.ListExerciseLoads(ctx, dbmodels.ListExerciseLoadsParams{UserID: userID, ExerciseID: exerciseID, WorkoutLimit: loadHistoryWorkouts})
+	if err != nil {
+		return nil, err
+	}
+	repUnits, loadUnits, err := m.unitNames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := []trackinghttp.LoadHistoryWorkout{}
+	for _, r := range rows {
+		// The query only takes sets with a load of finished workouts.
+		if r.LoadValue == nil || r.LoadUnit == nil || r.CompletedAt == nil {
+			continue
+		}
+		if len(out) == 0 || out[len(out)-1].WorkoutId != r.WorkoutID {
+			out = append(out, trackinghttp.LoadHistoryWorkout{
+				WorkoutId: r.WorkoutID, SessionName: r.SessionName, DoneAt: *r.CompletedAt, Sets: []trackinghttp.LoadHistorySet{},
+			})
+		}
+		w := &out[len(out)-1]
+		w.Sets = append(w.Sets, trackinghttp.LoadHistorySet{
+			SetNumber: r.SetNumber, RepsValue: r.RepsValue, RepsUnitName: repUnits[r.RepsUnit], PerSide: r.PerSide,
+			LoadValue: *r.LoadValue, LoadUnit: *r.LoadUnit, LoadUnitName: loadUnits[*r.LoadUnit],
+		})
+	}
+	return out, nil
+}
+
 // unitNames returns the names of the rep and load units by id.
 func (m *ReadModel) unitNames(ctx context.Context) (rep, load map[uuid.UUID]string, err error) {
 	units, err := m.catalog.Units(ctx)
