@@ -79,6 +79,7 @@ export interface WodCard {
   lines: WodLine[]
   draft: ScoreDraft
   result: WorkoutResult | null // as saved once logged
+  partsTotal: number | null // the sum of the reps or calories logged per movement (see partsUnit), null without
   saving: boolean
 }
 
@@ -393,7 +394,8 @@ export function buildCards(
   return { blocks, extras, extraResults }
 }
 
-// The score card of a WOD block; an EMOM not scored yet starts from the reps logged per movement.
+// The score card of a WOD block; one with parts logged per movement is scored by them (a logged
+// score was saved from them already).
 function wodCard(
   blockPosition: number,
   scoreType: ScoreType,
@@ -403,8 +405,10 @@ function wodCard(
   result: WorkoutResult | null,
   exercises: ExerciseCard[],
 ): WodCard {
-  const wod: WodCard = { blockPosition, scoreType, intervals, rounds, lines, draft: scoreDraft(result, lines, rounds), result, saving: false }
-  if (scoreType === 'emom' && !result) fillEmomScore(wod, exercises)
+  const wod: WodCard = { blockPosition, scoreType, intervals, rounds, lines, draft: scoreDraft(result, lines, rounds), result, partsTotal: null, saving: false }
+  if (!partsUnit(wod)) return wod
+  if (result) wod.partsTotal = partsTotalOf(wod, exercises)
+  else fillPartsScore(wod, exercises)
   return wod
 }
 
@@ -483,46 +487,63 @@ export function listMark(wod: WodCard): { step: number; reps: number } | null {
   return { step: p.step, reps: p.reps }
 }
 
-// An EMOM is done one movement per interval, so a round is one pass through its movements (an
-// EMOM of 12:00 with 4 movements has 3 rounds); the last round is short when the intervals don't
-// divide evenly. Without known intervals, the block's rounds.
-export function emomRoundCount(wod: WodCard): number {
+// What a WOD logs per movement besides its score, added up into it: the reps of an EMOM (e.g. the
+// max reps of a 20 s station) or of a max reps WOD, the calories of a max calories one (e.g. each
+// interval of an erg pyramid); null for the other formats.
+export function partsUnit(wod: WodCard): 'reps' | 'cal' | null {
+  if (wod.scoreType === 'emom' || wod.scoreType === 'max_reps') return 'reps'
+  return wod.scoreType === 'max_calories' ? 'cal' : null
+}
+
+// The rounds the parts are entered in. An EMOM is done one movement per interval, so a round is
+// one pass through its movements (an EMOM of 12:00 with 4 movements has 3 rounds), the last one
+// short when the intervals don't divide evenly; other WODs go through their lines in their rounds.
+export function partRoundCount(wod: WodCard): number {
   const n = wod.lines.length
-  return wod.intervals && n ? Math.ceil(wod.intervals / n) : wod.rounds
+  return wod.scoreType === 'emom' && wod.intervals && n ? Math.ceil(wod.intervals / n) : wod.rounds
 }
 
 // The movements (indexes into lines) done in a round, from 1.
-export function emomLinesIn(wod: WodCard, round: number): number[] {
+export function partLinesIn(wod: WodCard, round: number): number[] {
   const n = wod.lines.length
-  const done = wod.intervals ? wod.intervals - (round - 1) * n : n
+  const done = wod.scoreType === 'emom' && wod.intervals ? wod.intervals - (round - 1) * n : n
   return wod.lines.map((_, i) => i).filter((i) => i < done)
 }
 
-// The reps logged per round and movement of an EMOM ([round - 1][line]): its exercises' sets, the
-// set number being the round.
-export function emomReps(wod: WodCard, cards: ExerciseCard[]): (number | null)[][] {
-  return Array.from({ length: emomRoundCount(wod) }, (_, r) =>
+// The value logged per round and movement ([round - 1][line]): its exercises' sets, the set number
+// being the round; reps as the set's reps, calories as its load (in cal).
+export function partValues(wod: WodCard, cards: ExerciseCard[]): (number | null)[][] {
+  const cal = partsUnit(wod) === 'cal'
+  return Array.from({ length: partRoundCount(wod) }, (_, r) =>
     wod.lines.map((line) => {
-      const row = cards.find((c) => c.key === line.key)?.rows.find((x) => x.number === r + 1)
-      return row?.logged?.reps_value ?? null
+      const logged = cards.find((c) => c.key === line.key)?.rows.find((x) => x.number === r + 1)?.logged
+      return (cal ? logged?.load_value : logged?.reps_value) ?? null
     }),
   )
 }
 
-// The reps of all rounds together.
-export const repsTotal = (grid: (number | null)[][]): number => grid.flat().reduce<number>((sum, v) => sum + (v ?? 0), 0)
+// The values of all rounds together.
+export const partsTotal = (grid: (number | null)[][]): number => grid.flat().reduce<number>((sum, v) => sum + (v ?? 0), 0)
 
-// An EMOM with reps logged per movement is scored by them: their total, and as its rounds the
-// intervals that have reps (an interval without any wasn't done). Without reps logged it keeps the
-// rounds entered by hand, and no total.
-export function fillEmomScore(wod: WodCard, cards: ExerciseCard[]) {
-  const grid = emomReps(wod, cards)
-  if (!grid.flat().some((v) => v !== null)) {
-    wod.draft.reps = null
+// The total of the parts logged, null without any.
+export function partsTotalOf(wod: WodCard, cards: ExerciseCard[]): number | null {
+  const grid = partValues(wod, cards)
+  return grid.flat().some((v) => v !== null) ? partsTotal(grid) : null
+}
+
+// A WOD with parts logged is scored by them: their total as its reps or calories, and an EMOM's
+// rounds the intervals that have reps (an interval without any wasn't done). Without parts the
+// score stays as entered by hand (an EMOM then has no total reps).
+export function fillPartsScore(wod: WodCard, cards: ExerciseCard[]) {
+  const grid = partValues(wod, cards)
+  wod.partsTotal = partsTotalOf(wod, cards)
+  if (wod.partsTotal === null) {
+    if (wod.scoreType === 'emom') wod.draft.reps = null
     return
   }
-  wod.draft.reps = repsTotal(grid)
-  wod.draft.rounds = grid.flatMap((r, n) => emomLinesIn(wod, n + 1).filter((i) => (r[i] ?? 0) > 0)).length
+  if (wod.scoreType === 'max_calories') wod.draft.calories = wod.partsTotal
+  else wod.draft.reps = wod.partsTotal
+  if (wod.scoreType === 'emom') wod.draft.rounds = grid.flatMap((r, n) => partLinesIn(wod, n + 1).filter((i) => (r[i] ?? 0) > 0)).length
 }
 
 // Gives each card the note on the exercise at its place in the session, if any.

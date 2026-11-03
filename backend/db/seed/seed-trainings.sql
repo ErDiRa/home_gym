@@ -13,7 +13,10 @@
 --   Home functional     the next phase, inactive: kettlebell work, seconds, per-side reps,
 --                       bodyweight exercises
 --   Engine              active too: erg intervals (endurance exercises) with target pace, watts
---                       and cal/h plus recovery; last week's workout with each set's average
+--                       and cal/h plus recovery; last week's workout with each set's average;
+--                       and a cycle retest, a max calories pyramid (4-3-2-1 min on three
+--                       machines), done last week with the calories of every interval
+--                       (logged as sets: the minutes and the calories as the load in cal)
 --   Strength base       a cycle of 8 weeks around both strength phases (now in its second half),
 --                       with two goals; the other trainings are in no cycle
 -- The user also rates some exercises (1-5), for the rating filter in the exercise picker.
@@ -168,23 +171,25 @@ CREATE FUNCTION pg_temp.exercise(
     )
 $$;
 
--- A finished workout of a planned slot, done at the given time and taking an hour.
+-- A finished workout of a planned slot, done at the given time and taking an hour. The notes are
+-- $3, as a plain notes would name the sessions' column.
 CREATE FUNCTION pg_temp.workout(slot uuid, done_at timestamptz, notes text DEFAULT '')
 RETURNS uuid LANGUAGE sql AS $$
     INSERT INTO workouts (user_id, training_id, week_session_id, session_id, session_name, started_at, completed_at, notes)
-    SELECT pg_temp.me(), ws.training_id, ws.id, s.id, s.name, done_at - interval '1 hour', done_at, notes
+    SELECT pg_temp.me(), ws.training_id, ws.id, s.id, s.name, done_at - interval '1 hour', done_at, $3
     FROM training_week_sessions ws JOIN sessions s ON s.id = ws.session_id
     WHERE ws.id = slot
     RETURNING id
 $$;
 
--- Logs the score of a WOD block of a workout; the values that count depend on the format.
+-- Logs the score of a WOD block of a workout; the values that count depend on the format. The
+-- notes are $8, as a plain notes would name the workout's column.
 CREATE FUNCTION pg_temp.result(
     workout uuid, block int, score_type text, time_seconds int DEFAULT NULL, rounds int DEFAULT NULL,
     reps int DEFAULT NULL, calories int DEFAULT NULL, notes text DEFAULT ''
 ) RETURNS void LANGUAGE sql AS $$
     INSERT INTO workout_results (workout_id, block_position, score_type, time_seconds, rounds, reps, calories, notes, completed_at)
-    SELECT workout, block, score_type, time_seconds, rounds, reps, calories, notes, w.completed_at
+    SELECT workout, block, score_type, time_seconds, rounds, reps, calories, $8, w.completed_at
     FROM workouts w WHERE w.id = workout
 $$;
 
@@ -230,6 +235,7 @@ DECLARE
     wod_1 uuid;
     wod_2 uuid;
     engine uuid;
+    retest uuid;
     c uuid; -- the cycle
     week int;
     session int;
@@ -373,12 +379,24 @@ BEGIN
     PERFORM pg_temp.exercise(b, 2, 'Ski Erg', reps => 90, reps_unit => 's',
         intensity_metric => 'watts', intensity => 120, intensity_max => 150);
 
+    -- The retest: a pyramid on three machines for the most calories in 33 minutes.
+    u := pg_temp.template('Engine – pyramid retest', notes => 'Pace from your previous scores; build as the intervals shorten.');
+    retest := u;
+    b := pg_temp.wod(u, 1, 'max_calories', 33 * 60, name => 'Pyramid – Cycle Retest',
+        notes => '33 min running clock, rest 1:00 after each round of the three machines. Score: total calories over all machines.');
+    FOR session IN 0..11 LOOP
+        PERFORM pg_temp.exercise(b, session + 1, (ARRAY['Echo Bike', 'Row Erg', 'Ski Erg'])[session % 3 + 1],
+            reps => 4 - session / 3, reps_unit => 'min', logged_in => 'cal');
+    END LOOP;
+
     -- Active alongside: conditioning twice a week; last week's first session done.
     t := pg_temp.training('Engine', 'Erg intervals for the aerobic base, logged with each set''s average.', true,
         pg_temp.this_monday() - 7, 6);
     s1 := pg_temp.copy_session(engine, t, 1, 'Intervals');
+    s2 := pg_temp.copy_session(retest, t, 2, 'Pyramid retest');
+    -- The retest in the first two weeks: done last week, open this week.
     FOR week IN 1..6 LOOP
-        PERFORM pg_temp.plan(t, week, ARRAY[s1, s1]);
+        PERFORM pg_temp.plan(t, week, CASE WHEN week <= 2 THEN ARRAY[s1, s1, s2] ELSE ARRAY[s1, s1] END);
     END LOOP;
     w := pg_temp.workout(pg_temp.slot(t, 1, 1), (pg_temp.this_monday() - 6)::timestamptz + interval '7 hours', 'Last row interval hurt.');
     PERFORM pg_temp.sets(w, 1, 1, 'Row Erg', 4, 4, reps_unit => 'min', load => 64, load_unit => 'cal', load_step => -1,
@@ -389,6 +407,16 @@ BEGIN
         intensity_metric => 'cal_per_hour', intensity => 1640, intensity_step => -60);
     PERFORM pg_temp.sets(w, 3, 2, 'Ski Erg', 3, 90, reps_unit => 's', load => 6, load_unit => 'cal',
         intensity_metric => 'watts', intensity => 135, intensity_step => -5);
+    -- The retest: every interval's calories as a set (its minutes, the calories as the load), their
+    -- total the score.
+    w := pg_temp.workout(pg_temp.slot(t, 1, 3), (pg_temp.this_monday() - 3)::timestamptz + interval '7 hours',
+        'Paced the 4 min too hard, held on in the 1 min.');
+    FOR session IN 0..11 LOOP
+        PERFORM pg_temp.sets(w, 1, session + 1, (ARRAY['Echo Bike', 'Row Erg', 'Ski Erg'])[session % 3 + 1], 1,
+            4 - session / 3, reps_unit => 'min',
+            load => (ARRAY[60, 54, 50, 47, 42, 39, 33, 29, 27, 18, 16, 14])[session + 1], load_unit => 'cal');
+    END LOOP;
+    PERFORM pg_temp.result(w, 1, 'max_calories', calories => 429, notes => '+18 cal on the test of 14 Sep');
 
     -- Active alongside: the WODs, three a week; last week's done with their scores.
     t := pg_temp.training('CrossFit WODs', 'Class programming, logged with the score of every WOD.', true,

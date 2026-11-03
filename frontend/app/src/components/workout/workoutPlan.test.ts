@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BlockKind, TrainingSession, Unit, WorkoutSet } from '../../types'
-import { buildCards, changed, emomLinesIn, emomReps, emomRoundCount, fillEmomScore, listMark, progressTotal, repsTotal, scoreDraft, scoreValues, takesProgress, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
+import { buildCards, changed, fillPartsScore, listMark, partLinesIn, partRoundCount, partsTotal, partsUnit, partValues, progressTotal, scoreDraft, scoreValues, takesProgress, progressOf, roundsOf, roundState, suggestedLoad, type LoadContext } from './workoutPlan'
 
 const kg: Unit = { id: 'kg', name: 'kg', min_value: 0, max_value: null, kg_per_unit: 1, percent_of_max: false }
 const lb: Unit = { id: 'lb', name: 'lb', min_value: 0, max_value: null, kg_per_unit: 0.45359237, percent_of_max: false }
@@ -423,21 +423,21 @@ describe('an EMOM', () => {
   it('has a round per pass through its movements', () => {
     const wod = block().wod!
     expect(wod.intervals).toBe(10)
-    expect(emomRoundCount(wod)).toBe(4)
-    expect(emomLinesIn(wod, 1)).toEqual([0, 1, 2])
-    expect(emomLinesIn(wod, 4)).toEqual([0])
+    expect(partRoundCount(wod)).toBe(4)
+    expect(partLinesIn(wod, 1)).toEqual([0, 1, 2])
+    expect(partLinesIn(wod, 4)).toEqual([0])
   })
 
   it('reads the reps logged per round and movement from the sets, and counts them up', () => {
     const b = block([set(1, 1, 9), set(2, 1, 2), set(1, 2, 8), set(3, 4, 6)])
-    const grid = emomReps(b.wod!, b.exercises)
+    const grid = partValues(b.wod!, b.exercises)
     expect(grid).toEqual([
       [9, 2, null],
       [8, null, null],
       [null, null, null],
       [null, null, 6],
     ])
-    expect(repsTotal(grid)).toBe(25)
+    expect(partsTotal(grid)).toBe(25)
     // The sets don't count as planned sets of the block: it is done when scored.
     expect(progressOf(b)).toEqual({ logged: 0, total: 0 })
   })
@@ -449,12 +449,65 @@ describe('an EMOM', () => {
     // Without reps it keeps the rounds entered by hand.
     const empty = block()
     empty.wod!.draft.rounds = 8
-    fillEmomScore(empty.wod!, empty.exercises)
+    fillPartsScore(empty.wod!, empty.exercises)
     expect(empty.wod!.draft).toMatchObject({ rounds: 8, reps: null })
   })
 
   it('sends the total reps with the rounds', () => {
     const draft = { ...scoreDraft(null), rounds: 10, reps: 164 }
     expect(scoreValues('emom', draft)).toEqual({ time_seconds: null, rounds: 10, reps: 164, calories: null })
+  })
+})
+
+// An erg pyramid scored by its calories: 4 min each on the bike and the rower, then 2 min each,
+// one round; each interval logged as its minutes and its calories (in cal).
+describe('a max calories WOD with calories per interval', () => {
+  const erg = (id: string, name: string, minutes: number) => ({ ...ladder(id, name, minutes, null), reps_unit: 'min', reps_unit_name: 'min' })
+  const pyramid: TrainingSession = {
+    ...wodSession,
+    blocks: [
+      {
+        ...wodSession.blocks[0],
+        score_type: 'max_calories',
+        time_seconds: 900,
+        sets: null,
+        exercises: [erg('bike', 'Echo Bike', 4), erg('row', 'Row Erg', 4), erg('bike', 'Echo Bike', 2), erg('row', 'Row Erg', 2)],
+      },
+    ],
+  }
+  const interval = (position: number, cal: number): WorkoutSet => ({
+    ...cleanSet,
+    exercise_id: position % 2 ? 'bike' : 'row',
+    exercise_position: position,
+    set_number: 1,
+    reps_value: position < 3 ? 4 : 2,
+    reps_unit: 'min',
+    load_value: cal,
+    load_unit: 'cal',
+  })
+  const block = (sets: WorkoutSet[] = [], results: Parameters<typeof buildCards>[2] = []) =>
+    buildCards(pyramid, sets, results, () => wodKind, 'kg', wodContext).blocks[0]
+
+  it('takes the calories of every interval in one round', () => {
+    const wod = block().wod!
+    expect(partsUnit(wod)).toBe('cal')
+    expect(partRoundCount(wod)).toBe(1)
+    expect(partLinesIn(wod, 1)).toEqual([0, 1, 2, 3])
+    expect(wod.partsTotal).toBeNull()
+  })
+
+  it('reads the calories from the loads of the sets and is scored by their total', () => {
+    const b = block([interval(1, 52), interval(2, 61), interval(4, 30)])
+    expect(partValues(b.wod!, b.exercises)).toEqual([[52, 61, null, 30]])
+    expect(b.wod!.partsTotal).toBe(143)
+    expect(b.wod!.draft.calories).toBe(143)
+    expect(scoreValues('max_calories', b.wod!.draft)).toEqual({ time_seconds: null, rounds: null, reps: null, calories: 143 })
+  })
+
+  it('keeps a logged score as it was saved', () => {
+    const saved = { id: 'r', workout_id: 'w', block_position: 1, score_type: 'max_calories' as const, time_seconds: null, rounds: null, reps: null, calories: 140, notes: '', completed_at: '' }
+    const wod = block([interval(1, 52)], [saved]).wod!
+    expect(wod.draft.calories).toBe(140)
+    expect(wod.partsTotal).toBe(52)
   })
 })

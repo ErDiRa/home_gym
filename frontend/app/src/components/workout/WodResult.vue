@@ -30,6 +30,11 @@
           <TextInput v-model.number="wod.draft.reps" v-bind="countInput" placeholder="0" aria-label="Extra reps" class="mt-1 w-20!" />
         </label>
       </template>
+      <!-- Scored by the parts logged per movement (WodParts): their total, not typed in. -->
+      <p v-else-if="wod.partsTotal !== null && wod.scoreType !== 'emom'" class="text-base text-slate-600">
+        <span class="font-semibold text-slate-900">{{ wod.partsTotal }}</span>
+        {{ wod.scoreType === 'max_calories' ? 'cal from the intervals' : 'reps from the movements' }}
+      </p>
       <label v-else-if="wod.scoreType === 'max_reps'" class="text-xs font-medium text-slate-500">
         Reps
         <TextInput v-model.number="wod.draft.reps" v-bind="countInput" aria-label="Reps" class="mt-1 w-24!" />
@@ -39,7 +44,7 @@
         <TextInput v-model.number="wod.draft.calories" v-bind="countInput" aria-label="Calories" class="mt-1 w-24!" />
       </label>
       <!-- An EMOM with reps per movement is scored by them; else by the rounds completed. -->
-      <p v-else-if="wod.draft.reps !== null" class="text-base text-slate-600">
+      <p v-else-if="wod.partsTotal !== null" class="text-base text-slate-600">
         <span class="font-semibold text-slate-900">{{ wod.draft.reps }}</span> reps in {{ wod.draft.rounds ?? 0 }}
         <template v-if="wod.intervals">of {{ wod.intervals }}</template> intervals
       </p>

@@ -66,12 +66,7 @@
               @toggle="toggle(card, $event)"
             />
           </div>
-          <EmomReps
-            v-if="block.wod?.scoreType === 'emom'"
-            :wod="block.wod"
-            :cards="block.exercises"
-            :save="(grid) => saveEmomReps(block, grid)"
-          />
+          <WodParts v-if="block.wod && partsUnit(block.wod)" :wod="block.wod" :cards="block.exercises" :save="(grid) => saveParts(block, grid)" />
           <WodResult v-if="block.wod" v-model="block.wod" @toggle="toggleScore(block.wod)" />
         </div>
       </section>
@@ -107,8 +102,6 @@
           </p>
         </div>
       </section>
-
-      <WorkoutMacros :day="workout.completed_at ? toIso(new Date(workout.completed_at)) : today()" />
 
       <WhoopCard v-if="workout.completed_at && whoop.status?.connected" :workout-id="workout.id" :done-at="workout.completed_at" />
 
@@ -180,11 +173,10 @@ import AppButton from '../../components/button/AppButton.vue'
 import StarRating from '../../components/exercise/StarRating.vue'
 import { newMaxOffers } from '../../components/exercise/maxes'
 import TextInput from '../../components/form/TextInput.vue'
-import WorkoutMacros from '../../components/nutrition/WorkoutMacros.vue'
 import ComplexSets from '../../components/workout/ComplexSets.vue'
-import EmomReps from '../../components/workout/EmomReps.vue'
 import ExerciseSets from '../../components/workout/ExerciseSets.vue'
 import WhoopCard from '../../components/workout/WhoopCard.vue'
+import WodParts from '../../components/workout/WodParts.vue'
 import WodMovements from '../../components/workout/WodMovements.vue'
 import WodResult from '../../components/workout/WodResult.vue'
 import { blockLetter } from '../../components/training/trainingForm'
@@ -194,9 +186,10 @@ import {
   attachNotes,
   buildCards,
   changed,
-  emomLinesIn,
-  fillEmomScore,
+  fillPartsScore,
   num,
+  partLinesIn,
+  partsUnit,
   progressOf,
   roundState,
   scoreChanged,
@@ -402,24 +395,32 @@ async function toggleScore(wod: WodCard) {
   }
 }
 
-// Logs the reps of an EMOM per round and movement as sets of its exercises (the set number is the
-// round; in reps, whatever the movement was planned in, e.g. the reps of a 20 s station), removes
-// the ones cleared, and scores the EMOM by them (fillEmomScore): saved right away when the score
-// was logged. Resolves to whether everything was saved.
-async function saveEmomReps(block: BlockCard, grid: (number | null)[][]): Promise<boolean> {
+// Logs what was done per round and movement of a WOD as sets of its exercises (the set number is
+// the round): reps in reps, whatever the movement was planned in (e.g. the reps of a 20 s station);
+// calories as the load in cal, with the planned time as the reps (e.g. 4 min logged as 52 cal, like
+// any timed machine interval). Removes the ones cleared and scores the WOD by them
+// (fillPartsScore): saved right away when the score was logged. Resolves to whether all was saved.
+async function saveParts(block: BlockCard, grid: (number | null)[][]): Promise<boolean> {
   const wod = block.wod
   if (!workout.value || !wod) return false
   const id = workout.value.id
+  const cal = partsUnit(wod) === 'cal'
   const repsUnit = lookups.repUnits.find((u) => u.name === 'reps')?.id
+  const calUnit = lookups.loadUnits.find((u) => u.name === 'cal')?.id
+  if (cal && !calUnit) {
+    toast.error('The unit cal is missing.')
+    return false
+  }
   try {
     await Promise.all(
       grid.flatMap((values, r) =>
-        emomLinesIn(wod, r + 1).map(async (i) => {
+        partLinesIn(wod, r + 1).map(async (i) => {
           const card = block.exercises.find((c) => c.key === wod.lines[i].key)
           if (!card) return
           const value = num(values[i])
           const row = card.rows.find((x) => x.number === r + 1)
-          if (value === row?.logged?.reps_value || (value === null && !row?.logged)) return
+          const before = cal ? row?.logged?.load_value : row?.logged?.reps_value
+          if (value === before || (value === null && !row?.logged)) return
           if (value === null) {
             await workouts.deleteSet(id, row!.logged!.id)
             card.rows = card.rows.filter((x) => x !== row)
@@ -430,25 +431,26 @@ async function saveEmomReps(block: BlockCard, grid: (number | null)[][]): Promis
             block_position: card.blockPosition,
             exercise_position: card.position,
             set_number: r + 1,
-            reps_value: value,
-            reps_unit: repsUnit ?? card.repsUnit,
+            reps_value: cal ? wod.lines[i].repsValue : value,
+            reps_unit: cal ? card.repsUnit : (repsUnit ?? card.repsUnit),
             per_side: card.perSide,
-            load_value: null,
-            load_unit: null,
+            load_value: cal ? value : null,
+            load_unit: cal ? calUnit! : null,
             bodyweight: false,
             intensity_metric: null,
             intensity_value: null,
           })
-          if (row) Object.assign(row, { reps: value, logged })
-          else card.rows = [...card.rows, { number: r + 1, reps: value, load: null, intensity: null, logged, saving: false }].sort((a, b) => a.number - b.number)
+          const inputs = { reps: logged.reps_value, load: logged.load_value }
+          if (row) Object.assign(row, { ...inputs, logged })
+          else card.rows = [...card.rows, { number: r + 1, ...inputs, intensity: null, logged, saving: false }].sort((a, b) => a.number - b.number)
         }),
       ),
     )
   } catch (e) {
-    toast.error(e instanceof ApiError && e.status === 400 ? e.message : 'Could not save the reps.')
+    toast.error(e instanceof ApiError && e.status === 400 ? e.message : `Could not save the ${cal ? 'calories' : 'reps'}.`)
     return false
   }
-  fillEmomScore(wod, block.exercises)
+  fillPartsScore(wod, block.exercises)
   if (wod.result && scoreChanged(wod)) await toggleScore(wod)
   return true
 }
