@@ -86,9 +86,10 @@ const nameOf = (id: string | null) => props.options.find((o) => o.id === id)?.na
 const { field, openUp, place } = useDropPlacement()
 
 const labelClass = 'mb-1 block text-sm font-medium text-slate-800'
+// At least 16px on phones (text-base below md), so iOS doesn't zoom into the search.
 const sizeClasses: Record<FieldSize, string> = {
-  sm: 'h-8 rounded-md pr-6 pl-2 text-sm',
-  md: 'h-10 rounded-lg pr-8 pl-3 text-sm',
+  sm: 'h-8 rounded-md pr-6 pl-2 text-base md:text-sm',
+  md: 'h-10 rounded-lg pr-8 pl-3 text-base md:text-sm',
   touch: 'h-11 rounded-xl pr-10 pl-3 text-base',
 }
 const fieldClasses = computed(() => [

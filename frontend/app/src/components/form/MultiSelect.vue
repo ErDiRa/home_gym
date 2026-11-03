@@ -26,7 +26,7 @@
           ref="input"
           :display-value="() => query"
           :placeholder="selected.length ? 'Search…' : placeholder"
-          class="min-w-24 flex-1 border-0 bg-transparent px-1 py-0.5 text-slate-900 outline-none placeholder:text-slate-400"
+          class="min-w-24 flex-1 border-0 bg-transparent px-1 py-0.5 text-base text-slate-900 md:text-sm outline-none placeholder:text-slate-400"
           @change="query = $event.target.value"
           @focus="place"
           @keydown.backspace="removeLastOnEmpty"

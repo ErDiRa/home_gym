@@ -27,7 +27,8 @@ export interface TextInputExposed {
 
 // A text, number, date… input (attributes such as type, placeholder or required pass through), or
 // a textarea with `multiline`. Use v-model, v-model.number (empty = null) or :model-value with your
-// own @change. touch is the tracker's 44px size with text-base, so iOS doesn't zoom in.
+// own @change. touch is the tracker's 44px size. Text is at least 16px on phones (text-base below
+// md), so iOS doesn't zoom in.
 const props = withDefaults(
   defineProps<{ size?: InputSize; multiline?: boolean; tone?: 'default' | 'success' }>(),
   { size: 'md', multiline: false, tone: 'default' },
@@ -51,9 +52,9 @@ const toneClasses = {
   success: 'border-emerald-300 bg-emerald-50',
 }
 const sizeClasses: Record<InputSize, string> = {
-  sm: 'h-8 rounded-md px-2 text-sm',
-  md: 'h-10 rounded-md px-3 text-sm',
+  sm: 'h-8 rounded-md px-2 text-base md:text-sm',
+  md: 'h-10 rounded-md px-3 text-base md:text-sm',
   touch: 'h-11 rounded-xl px-3 text-base',
 }
-const textSize = computed(() => (props.size === 'touch' ? 'rounded-xl text-base' : 'rounded-md text-sm'))
+const textSize = computed(() => (props.size === 'touch' ? 'rounded-xl text-base' : 'rounded-md text-base md:text-sm'))
 </script>

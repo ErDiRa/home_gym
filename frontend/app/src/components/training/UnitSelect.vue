@@ -5,7 +5,7 @@
         :display-value="(id) => units.find((u) => u.id === id)?.name ?? ''"
         :aria-label="label"
         placeholder="Unit"
-        class="block h-8 w-full rounded-md border border-slate-300 bg-white py-1 pr-6 pl-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+        class="block h-8 w-full rounded-md border border-slate-300 bg-white py-1 pr-6 pl-2 text-base text-slate-900 md:text-sm outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
         @change="query = $event.target.value"
         @focus="place"
       />
