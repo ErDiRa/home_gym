@@ -265,6 +265,8 @@ func mapError(err error) error {
 		return errors.Join(app.ErrNotFound, err)
 	case errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation:
 		return errors.Join(app.ErrUnknownReference, err)
+	case errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation:
+		return errors.Join(app.ErrDuplicate, err)
 	default:
 		return err
 	}

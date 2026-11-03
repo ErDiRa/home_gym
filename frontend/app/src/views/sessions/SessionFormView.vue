@@ -48,6 +48,7 @@ import { confirmDialog } from '../../confirm'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useWorkoutsStore } from '../../stores/workouts'
+import { useBlockTemplatesStore } from '../../stores/blockTemplates'
 import { useSessionsStore } from '../../stores/sessions'
 
 const router = useRouter()
@@ -56,6 +57,7 @@ const store = useSessionsStore()
 const exercisesStore = useExercisesStore()
 const lookups = useLookupsStore()
 const workouts = useWorkoutsStore()
+const blockTemplates = useBlockTemplatesStore()
 // Set when editing a template (route /sessions/:id), absent when creating one.
 const sessionId = route.params.id as string | undefined
 
@@ -75,6 +77,8 @@ onMounted(async () => {
       lookups.loadTrainingLookups(),
       // Without the last loads the loads just suggest none.
       workouts.loadLastLoads().catch(() => {}),
+      // Without them only "Add saved block" is missing.
+      blockTemplates.loadTemplates().catch(() => {}),
     ])
     if (loaded) session.value = toSessionRow(loaded, false)
   } catch (e) {

@@ -3,6 +3,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import {
   ArrowPathIcon,
   BoltIcon,
+  BookmarkIcon,
   ClipboardDocumentListIcon,
   DevicePhoneMobileIcon,
   Squares2X2Icon,
@@ -21,6 +22,7 @@ export const navigation: NavItem[] = [
   { name: 'Exercises', to: { name: 'exercises' }, icon: BoltIcon },
   { name: 'PRs', to: { name: 'maxes' }, icon: TrophyIcon },
   { name: 'Sessions', to: { name: 'sessions' }, icon: Squares2X2Icon },
+  { name: 'Blocks', to: { name: 'blocks' }, icon: BookmarkIcon },
   { name: 'Cycles', to: { name: 'cycles' }, icon: ArrowPathIcon },
   { name: 'Trainings', to: { name: 'trainings' }, icon: ClipboardDocumentListIcon },
   { name: 'Tracker', to: { name: 'track' }, icon: DevicePhoneMobileIcon },

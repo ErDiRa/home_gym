@@ -16,6 +16,7 @@ A personal workout planner and tracker. In the dashboard you keep your exercise 
 - **Exercises:** your own library with joints, muscle groups, focuses, video links and ratings.
 - **PRs (1RM):** your one-rep max per exercise in kg or lb, with its history and PRs, on its own dashboard page (Log PR: search the exercise, enter the max). Loads planned in % 1RM show as a weight in the tracker, switching between kg and lb converts, and a logged single above your 1RM offers to save it as the new one.
 - **Trainings:** sessions made of blocks (single, superset, complex, WOD with for time, AMRAP, EMOM, max reps or calories), each exercise with sets, reps, load and tempo, and an explicit plan for every week. Several trainings can be active side by side.
+- **Saved blocks:** combinations of exercises you use often (a complex, a superset, a WOD's movements), saved from any block or made under Blocks, and added to a session with "Add saved block"; sets, reps and load are planned there.
 - **Cycles:** a planned period of weeks with goals (e.g. "Mobility, 8 weeks: better hips"), grouping trainings that may run in parallel. The dashboard shows them on a week-by-week timeline; the tracker shows the cycle's week and goals above the training.
 - **Tracker:** this week's sessions as cards, logging sets and WOD scores as you go, and the history.
 - **Nutrition:** the protein, fat and carbs eaten per day (totals) in the tracker, against a daily target for keeping your weight, estimated from your body (height, age, sex, weight and body fat history) and that day's workouts, or from the energy WHOOP measured. A workout shows the macros of its day and the day before.
@@ -115,7 +116,7 @@ backend/
   modules/            the modules, one directory each:
     identity/         users and sessions (login, JWT cookie)
     catalog/          exercises, ratings and the shared lists (joints, focuses, units, block kinds)
-    planning/         cycles, trainings with their week plans, the session library
+    planning/         cycles, trainings with their week plans, the session library, saved blocks
     tracking/         the week, workouts with sets and WOD scores, 1RMs, stats
     whoop/            the WHOOP connection, the activity linked to a workout, the energy of a day
     nutrition/        the body (profile, weight history), the macros per day and their targets

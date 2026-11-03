@@ -108,6 +108,8 @@ export type CycleSummary = Planning['CycleSummary']
 export type LibrarySession = Planning['LibrarySession']
 // A session template with its blocks; the form sends a TrainingSessionInput without id.
 export type LibrarySessionDetail = Planning['LibrarySessionDetail']
+export type BlockTemplate = Planning['BlockTemplate']
+export type BlockTemplateInput = Planning['BlockTemplateInput']
 
 // An entry of the user's 1RM history of an exercise, always in a weight unit; the newest is the
 // current max.

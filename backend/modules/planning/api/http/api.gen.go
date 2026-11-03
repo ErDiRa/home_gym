@@ -147,6 +147,37 @@ type AmountUnitNames struct {
 	RepsUnitName string `json:"reps_unit_name"`
 }
 
+// BlockTemplate A saved block, a combination of exercises without sets, reps or load; exercises deleted since are left out.
+type BlockTemplate struct {
+	CreatedAt time.Time               `json:"created_at"`
+	Exercises []BlockTemplateExercise `json:"exercises"`
+	Id        openapi_types.UUID      `json:"id"`
+	Kind      string                  `json:"kind"`
+	Name      string                  `json:"name"`
+	UpdatedAt time.Time               `json:"updated_at"`
+}
+
+// BlockTemplateExercise defines model for BlockTemplateExercise.
+type BlockTemplateExercise struct {
+	ExerciseId openapi_types.UUID `json:"exercise_id"`
+	Name       string             `json:"name"`
+
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
+	Type ExerciseType `json:"type"`
+}
+
+// BlockTemplateInput defines model for BlockTemplateInput.
+type BlockTemplateInput struct {
+	// ExerciseIds The user's exercises in order, 1-20.
+	ExerciseIds []openapi_types.UUID `json:"exercise_ids"`
+
+	// Kind A block kind's code; the exercises must fit its rules.
+	Kind string `json:"kind"`
+
+	// Name Unique among the user's saved blocks (ignoring case), at most 100 characters.
+	Name string `json:"name"`
+}
+
 // Cycle defines model for Cycle.
 type Cycle struct {
 	CreatedAt   time.Time `json:"created_at"`
@@ -534,6 +565,9 @@ type ID = openapi_types.UUID
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
+// Conflict defines model for Conflict.
+type Conflict = Error
+
 // NotFound defines model for NotFound.
 type NotFound = Error
 
@@ -550,6 +584,12 @@ type DeleteCycleParams struct {
 
 // DeleteCycleParamsTrainings defines parameters for DeleteCycle.
 type DeleteCycleParamsTrainings string
+
+// CreateBlockTemplateJSONRequestBody defines body for CreateBlockTemplate for application/json ContentType.
+type CreateBlockTemplateJSONRequestBody = BlockTemplateInput
+
+// UpdateBlockTemplateJSONRequestBody defines body for UpdateBlockTemplate for application/json ContentType.
+type UpdateBlockTemplateJSONRequestBody = BlockTemplateInput
 
 // CreateCycleJSONRequestBody defines body for CreateCycle for application/json ContentType.
 type CreateCycleJSONRequestBody = CycleInput
@@ -574,6 +614,21 @@ type UpdateTrainingJSONRequestBody = TrainingInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListBlockTemplates The user's saved blocks (reusable combinations of exercises) by name.
+	// (GET /block-templates)
+	ListBlockTemplates(w http.ResponseWriter, r *http.Request)
+
+	// (POST /block-templates)
+	CreateBlockTemplate(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /block-templates/{id})
+	DeleteBlockTemplate(w http.ResponseWriter, r *http.Request, id ID)
+
+	// (GET /block-templates/{id})
+	GetBlockTemplate(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateBlockTemplate Replace a saved block; sessions it was added to keep their blocks.
+	// (PUT /block-templates/{id})
+	UpdateBlockTemplate(w http.ResponseWriter, r *http.Request, id ID)
 	// ListCycles The user's cycles with their goal and training counts, the latest first.
 	// (GET /cycles)
 	ListCycles(w http.ResponseWriter, r *http.Request)
@@ -630,6 +685,33 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListBlockTemplates The user's saved blocks (reusable combinations of exercises) by name.
+// (GET /block-templates)
+func (_ Unimplemented) ListBlockTemplates(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /block-templates)
+func (_ Unimplemented) CreateBlockTemplate(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /block-templates/{id})
+func (_ Unimplemented) DeleteBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /block-templates/{id})
+func (_ Unimplemented) GetBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateBlockTemplate Replace a saved block; sessions it was added to keep their blocks.
+// (PUT /block-templates/{id})
+func (_ Unimplemented) UpdateBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // ListCycles The user's cycles with their goal and training counts, the latest first.
 // (GET /cycles)
@@ -731,6 +813,112 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListBlockTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListBlockTemplates(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBlockTemplates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBlockTemplate operation middleware
+func (siw *ServerInterfaceWrapper) CreateBlockTemplate(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBlockTemplate(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBlockTemplate operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBlockTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBlockTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBlockTemplate operation middleware
+func (siw *ServerInterfaceWrapper) GetBlockTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBlockTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBlockTemplate operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBlockTemplate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBlockTemplate(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListCycles operation middleware
 func (siw *ServerInterfaceWrapper) ListCycles(w http.ResponseWriter, r *http.Request) {
@@ -1235,6 +1423,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/sessions/{id}", wrapper.UpdateSession)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/block-templates", wrapper.ListBlockTemplates)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/block-templates", wrapper.CreateBlockTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/block-templates/{id}", wrapper.DeleteBlockTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/block-templates/{id}", wrapper.GetBlockTemplate)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/block-templates/{id}", wrapper.UpdateBlockTemplate)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/cycles", wrapper.ListCycles)
 	})
 	r.Group(func(r chi.Router) {
@@ -1276,9 +1479,311 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 type BadRequestJSONResponse Error
 
+type ConflictJSONResponse Error
+
 type NotFoundJSONResponse Error
 
 type UnauthorizedJSONResponse Error
+
+type ListBlockTemplatesRequestObject struct {
+}
+
+type ListBlockTemplatesResponseObject interface {
+	VisitListBlockTemplatesResponse(w http.ResponseWriter) error
+}
+
+type ListBlockTemplates200JSONResponse []BlockTemplate
+
+func (response ListBlockTemplates200JSONResponse) VisitListBlockTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListBlockTemplates401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListBlockTemplates401JSONResponse) VisitListBlockTemplatesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBlockTemplateRequestObject struct {
+	Body *CreateBlockTemplateJSONRequestBody
+}
+
+type CreateBlockTemplateResponseObject interface {
+	VisitCreateBlockTemplateResponse(w http.ResponseWriter) error
+}
+
+type CreateBlockTemplate201JSONResponse BlockTemplate
+
+func (response CreateBlockTemplate201JSONResponse) VisitCreateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBlockTemplate400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateBlockTemplate400JSONResponse) VisitCreateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBlockTemplate401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateBlockTemplate401JSONResponse) VisitCreateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBlockTemplate409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateBlockTemplate409JSONResponse) VisitCreateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBlockTemplateRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteBlockTemplateResponseObject interface {
+	VisitDeleteBlockTemplateResponse(w http.ResponseWriter) error
+}
+
+type DeleteBlockTemplate204Response struct {
+}
+
+func (response DeleteBlockTemplate204Response) VisitDeleteBlockTemplateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteBlockTemplate400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteBlockTemplate400JSONResponse) VisitDeleteBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBlockTemplate401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteBlockTemplate401JSONResponse) VisitDeleteBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBlockTemplate404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteBlockTemplate404JSONResponse) VisitDeleteBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBlockTemplateRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetBlockTemplateResponseObject interface {
+	VisitGetBlockTemplateResponse(w http.ResponseWriter) error
+}
+
+type GetBlockTemplate200JSONResponse BlockTemplate
+
+func (response GetBlockTemplate200JSONResponse) VisitGetBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBlockTemplate400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetBlockTemplate400JSONResponse) VisitGetBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBlockTemplate401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetBlockTemplate401JSONResponse) VisitGetBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBlockTemplate404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetBlockTemplate404JSONResponse) VisitGetBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBlockTemplateRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateBlockTemplateJSONRequestBody
+}
+
+type UpdateBlockTemplateResponseObject interface {
+	VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error
+}
+
+type UpdateBlockTemplate200JSONResponse BlockTemplate
+
+func (response UpdateBlockTemplate200JSONResponse) VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBlockTemplate400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateBlockTemplate400JSONResponse) VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBlockTemplate401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateBlockTemplate401JSONResponse) VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBlockTemplate404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateBlockTemplate404JSONResponse) VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBlockTemplate409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateBlockTemplate409JSONResponse) VisitUpdateBlockTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListCyclesRequestObject struct {
 }
@@ -2213,6 +2718,21 @@ func (response DuplicateTraining404JSONResponse) VisitDuplicateTrainingResponse(
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListBlockTemplates The user's saved blocks (reusable combinations of exercises) by name.
+	// (GET /block-templates)
+	ListBlockTemplates(ctx context.Context, request ListBlockTemplatesRequestObject) (ListBlockTemplatesResponseObject, error)
+
+	// (POST /block-templates)
+	CreateBlockTemplate(ctx context.Context, request CreateBlockTemplateRequestObject) (CreateBlockTemplateResponseObject, error)
+
+	// (DELETE /block-templates/{id})
+	DeleteBlockTemplate(ctx context.Context, request DeleteBlockTemplateRequestObject) (DeleteBlockTemplateResponseObject, error)
+
+	// (GET /block-templates/{id})
+	GetBlockTemplate(ctx context.Context, request GetBlockTemplateRequestObject) (GetBlockTemplateResponseObject, error)
+	// UpdateBlockTemplate Replace a saved block; sessions it was added to keep their blocks.
+	// (PUT /block-templates/{id})
+	UpdateBlockTemplate(ctx context.Context, request UpdateBlockTemplateRequestObject) (UpdateBlockTemplateResponseObject, error)
 	// ListCycles The user's cycles with their goal and training counts, the latest first.
 	// (GET /cycles)
 	ListCycles(ctx context.Context, request ListCyclesRequestObject) (ListCyclesResponseObject, error)
@@ -2303,6 +2823,146 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListBlockTemplates operation middleware
+func (sh *strictHandler) ListBlockTemplates(w http.ResponseWriter, r *http.Request) {
+	var request ListBlockTemplatesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListBlockTemplates(ctx, request.(ListBlockTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListBlockTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListBlockTemplatesResponseObject); ok {
+		if err := validResponse.VisitListBlockTemplatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateBlockTemplate operation middleware
+func (sh *strictHandler) CreateBlockTemplate(w http.ResponseWriter, r *http.Request) {
+	var request CreateBlockTemplateRequestObject
+
+	var body CreateBlockTemplateJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBlockTemplate(ctx, request.(CreateBlockTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBlockTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBlockTemplateResponseObject); ok {
+		if err := validResponse.VisitCreateBlockTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteBlockTemplate operation middleware
+func (sh *strictHandler) DeleteBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteBlockTemplateRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBlockTemplate(ctx, request.(DeleteBlockTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBlockTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteBlockTemplateResponseObject); ok {
+		if err := validResponse.VisitDeleteBlockTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBlockTemplate operation middleware
+func (sh *strictHandler) GetBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetBlockTemplateRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBlockTemplate(ctx, request.(GetBlockTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBlockTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBlockTemplateResponseObject); ok {
+		if err := validResponse.VisitGetBlockTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBlockTemplate operation middleware
+func (sh *strictHandler) UpdateBlockTemplate(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateBlockTemplateRequestObject
+
+	request.Id = id
+
+	var body UpdateBlockTemplateJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBlockTemplate(ctx, request.(UpdateBlockTemplateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBlockTemplate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBlockTemplateResponseObject); ok {
+		if err := validResponse.VisitUpdateBlockTemplateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListCycles operation middleware

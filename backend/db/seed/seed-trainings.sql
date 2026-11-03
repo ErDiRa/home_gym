@@ -19,6 +19,7 @@
 --                       (logged as sets: the minutes and the calories as the load in cal)
 --   Strength base       a cycle of 8 weeks around both strength phases (now in its second half),
 --                       with two goals; the other trainings are in no cycle
+--   Saved blocks        a barbell complex and a pull-up superset
 -- The user also rates some exercises (1-5), for the rating filter in the exercise picker.
 
 -- Helpers, dropped with the database session. Units and exercises are looked up by name.
@@ -509,4 +510,23 @@ BEGIN
         (c, 2, 'Get stronger in the compounds', 'Squat 5×5 at 105 kg', 'open');
     UPDATE trainings SET cycle_id = c
     WHERE user_id = pg_temp.me() AND name IN ('Strength – Phase 1', 'Strength – Phase 2');
+END $$;
+
+-- Saved blocks: combinations used often, to add to new sessions (only the exercises; sets, reps
+-- and load are planned in the session). Skipped when the user already has some.
+DO $$
+DECLARE b uuid;
+BEGIN
+    IF EXISTS (SELECT 1 FROM block_templates WHERE user_id = pg_temp.me()) THEN
+        RETURN;
+    END IF;
+    INSERT INTO block_templates (user_id, name, kind) VALUES (pg_temp.me(), 'Barbell complex', 'complex') RETURNING id INTO b;
+    INSERT INTO block_template_exercises (template_id, position, exercise_id) VALUES
+        (b, 1, pg_temp.exercise_id('Deadlift')),
+        (b, 2, pg_temp.exercise_id('Barbell Row')),
+        (b, 3, pg_temp.exercise_id('Overhead Press'));
+    INSERT INTO block_templates (user_id, name, kind) VALUES (pg_temp.me(), 'Pull-up + curl', 'superset') RETURNING id INTO b;
+    INSERT INTO block_template_exercises (template_id, position, exercise_id) VALUES
+        (b, 1, pg_temp.exercise_id('Pull-up')),
+        (b, 2, pg_temp.exercise_id('Bicep Curl'));
 END $$;

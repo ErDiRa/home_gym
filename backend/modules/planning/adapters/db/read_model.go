@@ -118,6 +118,60 @@ func (m *ReadModel) LibrarySession(ctx context.Context, userID, id uuid.UUID) (p
 	}, nil
 }
 
+// BlockTemplates lists the user's live saved blocks by name.
+func (m *ReadModel) BlockTemplates(ctx context.Context, userID uuid.UUID) ([]planninghttp.BlockTemplate, error) {
+	rows, err := m.q.ListBlockTemplates(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return m.blockTemplates(ctx, userID, mapSlice(rows, func(r dbmodels.ListBlockTemplatesRow) dbmodels.GetBlockTemplateRow {
+		return dbmodels.GetBlockTemplateRow(r)
+	}))
+}
+
+// BlockTemplate is one of the user's live saved blocks.
+func (m *ReadModel) BlockTemplate(ctx context.Context, userID, id uuid.UUID) (planninghttp.BlockTemplate, error) {
+	row, err := m.q.GetBlockTemplate(ctx, dbmodels.GetBlockTemplateParams{ID: id, UserID: userID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return planninghttp.BlockTemplate{}, errs.NotFound("saved block not found", err)
+	}
+	if err != nil {
+		return planninghttp.BlockTemplate{}, err
+	}
+	out, err := m.blockTemplates(ctx, userID, []dbmodels.GetBlockTemplateRow{row})
+	if err != nil {
+		return planninghttp.BlockTemplate{}, err
+	}
+	return out[0], nil
+}
+
+// blockTemplates adds their exercises to saved blocks, with the catalog's names; exercises deleted
+// since are left out.
+func (m *ReadModel) blockTemplates(ctx context.Context, userID uuid.UUID, rows []dbmodels.GetBlockTemplateRow) ([]planninghttp.BlockTemplate, error) {
+	ids := mapSlice(rows, func(r dbmodels.GetBlockTemplateRow) uuid.UUID { return r.ID })
+	links, err := m.q.ListBlockTemplateExercises(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	exercises, err := m.catalog.Exercises(ctx, userID, mapSlice(links, func(l dbmodels.ListBlockTemplateExercisesRow) uuid.UUID { return l.ExerciseID }))
+	if err != nil {
+		return nil, err
+	}
+	byTemplate := map[uuid.UUID][]planninghttp.BlockTemplateExercise{}
+	for _, l := range links {
+		if e, ok := exercises[l.ExerciseID]; ok && !e.Deleted {
+			byTemplate[l.TemplateID] = append(byTemplate[l.TemplateID], planninghttp.BlockTemplateExercise{
+				ExerciseId: e.ID, Name: e.Name, Type: planninghttp.ExerciseType(e.Type),
+			})
+		}
+	}
+	return mapSlice(rows, func(r dbmodels.GetBlockTemplateRow) planninghttp.BlockTemplate {
+		return planninghttp.BlockTemplate{
+			Id: r.ID, Name: r.Name, Kind: r.Kind, Exercises: orEmpty(byTemplate[r.ID]), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		}
+	}), nil
+}
+
 // Cycles lists the user's live cycles with their goal and training counts, the latest first.
 func (m *ReadModel) Cycles(ctx context.Context, userID uuid.UUID) ([]planninghttp.CycleSummary, error) {
 	rows, err := m.q.ListCycles(ctx, userID)

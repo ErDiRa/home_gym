@@ -8,6 +8,7 @@ import type { paths as trackingPaths } from './openapi/tracking'
 import type { paths as whoopPaths } from './openapi/whoop'
 import { state } from './session'
 import type {
+  BlockTemplateInput,
   BodyWeightInput,
   CycleImportInput,
   CycleInput,
@@ -127,6 +128,13 @@ export const createSession = (input: TrainingSessionInput) => unwrap(planning.PO
 export const updateSession = (id: string, input: TrainingSessionInput) =>
   unwrap(planning.PUT('/sessions/{id}', { ...byId(id), body: input }))
 export const deleteSession = (id: string) => unwrap(planning.DELETE('/sessions/{id}', byId(id)))
+// Saved blocks: combinations of exercises (a complex, a superset) that sessions copy.
+export const listBlockTemplates = () => unwrap(planning.GET('/block-templates'))
+export const getBlockTemplate = (id: string) => unwrap(planning.GET('/block-templates/{id}', byId(id)))
+export const createBlockTemplate = (input: BlockTemplateInput) => unwrap(planning.POST('/block-templates', { body: input }))
+export const updateBlockTemplate = (id: string, input: BlockTemplateInput) =>
+  unwrap(planning.PUT('/block-templates/{id}', { ...byId(id), body: input }))
+export const deleteBlockTemplate = (id: string) => unwrap(planning.DELETE('/block-templates/{id}', byId(id)))
 
 // A period [from, to) as query parameters; instants, so the server needs no time zone.
 const period = (from: Date, to: Date) => ({ from: from.toISOString(), to: to.toISOString() })

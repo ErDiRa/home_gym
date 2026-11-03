@@ -40,6 +40,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/block-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The user's saved blocks (reusable combinations of exercises) by name. */
+        get: operations["ListBlockTemplates"];
+        put?: never;
+        post: operations["CreateBlockTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/block-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get: operations["GetBlockTemplate"];
+        /** Replace a saved block; sessions it was added to keep their blocks. */
+        put: operations["UpdateBlockTemplate"];
+        post?: never;
+        delete: operations["DeleteBlockTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cycles": {
         parameters: {
             query?: never;
@@ -389,6 +425,32 @@ export interface components {
             updated_at: string;
             blocks: components["schemas"]["TrainingBlock"][];
         };
+        BlockTemplateInput: {
+            /** @description Unique among the user's saved blocks (ignoring case), at most 100 characters. */
+            name: string;
+            /** @description A block kind's code; the exercises must fit its rules. */
+            kind: string;
+            /** @description The user's exercises in order, 1-20. */
+            exercise_ids: string[];
+        };
+        /** @description A saved block, a combination of exercises without sets, reps or load; exercises deleted since are left out. */
+        BlockTemplate: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: string;
+            exercises: components["schemas"]["BlockTemplateExercise"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BlockTemplateExercise: {
+            /** Format: uuid */
+            exercise_id: string;
+            name: string;
+            type: components["schemas"]["ExerciseType"];
+        };
         /** @enum {string} */
         GoalStatus: "open" | "achieved" | "missed";
         CycleGoalInput: {
@@ -522,11 +584,25 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Clashes with existing data, e.g. a name taken. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         ID: string;
     };
     requestBodies: {
+        BlockTemplateInput: {
+            content: {
+                "application/json": components["schemas"]["BlockTemplateInput"];
+            };
+        };
         SessionInput: {
             content: {
                 "application/json": components["schemas"]["TrainingSessionInput"];
@@ -642,6 +718,124 @@ export interface operations {
         };
     };
     DeleteSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    ListBlockTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved blocks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockTemplate"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    CreateBlockTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["BlockTemplateInput"];
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockTemplate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    GetBlockTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved block. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockTemplate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    UpdateBlockTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["BlockTemplateInput"];
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockTemplate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    DeleteBlockTemplate: {
         parameters: {
             query?: never;
             header?: never;

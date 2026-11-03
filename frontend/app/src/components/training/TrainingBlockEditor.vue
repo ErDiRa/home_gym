@@ -28,6 +28,7 @@
         size="sm"
         class="w-auto! min-w-40 flex-1 font-medium!"
       />
+      <MoreMenu :items="menuItems" :label="`More actions of block ${letter}`" @select="onMenu" />
       <MoveRemoveButtons :index="index" :count="count" :label="`block ${letter}`" @move="emit('move', $event)" @remove="emit('remove')" />
     </div>
     <p v-if="collapsed" class="mt-1 ml-10 text-xs text-slate-500">
@@ -173,6 +174,7 @@
         Add exercises…
       </AppButton>
     </div>
+    <SaveBlockDialog :open="saveOpen" :block="block" @close="saveOpen = false" />
     <ExercisePickerDialog
       :open="pickerOpen"
       :title="`Add exercises to block ${letter}`"
@@ -197,9 +199,10 @@ import RatingBadge from '../exercise/RatingBadge.vue'
 import AmountInput from './AmountInput.vue'
 import IntensityTargetInput from './IntensityTargetInput.vue'
 import ExercisePickerDialog from './ExercisePickerDialog.vue'
+import SaveBlockDialog from './SaveBlockDialog.vue'
+import MoreMenu from '../ui/MoreMenu.vue'
 import MoveRemoveButtons from '../ui/MoveRemoveButtons.vue'
-import { blockLetter, blockProblem, emptyAmount, exerciseLabel, move, nextKey, type BlockRow } from './trainingForm'
-import { emptyIntensity } from '../exercise/intensity'
+import { blockLetter, blockProblem, exerciseLabel, exerciseRow, move, type BlockRow } from './trainingForm'
 import { DEFAULT_INTERVAL, scoreFormat, scoreFormats, wodSummary } from './wod'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
@@ -266,6 +269,21 @@ watch(
 )
 
 const pickerOpen = ref(false)
+const saveOpen = ref(false)
+
+// The block's further actions behind its "…" button.
+const menuItems = computed(() => [
+  {
+    id: 'save',
+    name: 'Save block',
+    disabled: !block.value.exercises.length,
+    title: block.value.exercises.length ? 'Save its exercises to reuse them in other sessions' : 'Add exercises first',
+  },
+])
+
+function onMenu(id: string) {
+  if (id === 'save') saveOpen.value = true
+}
 
 function addExercises(exercises: Exercise[]) {
   exercises.forEach(addExercise)
@@ -273,16 +291,6 @@ function addExercises(exercises: Exercise[]) {
 }
 
 function addExercise(exercise: Exercise) {
-  block.value.exercises.push({
-    key: nextKey(),
-    exercise_id: exercise.id,
-    name: exercise.name,
-    type: exercise.type,
-    sets: block.value.sets,
-    tempo: '',
-    notes: '',
-    ...emptyAmount(),
-    ...emptyIntensity(),
-  })
+  block.value.exercises.push(exerciseRow(exercise.id, exercise.name, exercise.type, block.value.sets))
 }
 </script>

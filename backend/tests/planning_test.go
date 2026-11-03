@@ -186,6 +186,57 @@ func TestLibrarySession(t *testing.T) {
 	}
 }
 
+// A saved block keeps a combination of exercises; names are unique per user, another user's is
+// missing.
+func TestBlockTemplates(t *testing.T) {
+	t.Parallel()
+	u := newUser(t)
+	ctx := t.Context()
+	clean, squat, jerk := createExercise(t, u, exerciseInput("Power clean")), createExercise(t, u, exerciseInput("Front squat")), createExercise(t, u, exerciseInput("Jerk"))
+
+	in := planningclient.BlockTemplateInput{Name: " Clean complex ", Kind: "complex", ExerciseIds: []uuid.UUID{clean, squat, jerk}}
+	created, err := u.Planning.CreateBlockTemplateWithResponse(ctx, in)
+	if err != nil || created.StatusCode() != http.StatusCreated {
+		t.Fatalf("create = %v %s", err, body(created.Body))
+	}
+	if c := created.JSON201; c.Name != "Clean complex" || len(c.Exercises) != 3 || c.Exercises[1].Name != "Front squat" {
+		t.Errorf("created = %s", body(created.Body))
+	}
+	id := created.JSON201.Id
+
+	in.Name = "clean COMPLEX"
+	if resp, _ := u.Planning.CreateBlockTemplateWithResponse(ctx, in); resp.StatusCode() != http.StatusConflict {
+		t.Errorf("duplicate name = %d %s, want 409", resp.StatusCode(), body(resp.Body))
+	}
+
+	updated, _ := u.Planning.UpdateBlockTemplateWithResponse(ctx, id, planningclient.BlockTemplateInput{Name: "Clean + jerk", Kind: "complex", ExerciseIds: []uuid.UUID{clean, jerk}})
+	if updated.StatusCode() != http.StatusOK || len(updated.JSON200.Exercises) != 2 || updated.JSON200.Exercises[1].ExerciseId != jerk {
+		t.Errorf("update = %d %s", updated.StatusCode(), body(updated.Body))
+	}
+	if list, _ := u.Planning.ListBlockTemplatesWithResponse(ctx); len(*list.JSON200) != 1 || (*list.JSON200)[0].Name != "Clean + jerk" {
+		t.Errorf("list = %s", body(list.Body))
+	}
+
+	other := newUser(t)
+	if resp, _ := other.Planning.GetBlockTemplateWithResponse(ctx, id); resp.StatusCode() != http.StatusNotFound {
+		t.Errorf("another user's = %d, want 404", resp.StatusCode())
+	}
+	if resp, _ := other.Planning.CreateBlockTemplateWithResponse(ctx, in); resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("another user's exercises = %d, want 400", resp.StatusCode())
+	}
+
+	if resp, _ := u.Planning.DeleteBlockTemplateWithResponse(ctx, id); resp.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete = %d", resp.StatusCode())
+	}
+	if resp, _ := u.Planning.GetBlockTemplateWithResponse(ctx, id); resp.StatusCode() != http.StatusNotFound {
+		t.Errorf("get after delete = %d, want 404", resp.StatusCode())
+	}
+	// A deleted saved block's name is free again.
+	if resp, _ := u.Planning.CreateBlockTemplateWithResponse(ctx, planningclient.BlockTemplateInput{Name: "Clean + jerk", Kind: "complex", ExerciseIds: []uuid.UUID{clean, jerk}}); resp.StatusCode() != http.StatusCreated {
+		t.Errorf("reuse name = %d %s", resp.StatusCode(), body(resp.Body))
+	}
+}
+
 func TestCycleWithTrainings(t *testing.T) {
 	t.Parallel()
 	u := newUser(t)

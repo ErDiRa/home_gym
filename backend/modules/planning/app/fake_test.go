@@ -77,6 +77,7 @@ type fakeRepo struct {
 	updated       []Input
 	deleted       []uuid.UUID
 	sessions      []SessionInput
+	templates     []BlockTemplateInput
 	cycles        []CycleInput
 	withTrainings []bool
 	imported      []Input
@@ -131,6 +132,24 @@ func (f *fakeRepo) UpdateSession(_ context.Context, _, _ uuid.UUID, in SessionIn
 }
 
 func (f *fakeRepo) DeleteSession(context.Context, uuid.UUID, uuid.UUID) error { return f.err }
+
+func (f *fakeRepo) CreateBlockTemplate(_ context.Context, _ uuid.UUID, in BlockTemplateInput) (uuid.UUID, error) {
+	if f.err != nil {
+		return uuid.Nil, f.err
+	}
+	f.templates = append(f.templates, in)
+	return uuid.New(), nil
+}
+
+func (f *fakeRepo) UpdateBlockTemplate(_ context.Context, _, _ uuid.UUID, in BlockTemplateInput) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.templates = append(f.templates, in)
+	return nil
+}
+
+func (f *fakeRepo) DeleteBlockTemplate(context.Context, uuid.UUID, uuid.UUID) error { return f.err }
 
 func (f *fakeRepo) CreateCycle(_ context.Context, _ uuid.UUID, in CycleInput) (uuid.UUID, error) {
 	if f.err != nil {

@@ -148,6 +148,37 @@ type AmountUnitNames struct {
 	RepsUnitName string `json:"reps_unit_name"`
 }
 
+// BlockTemplate A saved block, a combination of exercises without sets, reps or load; exercises deleted since are left out.
+type BlockTemplate struct {
+	CreatedAt time.Time               `json:"created_at"`
+	Exercises []BlockTemplateExercise `json:"exercises"`
+	Id        openapi_types.UUID      `json:"id"`
+	Kind      string                  `json:"kind"`
+	Name      string                  `json:"name"`
+	UpdatedAt time.Time               `json:"updated_at"`
+}
+
+// BlockTemplateExercise defines model for BlockTemplateExercise.
+type BlockTemplateExercise struct {
+	ExerciseId openapi_types.UUID `json:"exercise_id"`
+	Name       string             `json:"name"`
+
+	// Type Whether an exercise mainly improves mobility, strength or endurance.
+	Type ExerciseType `json:"type"`
+}
+
+// BlockTemplateInput defines model for BlockTemplateInput.
+type BlockTemplateInput struct {
+	// ExerciseIds The user's exercises in order, 1-20.
+	ExerciseIds []openapi_types.UUID `json:"exercise_ids"`
+
+	// Kind A block kind's code; the exercises must fit its rules.
+	Kind string `json:"kind"`
+
+	// Name Unique among the user's saved blocks (ignoring case), at most 100 characters.
+	Name string `json:"name"`
+}
+
 // Cycle defines model for Cycle.
 type Cycle struct {
 	CreatedAt   time.Time `json:"created_at"`
@@ -535,6 +566,9 @@ type ID = openapi_types.UUID
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
+// Conflict defines model for Conflict.
+type Conflict = Error
+
 // NotFound defines model for NotFound.
 type NotFound = Error
 
@@ -551,6 +585,12 @@ type DeleteCycleParams struct {
 
 // DeleteCycleParamsTrainings defines parameters for DeleteCycle.
 type DeleteCycleParamsTrainings string
+
+// CreateBlockTemplateJSONRequestBody defines body for CreateBlockTemplate for application/json ContentType.
+type CreateBlockTemplateJSONRequestBody = BlockTemplateInput
+
+// UpdateBlockTemplateJSONRequestBody defines body for UpdateBlockTemplate for application/json ContentType.
+type UpdateBlockTemplateJSONRequestBody = BlockTemplateInput
 
 // CreateCycleJSONRequestBody defines body for CreateCycle for application/json ContentType.
 type CreateCycleJSONRequestBody = CycleInput
@@ -646,6 +686,39 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// ListBlockTemplates The user's saved blocks (reusable combinations of exercises) by name.
+	//
+	// Corresponds with GET /block-templates (the `ListBlockTemplates` operationId).
+	ListBlockTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBlockTemplateWithBody performs a POST /block-templates (the `CreateBlockTemplate` operationId) request,
+	// with any type of body and a specified content type.
+	CreateBlockTemplateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBlockTemplate performs a POST /block-templates (the `CreateBlockTemplate` operationId) request.
+	// Takes a body of the `application/json` content type.
+	CreateBlockTemplate(ctx context.Context, body CreateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBlockTemplate performs a DELETE /block-templates/{id} (the `DeleteBlockTemplate` operationId) request.
+	DeleteBlockTemplate(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBlockTemplate performs a GET /block-templates/{id} (the `GetBlockTemplate` operationId) request.
+	GetBlockTemplate(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBlockTemplateWithBody Replace a saved block; sessions it was added to keep their blocks.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+	UpdateBlockTemplateWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBlockTemplate Replace a saved block; sessions it was added to keep their blocks.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+	UpdateBlockTemplate(ctx context.Context, id ID, body UpdateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCycles The user's cycles with their goal and training counts, the latest first.
 	//
@@ -754,6 +827,109 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /trainings/{id}/duplicate (the `DuplicateTraining` operationId).
 	DuplicateTraining(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListBlockTemplates The user's saved blocks (reusable combinations of exercises) by name.
+//
+// Corresponds with GET /block-templates (the `ListBlockTemplates` operationId).
+func (c *Client) ListBlockTemplates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListBlockTemplatesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBlockTemplateWithBody performs a POST /block-templates (the `CreateBlockTemplate` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) CreateBlockTemplateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBlockTemplateRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBlockTemplate performs a POST /block-templates (the `CreateBlockTemplate` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) CreateBlockTemplate(ctx context.Context, body CreateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBlockTemplateRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBlockTemplate performs a DELETE /block-templates/{id} (the `DeleteBlockTemplate` operationId) request.
+func (c *Client) DeleteBlockTemplate(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBlockTemplateRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBlockTemplate performs a GET /block-templates/{id} (the `GetBlockTemplate` operationId) request.
+func (c *Client) GetBlockTemplate(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBlockTemplateRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateBlockTemplateWithBody Replace a saved block; sessions it was added to keep their blocks.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+func (c *Client) UpdateBlockTemplateWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBlockTemplateRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateBlockTemplate Replace a saved block; sessions it was added to keep their blocks.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+func (c *Client) UpdateBlockTemplate(ctx context.Context, id ID, body UpdateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBlockTemplateRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // ListCycles The user's cycles with their goal and training counts, the latest first.
@@ -1102,6 +1278,188 @@ func (c *Client) DuplicateTraining(ctx context.Context, id ID, reqEditors ...Req
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListBlockTemplatesRequest constructs an http.Request for the ListBlockTemplates method
+func NewListBlockTemplatesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/block-templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateBlockTemplateRequest calls the generic CreateBlockTemplate builder with application/json body
+func NewCreateBlockTemplateRequest(server string, body CreateBlockTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBlockTemplateRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateBlockTemplateRequestWithBody constructs an http.Request for the CreateBlockTemplate method, with any body, and a specified content type
+func NewCreateBlockTemplateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/block-templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBlockTemplateRequest constructs an http.Request for the DeleteBlockTemplate method
+func NewDeleteBlockTemplateRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/block-templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBlockTemplateRequest constructs an http.Request for the GetBlockTemplate method
+func NewGetBlockTemplateRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/block-templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateBlockTemplateRequest calls the generic UpdateBlockTemplate builder with application/json body
+func NewUpdateBlockTemplateRequest(server string, id ID, body UpdateBlockTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateBlockTemplateRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateBlockTemplateRequestWithBody constructs an http.Request for the UpdateBlockTemplate method, with any body, and a specified content type
+func NewUpdateBlockTemplateRequestWithBody(server string, id ID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/block-templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewListCyclesRequest constructs an http.Request for the ListCycles method
@@ -1795,6 +2153,47 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListBlockTemplatesWithResponse The user's saved blocks (reusable combinations of exercises) by name.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /block-templates (the `ListBlockTemplates` operationId).
+	ListBlockTemplatesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListBlockTemplatesResponse, error)
+
+	// CreateBlockTemplateWithBodyWithResponse performs a POST /block-templates (the `CreateBlockTemplate` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	CreateBlockTemplateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBlockTemplateResponse, error)
+
+	// CreateBlockTemplateWithResponse performs a POST /block-templates (the `CreateBlockTemplate` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	CreateBlockTemplateWithResponse(ctx context.Context, body CreateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBlockTemplateResponse, error)
+
+	// DeleteBlockTemplateWithResponse performs a DELETE /block-templates/{id} (the `DeleteBlockTemplate` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	DeleteBlockTemplateWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteBlockTemplateResponse, error)
+
+	// GetBlockTemplateWithResponse performs a GET /block-templates/{id} (the `GetBlockTemplate` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetBlockTemplateWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetBlockTemplateResponse, error)
+
+	// UpdateBlockTemplateWithBodyWithResponse Replace a saved block; sessions it was added to keep their blocks.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+	UpdateBlockTemplateWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBlockTemplateResponse, error)
+
+	// UpdateBlockTemplateWithResponse Replace a saved block; sessions it was added to keep their blocks.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+	UpdateBlockTemplateWithResponse(ctx context.Context, id ID, body UpdateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBlockTemplateResponse, error)
+
 	// ListCyclesWithResponse The user's cycles with their goal and training counts, the latest first.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1932,6 +2331,302 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /trainings/{id}/duplicate (the `DuplicateTraining` operationId).
 	DuplicateTrainingWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DuplicateTrainingResponse, error)
+}
+
+type ListBlockTemplatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]BlockTemplate
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListBlockTemplatesResponse) GetJSON200() *[]BlockTemplate {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListBlockTemplatesResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r ListBlockTemplatesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListBlockTemplatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListBlockTemplatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListBlockTemplatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateBlockTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *BlockTemplate
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateBlockTemplateResponse) GetJSON201() *BlockTemplate {
+	return r.JSON201
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CreateBlockTemplateResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateBlockTemplateResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r CreateBlockTemplateResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateBlockTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateBlockTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBlockTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateBlockTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBlockTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteBlockTemplateResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteBlockTemplateResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteBlockTemplateResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBlockTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBlockTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBlockTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBlockTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBlockTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BlockTemplate
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBlockTemplateResponse) GetJSON200() *BlockTemplate {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetBlockTemplateResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetBlockTemplateResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetBlockTemplateResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBlockTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBlockTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBlockTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBlockTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateBlockTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BlockTemplate
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateBlockTemplateResponse) GetJSON200() *BlockTemplate {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpdateBlockTemplateResponse) GetJSON400() *BadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateBlockTemplateResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateBlockTemplateResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpdateBlockTemplateResponse) GetJSON409() *Conflict {
+	return r.JSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateBlockTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateBlockTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateBlockTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateBlockTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListCyclesResponse struct {
@@ -2897,6 +3592,89 @@ func (r DuplicateTrainingResponse) ContentType() string {
 	return ""
 }
 
+// ListBlockTemplatesWithResponse The user's saved blocks (reusable combinations of exercises) by name.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /block-templates (the `ListBlockTemplates` operationId).
+func (c *ClientWithResponses) ListBlockTemplatesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListBlockTemplatesResponse, error) {
+	rsp, err := c.ListBlockTemplates(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListBlockTemplatesResponse(rsp)
+}
+
+// CreateBlockTemplateWithBodyWithResponse performs a POST /block-templates (the `CreateBlockTemplate` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateBlockTemplateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBlockTemplateResponse, error) {
+	rsp, err := c.CreateBlockTemplateWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBlockTemplateResponse(rsp)
+}
+
+// CreateBlockTemplateWithResponse performs a POST /block-templates (the `CreateBlockTemplate` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateBlockTemplateWithResponse(ctx context.Context, body CreateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBlockTemplateResponse, error) {
+	rsp, err := c.CreateBlockTemplate(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBlockTemplateResponse(rsp)
+}
+
+// DeleteBlockTemplateWithResponse performs a DELETE /block-templates/{id} (the `DeleteBlockTemplate` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DeleteBlockTemplateWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteBlockTemplateResponse, error) {
+	rsp, err := c.DeleteBlockTemplate(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBlockTemplateResponse(rsp)
+}
+
+// GetBlockTemplateWithResponse performs a GET /block-templates/{id} (the `GetBlockTemplate` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetBlockTemplateWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetBlockTemplateResponse, error) {
+	rsp, err := c.GetBlockTemplate(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBlockTemplateResponse(rsp)
+}
+
+// UpdateBlockTemplateWithBodyWithResponse Replace a saved block; sessions it was added to keep their blocks.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+func (c *ClientWithResponses) UpdateBlockTemplateWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBlockTemplateResponse, error) {
+	rsp, err := c.UpdateBlockTemplateWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBlockTemplateResponse(rsp)
+}
+
+// UpdateBlockTemplateWithResponse Replace a saved block; sessions it was added to keep their blocks.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /block-templates/{id} (the `UpdateBlockTemplate` operationId).
+func (c *ClientWithResponses) UpdateBlockTemplateWithResponse(ctx context.Context, id ID, body UpdateBlockTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBlockTemplateResponse, error) {
+	rsp, err := c.UpdateBlockTemplate(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBlockTemplateResponse(rsp)
+}
+
 // ListCyclesWithResponse The user's cycles with their goal and training counts, the latest first.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -3177,6 +3955,230 @@ func (c *ClientWithResponses) DuplicateTrainingWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseDuplicateTrainingResponse(rsp)
+}
+
+// ParseListBlockTemplatesResponse parses an HTTP response from a ListBlockTemplatesWithResponse call
+func ParseListBlockTemplatesResponse(rsp *http.Response) (*ListBlockTemplatesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListBlockTemplatesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []BlockTemplate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateBlockTemplateResponse parses an HTTP response from a CreateBlockTemplateWithResponse call
+func ParseCreateBlockTemplateResponse(rsp *http.Response) (*CreateBlockTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBlockTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest BlockTemplate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBlockTemplateResponse parses an HTTP response from a DeleteBlockTemplateWithResponse call
+func ParseDeleteBlockTemplateResponse(rsp *http.Response) (*DeleteBlockTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBlockTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBlockTemplateResponse parses an HTTP response from a GetBlockTemplateWithResponse call
+func ParseGetBlockTemplateResponse(rsp *http.Response) (*GetBlockTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBlockTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BlockTemplate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateBlockTemplateResponse parses an HTTP response from a UpdateBlockTemplateWithResponse call
+func ParseUpdateBlockTemplateResponse(rsp *http.Response) (*UpdateBlockTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateBlockTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BlockTemplate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListCyclesResponse parses an HTTP response from a ListCyclesWithResponse call

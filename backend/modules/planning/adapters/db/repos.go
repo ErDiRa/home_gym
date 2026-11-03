@@ -12,7 +12,8 @@ import (
 	"github.com/erdira/homegym/backend/modules/planning/app"
 )
 
-// Repo implements app.TrainingRepository, app.LibraryRepository and app.CycleRepository. Every
+// Repo implements app.TrainingRepository, app.LibraryRepository (session templates and saved
+// blocks) and app.CycleRepository. Every
 // write runs in one transaction (common/db.UpdateInTx).
 type Repo struct {
 	pool *pgxpool.Pool
@@ -236,6 +237,52 @@ func writeGoals(ctx context.Context, q *dbmodels.Queries, cycleID uuid.UUID, goa
 		if err := q.InsertCycleGoal(ctx, dbmodels.InsertCycleGoalParams{
 			CycleID: cycleID, Position: int32(i + 1), Title: g.Title, Target: g.Target, Status: g.Status, Notes: g.Notes,
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repo) CreateBlockTemplate(ctx context.Context, userID uuid.UUID, in app.BlockTemplateInput) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := r.inTx(ctx, func(q *dbmodels.Queries) error {
+		var err error
+		if id, err = q.InsertBlockTemplate(ctx, dbmodels.InsertBlockTemplateParams{UserID: userID, Name: in.Name, Kind: in.Kind}); err != nil {
+			return err
+		}
+		return insertTemplateExercises(ctx, q, id, in.ExerciseIDs)
+	})
+	return id, err
+}
+
+func (r *Repo) UpdateBlockTemplate(ctx context.Context, userID, id uuid.UUID, in app.BlockTemplateInput) error {
+	return r.inTx(ctx, func(q *dbmodels.Queries) error {
+		n, err := q.UpdateBlockTemplate(ctx, dbmodels.UpdateBlockTemplateParams{ID: id, UserID: userID, Name: in.Name, Kind: in.Kind})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return app.ErrNotFound
+		}
+		if err := q.DeleteBlockTemplateExercises(ctx, id); err != nil {
+			return err
+		}
+		return insertTemplateExercises(ctx, q, id, in.ExerciseIDs)
+	})
+}
+
+func (r *Repo) DeleteBlockTemplate(ctx context.Context, userID, id uuid.UUID) error {
+	n, err := dbmodels.New(r.pool).DeleteBlockTemplate(ctx, dbmodels.DeleteBlockTemplateParams{ID: id, UserID: userID})
+	if err == nil && n == 0 {
+		return app.ErrNotFound
+	}
+	return err
+}
+
+// insertTemplateExercises saves the exercises of a saved block in order, from position 1.
+func insertTemplateExercises(ctx context.Context, q *dbmodels.Queries, id uuid.UUID, exercises []uuid.UUID) error {
+	for i, e := range exercises {
+		if err := q.InsertBlockTemplateExercise(ctx, dbmodels.InsertBlockTemplateExerciseParams{TemplateID: id, Position: int32(i + 1), ExerciseID: e}); err != nil {
 			return err
 		}
 	}

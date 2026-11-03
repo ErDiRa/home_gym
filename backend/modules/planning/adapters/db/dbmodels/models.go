@@ -124,6 +124,22 @@ type IdentityUser struct {
 	DeletedAt    *time.Time
 }
 
+type PlanningBlockTemplate struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Name      string
+	Kind      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+}
+
+type PlanningBlockTemplateExercise struct {
+	TemplateID uuid.UUID
+	Position   int32
+	ExerciseID uuid.UUID
+}
+
 type PlanningCycle struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

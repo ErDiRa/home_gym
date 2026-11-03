@@ -4,7 +4,8 @@ info:
   version: "1.0"
   description: |
     What a user plans: cycles (periods with goals), trainings (sessions of blocks and exercises with
-    a plan for every week) and the session library (templates trainings copy). Every route needs the
+    a plan for every week) and the library (session templates and saved blocks, which trainings
+    copy). Every route needs the
     session cookie and acts on the user's own data only. Errors are `{"error": "message"}`.
 
     This module's part of the API contract: the Go server (package http) and client (http/client)
@@ -72,6 +73,71 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       operationId: DeleteSession
+      tags: [sessions]
+      responses:
+        "204": { description: "Deleted." }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /block-templates:
+    get:
+      operationId: ListBlockTemplates
+      tags: [sessions]
+      summary: The user's saved blocks (reusable combinations of exercises) by name.
+      responses:
+        "200":
+          description: The saved blocks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BlockTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: CreateBlockTemplate
+      tags: [sessions]
+      requestBody: { $ref: "#/components/requestBodies/BlockTemplateInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlockTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /block-templates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: GetBlockTemplate
+      tags: [sessions]
+      responses:
+        "200":
+          description: The saved block.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlockTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: UpdateBlockTemplate
+      tags: [sessions]
+      summary: Replace a saved block; sessions it was added to keep their blocks.
+      requestBody: { $ref: "#/components/requestBodies/BlockTemplateInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BlockTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      operationId: DeleteBlockTemplate
       tags: [sessions]
       responses:
         "204": { description: "Deleted." }
@@ -258,6 +324,11 @@ components:
       required: true
       schema: { type: string, format: uuid }
   requestBodies:
+    BlockTemplateInput:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BlockTemplateInput" }
     SessionInput:
       required: true
       content:
@@ -286,6 +357,11 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Missing (or another user's).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Clashes with existing data, e.g. a name taken.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -513,6 +589,31 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         blocks: { type: array, items: { $ref: "#/components/schemas/TrainingBlock" } }
+    BlockTemplateInput:
+      type: object
+      required: [name, kind, exercise_ids]
+      properties:
+        name: { type: string, description: "Unique among the user's saved blocks (ignoring case), at most 100 characters." }
+        kind: { type: string, description: "A block kind's code; the exercises must fit its rules." }
+        exercise_ids: { type: array, items: { type: string, format: uuid }, description: "The user's exercises in order, 1-20." }
+    BlockTemplate:
+      type: object
+      description: A saved block, a combination of exercises without sets, reps or load; exercises deleted since are left out.
+      required: [id, name, kind, exercises, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string }
+        exercises: { type: array, items: { $ref: "#/components/schemas/BlockTemplateExercise" } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    BlockTemplateExercise:
+      type: object
+      required: [exercise_id, name, type]
+      properties:
+        exercise_id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: "#/components/schemas/ExerciseType" }
     GoalStatus:
       type: string
       enum: [open, achieved, missed]

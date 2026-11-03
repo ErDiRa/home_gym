@@ -125,6 +125,7 @@
           :label="`Session ${i + 1}`"
           collapsible
           :start-collapsed="!!session.id"
+          saveable
           @move="move(sessions, i, $event)"
           @remove="removeSession(i)"
         />
@@ -196,6 +197,7 @@ import { useCyclesStore } from '../../stores/cycles'
 import { useExercisesStore } from '../../stores/exercises'
 import { useLookupsStore } from '../../stores/lookups'
 import { useWorkoutsStore } from '../../stores/workouts'
+import { useBlockTemplatesStore } from '../../stores/blockTemplates'
 import { useSessionsStore } from '../../stores/sessions'
 import { useTrainingsStore } from '../../stores/trainings'
 
@@ -205,6 +207,7 @@ const trainingsStore = useTrainingsStore()
 const exercisesStore = useExercisesStore()
 const lookups = useLookupsStore()
 const workouts = useWorkoutsStore()
+const blockTemplates = useBlockTemplatesStore()
 const library = useSessionsStore()
 const cyclesStore = useCyclesStore()
 // Set when editing an existing training (route /trainings/:id), absent when creating one.
@@ -309,6 +312,8 @@ onMounted(async () => {
       lookups.loadTrainingLookups(),
       // Without the last loads the loads just suggest none.
       workouts.loadLastLoads().catch(() => {}),
+      // Without them only "Add saved block" is missing.
+      blockTemplates.loadTemplates().catch(() => {}),
       library.loadSessions(),
       cyclesStore.loadCycles(),
     ])

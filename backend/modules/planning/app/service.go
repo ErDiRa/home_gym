@@ -9,8 +9,9 @@
 // done for one score (a WOD). Exercises and units are the catalog's, checked through its contract.
 //
 // A training may belong to one of the user's cycles: a planned period of whole weeks with goals.
-// The user's library holds session templates of the same shape; adding one to a training copies
-// it (the client sends the copy), so the two are independent afterwards. Every usecase acts on the
+// The user's library holds session templates of the same shape, and saved blocks: a kind with an
+// ordered combination of exercises (e.g. a complex), without sets, reps or load. Adding either to
+// a training copies it (the client sends the copy), so the two are independent afterwards. Every usecase acts on the
 // given user's data only; another user's looks missing.
 package app
 
@@ -42,6 +43,8 @@ var (
 	// ErrUnknownReference is a repository's answer when a referenced row (e.g. an exercise deleted
 	// meanwhile) doesn't exist.
 	ErrUnknownReference = errors.New("unknown reference")
+	// ErrDuplicate is a repository's answer when a name is taken (a saved block's).
+	ErrDuplicate = errors.New("duplicate")
 )
 
 // TrainingRepository saves trainings with their whole tree, each in one transaction.
@@ -57,12 +60,18 @@ type TrainingRepository interface {
 	DeleteTraining(ctx context.Context, userID, id uuid.UUID) error
 }
 
-// LibraryRepository saves the user's session templates.
+// LibraryRepository saves the user's session templates and saved blocks.
 type LibraryRepository interface {
 	CreateSession(ctx context.Context, userID uuid.UUID, in SessionInput) (uuid.UUID, error)
 	// UpdateSession replaces a template's fields and blocks, or returns ErrNotFound.
 	UpdateSession(ctx context.Context, userID, id uuid.UUID, in SessionInput) error
 	DeleteSession(ctx context.Context, userID, id uuid.UUID) error
+	// CreateBlockTemplate saves a new saved block; a name the user has taken is ErrDuplicate.
+	CreateBlockTemplate(ctx context.Context, userID uuid.UUID, in BlockTemplateInput) (uuid.UUID, error)
+	// UpdateBlockTemplate replaces a saved block's name, kind and exercises, or returns
+	// ErrNotFound (ErrDuplicate for a taken name).
+	UpdateBlockTemplate(ctx context.Context, userID, id uuid.UUID, in BlockTemplateInput) error
+	DeleteBlockTemplate(ctx context.Context, userID, id uuid.UUID) error
 }
 
 // CycleRepository saves the user's cycles with their goals.

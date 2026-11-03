@@ -1,6 +1,7 @@
 import type {
   Amount,
   BlockKind,
+  BlockTemplate,
   ExerciseType,
   Intensity,
   Score,
@@ -103,6 +104,41 @@ export const newBlock = (): BlockRow => ({
   ...emptyAmount(),
   ...emptyScore(),
 })
+
+// An exercise added to a block: nothing planned yet but the block's sets.
+export const exerciseRow = (exerciseId: string, name: string, type: ExerciseType, sets: number): ExerciseRow => ({
+  key: nextKey(),
+  exercise_id: exerciseId,
+  name,
+  type,
+  sets,
+  tempo: '',
+  notes: '',
+  ...emptyAmount(),
+  ...emptyIntensity(),
+})
+
+// A block made from a saved block: its kind, name and exercises; sets, reps and load are planned
+// in the session.
+export function blockFromTemplate(t: BlockTemplate): BlockRow {
+  const block: BlockRow = { ...newBlock(), kind: t.kind, name: t.name }
+  block.exercises = t.exercises.map((e) => exerciseRow(e.exercise_id, e.name, e.type, block.sets))
+  return block
+}
+
+// Why a saved block can't be saved yet, if anything; mirrors the server's checks.
+export function templateProblem(name: string, kindCode: string, exerciseCount: number): string {
+  if (!name.trim()) return 'Give the block a name.'
+  const kind = useLookupsStore().kindOf(kindCode)
+  if (!kind) return 'Choose a block kind.'
+  if (exerciseCount === 0) return 'Add at least one exercise.'
+  if (exerciseCount > MAX_TEMPLATE_EXERCISES) return `A saved block takes at most ${MAX_TEMPLATE_EXERCISES} exercises.`
+  if (exerciseCount < kind.min_exercises || (kind.max_exercises !== null && exerciseCount > kind.max_exercises)) return exerciseCountRule(kind)
+  return ''
+}
+
+// At most this many exercises in a saved block, like the server.
+export const MAX_TEMPLATE_EXERCISES = 20
 
 export const newSession = (name: string): SessionRow => ({
   key: nextKey(),

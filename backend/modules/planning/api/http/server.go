@@ -23,6 +23,8 @@ type ReadModel interface {
 	Training(ctx context.Context, userID, id uuid.UUID) (TrainingDetail, error)
 	LibrarySessions(ctx context.Context, userID uuid.UUID) ([]LibrarySession, error)
 	LibrarySession(ctx context.Context, userID, id uuid.UUID) (LibrarySessionDetail, error)
+	BlockTemplates(ctx context.Context, userID uuid.UUID) ([]BlockTemplate, error)
+	BlockTemplate(ctx context.Context, userID, id uuid.UUID) (BlockTemplate, error)
 	Cycles(ctx context.Context, userID uuid.UUID) ([]CycleSummary, error)
 	Cycle(ctx context.Context, userID, id uuid.UUID) (Cycle, error)
 }
@@ -214,6 +216,69 @@ func (s *Server) DeleteSession(ctx context.Context, req DeleteSessionRequestObje
 		return nil, err
 	}
 	return DeleteSession204Response{}, nil
+}
+
+// ListBlockTemplates returns the user's saved blocks by name.
+func (s *Server) ListBlockTemplates(ctx context.Context, _ ListBlockTemplatesRequestObject) (ListBlockTemplatesResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	templates, err := s.readModel.BlockTemplates(ctx, userID)
+	return ListBlockTemplates200JSONResponse(templates), err
+}
+
+// GetBlockTemplate returns one of the user's saved blocks.
+func (s *Server) GetBlockTemplate(ctx context.Context, req GetBlockTemplateRequestObject) (GetBlockTemplateResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	template, err := s.readModel.BlockTemplate(ctx, userID, req.Id)
+	return GetBlockTemplate200JSONResponse(template), err
+}
+
+// CreateBlockTemplate saves a new saved block.
+func (s *Server) CreateBlockTemplate(ctx context.Context, req CreateBlockTemplateRequestObject) (CreateBlockTemplateResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := s.service.CreateBlockTemplate(ctx, userID, blockTemplateInputFromAPI(*req.Body))
+	if err != nil {
+		return nil, err
+	}
+	template, err := s.readModel.BlockTemplate(ctx, userID, id)
+	return CreateBlockTemplate201JSONResponse(template), err
+}
+
+// UpdateBlockTemplate replaces a saved block; sessions it was added to keep their blocks.
+func (s *Server) UpdateBlockTemplate(ctx context.Context, req UpdateBlockTemplateRequestObject) (UpdateBlockTemplateResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.service.UpdateBlockTemplate(ctx, userID, req.Id, blockTemplateInputFromAPI(*req.Body)); err != nil {
+		return nil, err
+	}
+	template, err := s.readModel.BlockTemplate(ctx, userID, req.Id)
+	return UpdateBlockTemplate200JSONResponse(template), err
+}
+
+// DeleteBlockTemplate soft-deletes a saved block.
+func (s *Server) DeleteBlockTemplate(ctx context.Context, req DeleteBlockTemplateRequestObject) (DeleteBlockTemplateResponseObject, error) {
+	userID, err := web.CurrentUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.service.DeleteBlockTemplate(ctx, userID, req.Id); err != nil {
+		return nil, err
+	}
+	return DeleteBlockTemplate204Response{}, nil
+}
+
+func blockTemplateInputFromAPI(in BlockTemplateInput) app.BlockTemplateInput {
+	return app.BlockTemplateInput{Name: in.Name, Kind: in.Kind, ExerciseIDs: in.ExerciseIds}
 }
 
 // ListCycles returns the user's cycles with their goal and training counts.
