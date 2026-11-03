@@ -67,7 +67,7 @@
       </p>
       <ul v-else class="mt-2 space-y-2">
         <li v-for="w in selectedWorkouts" :key="w.id">
-          <WorkoutRow :workout="w" :macros="macrosOf(w)" show-time />
+          <WorkoutRow :workout="w" :macros="macrosOf(w)" :training="trainingOf(w)" show-time />
         </li>
       </ul>
     </section>
@@ -89,6 +89,8 @@ const props = defineProps<{
   loading?: boolean
   /** The macros line of a workout's day. */
   macrosOf: (w: WorkoutSummary) => string
+  /** The name of a workout's training, '' when unknown. */
+  trainingOf: (w: WorkoutSummary) => string
 }>()
 const month = defineModel<string>('month', { required: true })
 const selected = defineModel<string | null>('selected', { required: true })

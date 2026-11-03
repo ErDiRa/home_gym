@@ -4,7 +4,9 @@
     class="flex min-h-14 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 active:bg-slate-50"
   >
     <span class="min-w-0 flex-1">
-      <span class="block truncate font-medium text-slate-900">{{ workout.session_name }}</span>
+      <span class="block truncate font-medium text-slate-900">
+        {{ workout.session_name }}<span v-if="training" class="text-slate-500"> · {{ training }}</span>
+      </span>
       <span class="block text-sm text-slate-500">
         {{ showTime ? formatTime(workout.completed_at) : formatDay(workout.completed_at) }} · {{ workout.set_count }}
         {{ workout.set_count === 1 ? 'set' : 'sets' }}
@@ -22,6 +24,6 @@ import { formatDay, formatTime } from '../../dates'
 import type { WorkoutSummary } from '../../types'
 
 // A finished workout in the history, opening it. showTime: the time it was finished instead of
-// its day, for a list of one day's workouts.
-defineProps<{ workout: WorkoutSummary; macros?: string; showTime?: boolean }>()
+// its day, for a list of one day's workouts; training: its training's name, after the session's.
+defineProps<{ workout: WorkoutSummary; macros?: string; showTime?: boolean; training?: string }>()
 </script>

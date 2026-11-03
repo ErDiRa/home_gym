@@ -1,6 +1,7 @@
 <template>
   <TransitionRoot :show="open" as="template">
-    <Dialog class="relative z-50" @close="emit('close')">
+    <!-- Focuses the title, not the name: on a phone the keyboard would cover the dialog. -->
+    <Dialog :initial-focus="title?.$el" class="relative z-50" @close="emit('close')">
       <TransitionChild
         as="template"
         enter="duration-150 ease-out"
@@ -20,7 +21,7 @@
           leave-to="translate-y-full sm:translate-y-0 sm:scale-95 sm:opacity-0"
         >
           <DialogPanel class="w-full max-w-md rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl transition sm:rounded-2xl">
-            <DialogTitle class="font-semibold text-slate-900">Save to library</DialogTitle>
+            <DialogTitle ref="title" tabindex="-1" class="font-semibold text-slate-900 focus:outline-none">Save to library</DialogTitle>
             <p class="mt-1 mb-3 text-sm text-slate-500">
               Saves a copy of this session with its blocks to your library, to add to other trainings. Changing one later doesn't change the
               other.
@@ -55,6 +56,7 @@ const props = defineProps<{ open: boolean; session: SessionRow }>()
 const emit = defineEmits<{ close: [] }>()
 const store = useSessionsStore()
 
+const title = ref<{ $el: HTMLElement } | null>(null)
 const name = ref('')
 const error = ref('')
 const saving = ref(false)

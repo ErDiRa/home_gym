@@ -17,6 +17,7 @@
         :workouts="monthWorkouts"
         :loading="monthLoading"
         :macros-of="macrosOf"
+        :training-of="trainingOf"
       />
     </template>
 
@@ -62,6 +63,7 @@ import HistoryCalendar from '../../components/workout/HistoryCalendar.vue'
 import WorkoutRow from '../../components/workout/WorkoutRow.vue'
 import { addDays, formatDay, isMonth, monthGrid, monthOf, nextWeek, startOf, toIso, today, weekStart } from '../../dates'
 import { useNutritionStore } from '../../stores/nutrition'
+import { useTrainingsStore } from '../../stores/trainings'
 import { useWorkoutsStore } from '../../stores/workouts'
 import type { DayMacros, WorkoutSummary } from '../../types'
 
@@ -69,6 +71,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useWorkoutsStore()
 const nutrition = useNutritionStore()
+const trainingsStore = useTrainingsStore()
 const STEP = 8 // weeks loaded at a time
 const MAX_WEEKS = 52 // the server lists at most a year at once
 
@@ -121,6 +124,13 @@ const macros = ref(new Map<string, DayMacros>())
 function macrosOf(w: WorkoutSummary): string {
   const m = macros.value.get(toIso(new Date(w.completed_at)))
   return m ? `Ate ${macrosLine(m)}` : ''
+}
+
+// The names of the user's trainings by id; a workout of a training deleted since shows without one.
+const trainingNames = computed(() => new Map(trainingsStore.trainings.map((t) => [t.id, t.name])))
+
+function trainingOf(w: WorkoutSummary): string {
+  return (w.training_id && trainingNames.value.get(w.training_id)) || ''
 }
 
 // The local Monday a moment's week starts on, as a timestamp.
@@ -202,6 +212,9 @@ async function loadMonth() {
     if (id === monthRequest) monthLoading.value = false
   }
 }
+
+// The training names are an extra too.
+trainingsStore.loadTrainings().catch(() => {})
 
 // Each view loads when it is shown: the list once, the calendar per month.
 watch(
