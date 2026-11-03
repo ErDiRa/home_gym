@@ -1,0 +1,16 @@
+{
+  "format": "exercise-import/1",
+  "exercises": [
+    {
+      "name": "Copenhagen Plank",
+      "type": "strength",
+      "description": "Side plank with the top leg on a bench; the adductors hold the hips up.",
+      "joints": ["Hip"],
+      "muscle_groups": ["Core", "Adductors"],
+      "focuses": ["Hip stability"],
+      "video_urls": ["https://www.youtube.com/watch?v=example"]
+    },
+    { "name": "Ski Erg", "type": "endurance", "joints": ["Shoulder"] },
+    { "name": "90/90 Hip Switch", "type": "mobility", "joints": ["hip", "Ankle"], "focuses": ["MOB"] }
+  ]
+}

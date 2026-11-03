@@ -4,9 +4,11 @@
       <h1 class="text-xl font-bold text-slate-900">Exercises</h1>
       <div class="flex items-center gap-x-4 gap-y-2">
         <span class="hidden text-sm text-slate-500 sm:inline">{{ exercises.length }} exercises</span>
+        <AppButton variant="secondary" @click="importOpen = true">Import</AppButton>
         <AppButton :to="{ name: 'exercise-new' }">New exercise</AppButton>
       </div>
     </div>
+    <ImportExercisesDialog v-model:open="importOpen" @imported="(n) => toast.success(`Imported ${n} ${n === 1 ? 'exercise' : 'exercises'}.`)" />
     <div class="mb-4 flex flex-wrap gap-3">
       <TextInput v-model="query" type="search" placeholder="Search exercises..." class="min-w-60 flex-1" />
       <SelectField
@@ -52,6 +54,7 @@ import {
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AppButton from '../../components/button/AppButton.vue'
+import ImportExercisesDialog from '../../components/exercise/ImportExercisesDialog.vue'
 import { phoneColumns, phoneRowHeight } from '../../components/grid/phoneColumns'
 import SelectField from '../../components/form/SelectField.vue'
 import TextInput from '../../components/form/TextInput.vue'
@@ -74,6 +77,7 @@ const store = useExercisesStore()
 const { exercises, loading, ratings } = storeToRefs(store)
 const lookups = useLookupsStore()
 const query = ref('')
+const importOpen = ref(false)
 const error = ref('')
 const gridApi = shallowRef<GridApi | null>(null)
 
