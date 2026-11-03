@@ -107,3 +107,41 @@ export function formatTime(at: string | Date): string {
   const d = new Date(at)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+
+// Months travel as YYYY-MM (e.g. the month a calendar shows), local like the dates.
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+// Whether a string is a YYYY-MM month.
+export function isMonth(month: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(month)
+}
+
+// The month a YYYY-MM-DD date falls in.
+export function monthOf(date: string): string {
+  return date.slice(0, 7)
+}
+
+// The first day of a YYYY-MM month as YYYY-MM-DD.
+export function monthStart(month: string): string {
+  return `${month}-01`
+}
+
+// The month n months from a YYYY-MM month.
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number)
+  return monthOf(toIso(new Date(y, m - 1 + n, 1)))
+}
+
+// A YYYY-MM month, e.g. "October 2026".
+export function formatMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return `${MONTH_NAMES[m - 1]} ${y}`
+}
+
+// The days a month's calendar shows, Monday to Sunday, from the Monday of its first day to the
+// Sunday of its last (4 to 6 whole weeks).
+export function monthGrid(month: string): string[] {
+  const first = mondayOf(monthStart(month))
+  const last = addDays(mondayOf(addDays(monthStart(addMonths(month, 1)), -1)), 6)
+  return Array.from({ length: daysBetween(first, last) + 1 }, (_, i) => addDays(first, i))
+}

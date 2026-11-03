@@ -75,8 +75,8 @@ const showTabs = computed(() => route.name !== 'workout')
 
 const tabs = [
   { name: 'This week', to: { name: 'track' }, icon: CalendarDaysIcon },
-  { name: 'History', to: { name: 'history' }, icon: ClockIcon },
-  { name: 'PRs', to: { name: 'track-prs' }, icon: TrophyIcon },
   { name: 'Nutrition', to: { name: 'track-nutrition' }, icon: FireIcon },
+  { name: 'PRs', to: { name: 'track-prs' }, icon: TrophyIcon },
+  { name: 'History', to: { name: 'history' }, icon: ClockIcon },
 ]
 </script>
